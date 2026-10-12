@@ -1,0 +1,21 @@
+{
+  "name": "poultry360-mobile",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "customer": "npm --workspace apps/customer run start",
+    "rider": "npm --workspace apps/rider run start",
+    "admin": "npm --workspace apps/admin run dev",
+    "fix-deps": "cd apps/customer && npx expo install --fix && cd ../rider && npx expo install --fix"
+  },
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-screens": "4.26.2",
+    "react-native-safe-area-context": "5.7.0"
+  }
+}

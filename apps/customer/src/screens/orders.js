@@ -3,7 +3,7 @@ import { View, Pressable, Image, ScrollView, RefreshControl, Linking } from 'rea
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
+import { useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
   naira, rpc, publicUrl, uploadImage, friendlyError, timeAgo, clock, STATUS_LABEL, ORDER_STEPS, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
@@ -104,7 +104,7 @@ export function TrackingScreen({ navigation, route }) {
   const load = useCallback(() => rpc('order_detail', { p_order: orderId }).then(setO).catch(() => {}), [orderId]);
   useEffect(() => {
     load();
-    const ch = supabase.channel('track-' + orderId)
+    const ch = liveChannel('track-' + orderId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sub_orders', filter: 'order_id=eq.' + orderId }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_assignments' }, load)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'riders' }, load)

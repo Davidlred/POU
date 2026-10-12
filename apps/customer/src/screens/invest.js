@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Skeleton, Steps, PhotoBox,
+import { useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Skeleton, Steps, PhotoBox,
   naira, pct, isoDate, shortDate, timeAgo, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { projectReturn, daysLeft, progress, ESTIMATE_COPY } from '../lib/roi';
@@ -27,7 +27,7 @@ function useKyc() {
   const load = useCallback(async () => { const { data } = await supabase.from('kyc_records').select('*').eq('user_id', uid).maybeSingle(); setKyc(data || null); }, [uid]);
   useEffect(() => {
     load();
-    const ch = supabase.channel('kyc-' + uid + '-' + Math.random().toString(36).slice(2, 7))
+    const ch = liveChannel('kyc-' + uid)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kyc_records', filter: 'user_id=eq.' + uid }, (p) => {
         if (p.new?.status && p.new.status !== 'pending') track('kyc_' + p.new.status);
         load();
@@ -156,7 +156,7 @@ function TargetScreen({ navigation, route, kind }) {
   useEffect(() => {
     load();
     // Live raised amount while people invest.
-    const ch = supabase.channel('target-' + id)
+    const ch = liveChannel('target-' + id)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: kind === 'pool' ? 'investment_pools' : 'investment_offerings', filter: 'id=eq.' + id }, load).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [load, id, kind]);
@@ -338,7 +338,7 @@ export function InvestSuccessScreen({ navigation, route }) {
       </Card>
       <Txt v="small" style={{ textAlign: 'center' }}>Track it in your portfolio. The term starts once the raise is fully funded.</Txt>
       <Button title="View portfolio" onPress={() => navigation.replace('Portfolio')} style={{ marginTop: 12 }} />
-      <Button variant="ghost" title="Done" onPress={() => navigation.navigate('Tabs')} />
+      <Button variant="ghost" title="Done" onPress={() => navigation.popTo('Tabs')} />
     </Screen>
   );
 }

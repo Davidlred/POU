@@ -21,7 +21,7 @@ export function CartScreen({ navigation }) {
   useFocusEffect(useCallback(() => { setChecking(true); validate().finally(() => setChecking(false)); }, []));
   const groups = groupByVendor(items);
   const bad = items.filter((x) => x.unavailable);
-  if (!items.length) return <Screen><AppBar title="Cart" /><Empty icon="shopping-outline" title="Your cart is empty" body="Fresh eggs, birds and feed from verified farms." action="Browse the market" onAction={() => navigation.navigate('Tabs', { screen: 'Market' })} /></Screen>;
+  if (!items.length) return <Screen><AppBar title="Cart" /><Empty icon="shopping-outline" title="Your cart is empty" body="Fresh eggs, birds and feed from verified farms." action="Browse the market" onAction={() => navigation.popTo('Tabs', { screen: 'Market' })} /></Screen>;
   return (
     <Screen scroll footer={<>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="small" style={{ fontSize: 14 }}>Subtotal</Txt><Txt v="mono">{naira(subtotal)}</Txt></View>
@@ -237,7 +237,7 @@ export function OrderSuccessScreen({ navigation, route }) {
   const [o, setO] = useState(null);
   useEffect(() => { rpc('order_detail', { p_order: route.params.orderId }).then(setO); }, []);
   return (
-    <Screen scroll footer={<><Button title="Track order" onPress={() => navigation.replace('Tracking', { orderId: route.params.orderId })} /><Button variant="ghost" title="Keep shopping" onPress={() => navigation.navigate('Tabs', { screen: 'Home' })} /></>}>
+    <Screen scroll footer={<><Button title="Track order" onPress={() => navigation.replace('Tracking', { orderId: route.params.orderId })} /><Button variant="ghost" title="Keep shopping" onPress={() => navigation.popTo('Tabs', { screen: 'Home' })} /></>}>
       <View style={{ height: 32 }} />
       <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={40} color="#2A2119" /></View>
       <Txt v="display">Order placed</Txt>

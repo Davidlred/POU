@@ -30,6 +30,7 @@ drop policy if exists p360_admin_read_id_docs on storage.objects;
 
 -- Tables (CASCADE also removes their policies, triggers, indexes and realtime publication entries)
 drop table if exists
+  public.vet_slot_exceptions, public.vet_availability,
   public.symptom_checks, public.health_records, public.consultations, public.vet_slots, public.vets,
   public.farm_inventory, public.vaccinations, public.farm_logs, public.flocks,
   public.disputes, public.reviews, public.delivery_assignments, public.riders,
@@ -68,7 +69,7 @@ begin
       'set_buyer_type','submit_vet_application','vet_update_profile','vet_self','vet_add_slot','vet_remove_slot','vet_respond_onsite',
       'vet_complete','vet_desk','admin_vets','admin_set_vet','credit_threshold','credit_outstanding','farm_book','farm_book_allow_buyer',
       'farm_book_update_customer','farm_book_log_credit','farm_book_settle','farm_book_cancel','credit_available','my_credit','credit_pay',
-      'my_payout_account')
+      'my_payout_account','vet_generate_slots','vet_set_availability','vet_refresh_slots','vet_set_weekly')
   loop
     execute 'drop function if exists ' || r.sig || ' cascade';
   end loop;

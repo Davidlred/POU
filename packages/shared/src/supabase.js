@@ -15,6 +15,10 @@ export const supabase = createClient(url || 'http://localhost', key || 'missing'
 
 AppState.addEventListener('change', (s) => (s === 'active' ? supabase.auth.startAutoRefresh() : supabase.auth.stopAutoRefresh()));
 
+// Realtime channels need a name that is unique per subscriber. supabase-js returns the EXISTING channel when a name repeats,
+// and adding listeners to a channel that has already subscribed throws, which closes a release build. Always use this.
+export const liveChannel = (name) => supabase.channel(name + ':' + Math.random().toString(36).slice(2, 10));
+
 // Turns Postgres "raise exception 'CODE'" messages into readable copy.
 const MESSAGES = {
   OUT_OF_COVERAGE: "We don't deliver to this area yet.",
@@ -64,6 +68,7 @@ const MESSAGES = {
   SLOT_BOOKED: "That slot is already booked, so it can't be removed.",
   SLOT_EXISTS: 'You already opened that time.',
   INVALID_TIME: 'Choose a time in the future.',
+  INVALID_HOURS: 'The end time must be after the start time, with room for at least one consult.',
   SUMMARY_REQUIRED: 'Write a short summary for the farmer.',
 };
 export function friendlyError(e) {

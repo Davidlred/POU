@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Pressable, ScrollView, Linking } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Pressable, ScrollView, Linking, Alert } from 'react-native';
 import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, naira, isoDate, shortDate, timeAgo, supabase, rpc } from '@p360/shared';
 import { useFarm, save, retryFailed, discardFailed, flockStats } from '../lib/offlineQueue';
 import { itemAlert } from './inventory';
+import { isClosed, flockSummary, series, farmTotals } from '../lib/flockHistory';
 import { askForNotifications, notificationsAllowed } from '../lib/reminders';
 
 const TYPES = [['layers', 'Layers', 'egg-outline'], ['broilers', 'Broilers', 'food-drumstick-outline'], ['turkey', 'Turkey', 'turkey']];
@@ -27,10 +28,26 @@ function Bars({ values, highlightLast = true }) {
   );
 }
 
+const dmy = (d) => new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+const qty = (n) => Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 1 });
+
+// A closed flock, summed up in one card. Its whole record stays one tap away.
+function PastFlockCard({ f, s, onPress }) {
+  return (
+    <Card onPress={onPress}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><Txt v="bold" style={{ flex: 1 }}>{f.code} · {f.breed || f.type}</Txt><Pill label="Closed" /></View>
+      <Txt v="label">{dmy(s.start)} to {dmy(s.end)} · {s.weeks} week{s.weeks === 1 ? '' : 's'}</Txt>
+      <Txt v="small">{qty(s.started)} birds · {s.mortality.toFixed(1)}% mortality · {qty(s.output)} {s.outputUnit} · costs {naira(s.totalCost)}</Txt>
+    </Card>
+  );
+}
+
 export function FarmHomeScreen({ navigation }) {
   const { c } = useTheme();
   const { data } = useFarm();
-  const flocks = data.flocks.filter((f) => f.status !== 'inactive');
+  const flocks = data.flocks.filter((f) => !isClosed(f));
+  // Closed flocks are history, not deleted: newest first.
+  const past = useMemo(() => data.flocks.filter(isClosed).map((f) => ({ f, s: flockSummary(f, data.farm_logs) })).sort((a, b) => (a.s.end < b.s.end ? 1 : -1)), [data]);
   const today = isoDate();
   const overdue = data.vaccinations.filter((v) => !v.administered_date && v.scheduled_date < today && flocks.some((f) => f.id === v.flock_id)).length;
   const birds = flocks.reduce((s, f) => s + flockStats(f, data.farm_logs).alive, 0);
@@ -43,7 +60,7 @@ export function FarmHomeScreen({ navigation }) {
       <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Txt v="display" style={{ fontSize: 28 }}>Farm Hub</Txt>
-          {flocks.length ? <Button small variant="outline" icon="chart-bar" title="Dashboard" onPress={() => navigation.navigate('FarmDashboard')} style={{ height: 40 }} /> : null}
+          {data.flocks.length ? <Button small variant="outline" icon="chart-bar" title="Dashboard" onPress={() => navigation.navigate('FarmDashboard')} style={{ height: 40 }} /> : null}
         </View>
         <SyncBar />
         <Card onPress={() => navigation.navigate('FarmBook')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -56,7 +73,15 @@ export function FarmHomeScreen({ navigation }) {
           <View style={{ flex: 1 }}><Txt v="bold">Inventory</Txt><Txt v="small">{stock.length ? stock.length + ' item' + (stock.length === 1 ? '' : 's') + ' in store' + (stockAlerts ? ' · ' + stockAlerts + ' need attention' : '') : 'Feed, drugs, vaccines and equipment you have'}</Txt></View>
           {stockAlerts ? <Pill tone="warn" label={String(stockAlerts)} /> : <Icon name="chevron-right" color={c.mute} />}
         </Card>
-        {!flocks.length ? <Empty icon="egg-outline" title="Start with your first flock" body="Add a batch to log feed, mortality and production. Works without signal." action="Add a flock" onAction={() => navigation.navigate('FlockForm')} /> : <>
+        {!data.flocks.length ? <Empty icon="egg-outline" title="Start with your first flock" body="Add a batch to log feed, mortality and production. Works without signal." action="Add a flock" onAction={() => navigation.navigate('FlockForm')} /> : null}
+        {data.flocks.length && !flocks.length ? (
+          <Card>
+            <Txt v="bold">No flocks running right now</Txt>
+            <Txt v="small">Everything from your past flocks is kept below and in the dashboard.</Txt>
+            <Button small icon="plus" title="Start a new flock" onPress={() => navigation.navigate('FlockForm')} />
+          </Card>
+        ) : null}
+        {flocks.length ? <>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Stat label="Flocks" value={flocks.length} /><Stat label="Birds" value={birds.toLocaleString()} />
             <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('Vaccinations')}><Stat label="Overdue jabs" value={overdue} subColor={c.err} sub={overdue ? 'Tap to review' : 'All on time'} /></Pressable>
@@ -70,9 +95,43 @@ export function FarmHomeScreen({ navigation }) {
               </Card>
             );
           })}
-        </>}
+        </> : null}
+        {past.length ? <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+            <Txt v="h2">Past flocks</Txt>
+            <Txt v="bold" color={c.acc} onPress={() => navigation.navigate('FlockHistory')} style={{ fontSize: 14, paddingVertical: 8 }}>{past.length > 3 ? 'See all ' + past.length : 'Full history'}</Txt>
+          </View>
+          {past.slice(0, 3).map(({ f, s }) => <PastFlockCard key={f.id} f={f} s={s} onPress={() => navigation.navigate('FlockDetail', { id: f.id })} />)}
+        </> : null}
       </ScrollView>
-      {flocks.length ? <Pressable accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={26} color="#2A2119" /></Pressable> : null}
+      {data.flocks.length ? <Pressable accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={26} color="#2A2119" /></Pressable> : null}
+    </Screen>
+  );
+}
+
+// Every flock you have closed, with its totals. Nothing here is ever deleted.
+export function FlockHistoryScreen({ navigation }) {
+  const { data } = useFarm();
+  const past = useMemo(() => data.flocks.filter(isClosed).map((f) => ({ f, s: flockSummary(f, data.farm_logs) })).sort((a, b) => (a.s.end < b.s.end ? 1 : -1)), [data]);
+  const total = (k) => past.reduce((n, x) => n + x.s[k], 0);
+  const eggs = past.filter((x) => x.s.outputUnit === 'eggs').reduce((n, x) => n + x.s.output, 0);
+  const meat = past.filter((x) => x.s.outputUnit === 'kg').reduce((n, x) => n + x.s.output, 0);
+  return (
+    <Screen scroll>
+      <AppBar title="Flock history" subtitle={past.length + ' closed flock' + (past.length === 1 ? '' : 's')} />
+      {!past.length ? <Empty icon="archive-outline" title="No closed flocks yet" body="When you close out a flock, its full record of feed, output, mortality and costs is kept here." /> : <>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Stat label="Birds raised" value={qty(total('started'))} />
+          <Stat label="Feed used" value={qty(total('feedKg')) + ' kg'} />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {eggs ? <Stat label="Eggs" value={qty(eggs)} /> : null}
+          {meat ? <Stat label="Meat" value={qty(meat) + ' kg'} /> : null}
+          <Stat label="Total costs" value={naira(total('totalCost'))} />
+        </View>
+        {past.map(({ f, s }) => <PastFlockCard key={f.id} f={f} s={s} onPress={() => navigation.navigate('FlockDetail', { id: f.id })} />)}
+        <Button variant="outline" icon="chart-bar" title="Open the dashboard" onPress={() => navigation.navigate('FarmDashboard')} />
+      </>}
     </Screen>
   );
 }
@@ -110,34 +169,53 @@ export function FlockDetailScreen({ navigation, route }) {
   const f = data.flocks.find((x) => x.id === route.params.id);
   const logs = useMemo(() => data.farm_logs.filter((l) => l.flock_id === route.params.id).sort((a, b) => (a.log_date < b.log_date ? 1 : -1)), [data, route.params.id]);
   if (!f) return <Screen><AppBar /><Empty icon="egg-off-outline" title="Flock not found" /></Screen>;
+  const closed = isClosed(f);
   const s = flockStats(f, data.farm_logs);
+  const sum = flockSummary(f, data.farm_logs);
   const kind = { production: 'production', feed: 'feed', health: 'mortality', expenses: 'expense' }[tab];
   const rows = logs.filter((l) => l.kind === kind);
-  const last14 = Array.from({ length: 14 }).map((_, i) => { const d = isoDate(new Date(Date.now() - (13 - i) * 864e5)); return rows.filter((l) => l.log_date === d).reduce((a, l) => a + Number(tab === 'feed' || tab === 'expenses' ? l.cost || l.quantity : l.quantity), 0); });
+  const value = (l) => Number(tab === 'feed' || tab === 'expenses' ? l.cost || l.quantity : l.quantity);
+  // A running flock charts the last two weeks; a closed one charts its whole life, so the record never looks empty.
+  const bars = closed ? series(rows, value, sum.start, sum.end)
+    : Array.from({ length: 14 }).map((_, i) => { const d = isoDate(new Date(Date.now() - (13 - i) * 864e5)); return rows.filter((l) => l.log_date === d).reduce((a, l) => a + value(l), 0); });
+  const span = closed ? 'whole flock' : 'last 14 days';
   const unit = tab === 'production' ? (f.type === 'layers' ? 'eggs' : 'kg') : tab === 'feed' ? 'kg' : tab === 'health' ? 'birds' : '';
-  const close = () => save('flocks', { ...f, _pending: undefined, status: 'inactive' }).then(() => navigation.goBack());
+  const setStatus = (status) => save('flocks', { ...f, _pending: undefined, _failed: undefined, status });
+  const close = () => Alert.alert('Close out ' + f.code + '?', 'Use this when the flock is sold or finished. It moves to your flock history with every feed, output, mortality and cost entry kept. You can reopen it if this was a mistake.',
+    [{ text: 'Cancel', style: 'cancel' }, { text: 'Close out', onPress: () => setStatus('inactive').then(() => navigation.goBack()) }]);
+  const reopen = () => Alert.alert('Reopen ' + f.code + '?', 'It goes back to your running flocks so you can keep logging.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Reopen', onPress: () => setStatus('active') }]);
+  const shown = closed ? 100 : 20;
   return (
     <Screen scroll>
-      <AppBar title={f.code + ' · ' + (f.breed || f.type)} subtitle={s.alive.toLocaleString() + ' birds · ' + (f.type === 'broilers' ? 'day ' + s.days : 'week ' + s.week)}
-        right={<Pressable onPress={() => navigation.navigate('Vaccinations', { flockId: f.id })} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Vaccinations"><Icon name="needle" /></Pressable>} />
+      <AppBar title={f.code + ' · ' + (f.breed || f.type)} subtitle={closed ? 'Closed · ' + sum.weeks + ' week' + (sum.weeks === 1 ? '' : 's') + ' · ' + qty(sum.remaining) + ' birds at close' : s.alive.toLocaleString() + ' birds · ' + (f.type === 'broilers' ? 'day ' + s.days : 'week ' + s.week)}
+        right={closed ? null : <Pressable onPress={() => navigation.navigate('Vaccinations', { flockId: f.id })} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Vaccinations"><Icon name="needle" /></Pressable>} />
       <SyncBar />
+      {closed ? <Banner tone="info" icon="archive-outline" title={'Closed on ' + dmy(sum.end)} body={'Ran from ' + dmy(sum.start) + '. The full record is kept: nothing was deleted.'} /> : null}
+      <Card>
+        <Txt v="label">{closed ? 'Flock record' : 'So far'}</Txt>
+        {[['Birds started', qty(sum.started)], ['Birds lost', qty(sum.dead) + ' (' + sum.mortality.toFixed(1) + '%)'], [closed ? 'Birds at close' : 'Birds now', qty(sum.remaining)],
+          ['Feed used', qty(sum.feedKg) + ' kg · ' + naira(sum.feedCost)], [f.type === 'layers' ? 'Eggs collected' : 'Output', qty(sum.output) + ' ' + sum.outputUnit], ['Vet and other costs', naira(sum.vetCost + sum.otherCost)]].map(([l, v]) => (
+          <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}><Txt v="body" color={c.mute}>{l}</Txt><Txt v="mono" style={{ fontSize: 14, flexShrink: 1, textAlign: 'right' }}>{v}</Txt></View>))}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: c.line, paddingTop: 8 }}><Txt v="bold">Total costs</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(sum.totalCost)}</Txt></View>
+      </Card>
       <Segmented options={[{ value: 'health', label: 'Health' }, { value: 'feed', label: 'Feed' }, { value: 'production', label: 'Output' }, { value: 'expenses', label: 'Costs' }]} value={tab} onChange={setTab} />
       {rows.length ? <Card>
-        <Txt v="label">{tab === 'health' ? 'Mortality · ' + s.dead + ' birds (' + s.mortality.toFixed(1) + '%)' : tab === 'production' ? 'Output · last 14 days' : tab === 'feed' ? 'Feed spend · last 14 days' : 'Other costs · last 14 days'}</Txt>
-        <Bars values={last14} />
-      </Card> : <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'heart-pulse' : tab === 'production' ? 'egg-outline' : 'cash'} title={'No ' + (tab === 'health' ? 'mortality' : tab === 'production' ? 'output' : tab === 'feed' ? 'feed' : 'costs') + ' logged yet'} />}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Txt v="label">{tab === 'health' ? 'Mortality · ' + s.dead + ' birds (' + s.mortality.toFixed(1) + '%) · ' + span : tab === 'production' ? 'Output · ' + span : tab === 'feed' ? 'Feed spend · ' + span : 'Other costs · ' + span}</Txt>
+        <Bars values={bars} highlightLast={!closed} />
+      </Card> : <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'heart-pulse' : tab === 'production' ? 'egg-outline' : 'cash'} title={'No ' + (tab === 'health' ? 'mortality' : tab === 'production' ? 'output' : tab === 'feed' ? 'feed' : 'costs') + (closed ? ' was logged for this flock' : ' logged yet')} />}
+      {!closed ? <View style={{ flexDirection: 'row', gap: 8 }}>
         <Button small variant="outline" icon="egg-outline" title="Output" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'production' })} style={{ flex: 1 }} />
         <Button small variant="outline" icon="sack" title="Feed" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'feed' })} style={{ flex: 1 }} />
         <Button small variant="outline" icon="heart-minus-outline" title="Loss" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'mortality' })} style={{ flex: 1 }} />
-      </View>
-      {tab === 'expenses' ? <Button small variant="outline" icon="cash-plus" title="Log vet or other cost" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'expense' })} /> : null}
+      </View> : null}
+      {tab === 'expenses' && !closed ? <Button small variant="outline" icon="cash-plus" title="Log vet or other cost" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'expense' })} /> : null}
       {tab === 'health' ? <Button small variant="outline" icon="folder-heart-outline" title="Health records" onPress={() => navigation.navigate('HealthRecords', { flockId: f.id })} /> : null}
-      {rows.length ? <Group>{rows.slice(0, 20).map((l, i) => (
-        <Row key={l.id} last={i === Math.min(rows.length, 20) - 1} title={(l.kind === 'expense' || (l.kind === 'feed' && l.cost) ? naira(l.cost) + (l.kind === 'feed' ? ' · ' + l.quantity + ' kg' : '') : Number(l.quantity).toLocaleString() + ' ' + (l.unit || unit)) + (l.cause ? ' · ' + l.cause : '')}
-          subtitle={shortDate(l.log_date) + (l.updated_by ? ' · by ' + l.updated_by : '')}
+      {rows.length ? <Group>{rows.slice(0, shown).map((l, i) => (
+        <Row key={l.id} last={i === Math.min(rows.length, shown) - 1} title={(l.kind === 'expense' || (l.kind === 'feed' && l.cost) ? naira(l.cost) + (l.kind === 'feed' ? ' · ' + l.quantity + ' kg' : '') : Number(l.quantity).toLocaleString() + ' ' + (l.unit || unit)) + (l.cause ? ' · ' + l.cause : '')}
+          subtitle={(closed ? dmy(l.log_date) : shortDate(l.log_date)) + (l.updated_by ? ' · by ' + l.updated_by : '')}
           right={l._failed ? <Icon name="sync-alert" color={c.err} /> : l._pending ? <Icon name="cloud-upload-outline" color={c.warn} /> : <Icon name="cloud-check-outline" size={18} color={c.sage} />} />))}</Group> : null}
-      <Button variant="ghost" title="Close out this flock (sold / finished)" onPress={close} />
+      {rows.length > shown ? <Txt v="small" style={{ textAlign: 'center' }}>Showing the latest {shown} of {rows.length} entries.</Txt> : null}
+      {closed ? <Button variant="ghost" title="Reopen this flock" onPress={reopen} /> : <Button variant="ghost" title="Close out this flock (sold / finished)" onPress={close} />}
     </Screen>
   );
 }
@@ -223,40 +301,64 @@ export function VaccinationsScreen({ navigation, route }) {
   );
 }
 
+const PERIODS = [{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '365', label: '12 months' }, { value: 'all', label: 'All time' }];
+
 export function FarmDashboardScreen({ navigation }) {
   const { c } = useTheme();
   const { data } = useFarm();
+  const [period, setPeriod] = useState('30');
   const [rev, setRev] = useState(null);
-  const since = isoDate(new Date(Date.now() - 30 * 864e5));
-  React.useEffect(() => { supabase.from('transactions').select('amount').eq('type', 'payout').gte('created_at', since).then(({ data: d }) => setRev((d || []).reduce((s, t) => s + Number(t.amount), 0))); }, []);
-  const logs = data.farm_logs.filter((l) => l.log_date >= since);
-  const feed = logs.filter((l) => l.kind === 'feed').reduce((s, l) => s + Number(l.cost || 0), 0);
-  const vet = logs.filter((l) => l.kind === 'expense' && l.cause === 'Vet & drugs').reduce((s, l) => s + Number(l.cost || 0), 0);
-  const other = logs.filter((l) => l.kind === 'expense' && l.cause !== 'Vet & drugs').reduce((s, l) => s + Number(l.cost || 0), 0);
-  const costs = feed + vet + other;
+  const chosen = useRef(false);
+  const running = data.flocks.filter((f) => !isClosed(f)).length;
+  // With every flock closed, "last 30 days" is usually empty, so start on the whole record instead.
+  useEffect(() => { if (!chosen.current && data.flocks.length && !running) setPeriod('all'); }, [data.flocks.length, running]);
+  const since = period === 'all' ? null : isoDate(new Date(Date.now() - Number(period) * 864e5));
+  useEffect(() => {
+    setRev(null);
+    let q = supabase.from('transactions').select('amount').eq('type', 'payout');
+    if (since) q = q.gte('created_at', since);
+    q.then(({ data: d }) => setRev((d || []).reduce((n, t) => n + Number(t.amount), 0)));
+  }, [since]);
+  const t = useMemo(() => farmTotals(data.flocks, data.farm_logs, since), [data, since]);
+  const { feed, vet, other, costs } = t;
   const margin = rev ? ((rev - costs) / rev) * 100 : null;
+  const label = PERIODS.find((p) => p.value === period).label;
   return (
     <Screen scroll>
-      <AppBar title="Dashboard" subtitle="Last 30 days" />
-      {rev === null ? null : rev > 0 ? (
-        <Hearth>
-          <Txt v="label" color={c.hmute}>Net margin · all flocks</Txt>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}><Txt v="monoLg" color={c.hink}>{naira(rev - costs)}</Txt><Txt v="mono" color={margin >= 0 ? '#8DB57A' : '#F08A72'}>{margin.toFixed(0)}%</Txt></View>
-          <Txt v="small" color={c.hmute}>Marketplace revenue {naira(rev)} · costs {naira(costs)}</Txt>
-        </Hearth>
-      ) : <Banner icon="chart-line" title="No revenue data yet" body="Margin appears after your first Marketplace sale is delivered. Costs are tracked below." />}
-      <Card>
-        <Txt v="label">Costs</Txt>
-        {costs ? <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', gap: 2 }}>
-          <View style={{ flex: feed || 0.0001, backgroundColor: c.ember }} /><View style={{ flex: vet || 0.0001, backgroundColor: c.yolk }} /><View style={{ flex: other || 0.0001, backgroundColor: c.line2 }} /></View> : <Txt v="small">No costs logged in the last 30 days.</Txt>}
-        {[['Feed', feed, c.ember], ['Vet & drugs', vet, c.yolk], ['Other', other, c.line2]].map(([l, v, col]) => (
-          <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: col }} /><Txt v="body">{l}</Txt></View><Txt v="mono" style={{ fontSize: 14 }}>{naira(v)}</Txt></View>))}
-      </Card>
-      <Txt v="label">Cost by flock</Txt>
-      <Group>{data.flocks.map((f, i) => {
-        const fc = logs.filter((l) => l.flock_id === f.id).reduce((s, l) => s + Number(l.cost || 0), 0);
-        return <Row key={f.id} last={i === data.flocks.length - 1} title={f.code + ' · ' + (f.breed || f.type)} onPress={() => navigation.navigate('FlockDetail', { id: f.id })} right={<Txt v="mono" style={{ fontSize: 14 }}>{naira(fc)}</Txt>} />;
-      })}</Group>
+      <AppBar title="Dashboard" subtitle={running + ' running · ' + (data.flocks.length - running) + ' closed'} />
+      <Segmented options={PERIODS} value={period} onChange={(v) => { chosen.current = true; setPeriod(v); }} />
+      {!data.flocks.length ? <Empty icon="chart-bar" title="Nothing to show yet" body="Add a flock and log feed, output and losses to see your farm's numbers here." /> : <>
+        {rev === null ? null : rev > 0 ? (
+          <Hearth>
+            <Txt v="label" color={c.hmute}>Net margin · all flocks · {label.toLowerCase()}</Txt>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}><Txt v="monoLg" color={c.hink}>{naira(rev - costs)}</Txt><Txt v="mono" color={margin >= 0 ? '#8DB57A' : '#F08A72'}>{margin.toFixed(0)}%</Txt></View>
+            <Txt v="small" color={c.hmute}>Marketplace revenue {naira(rev)} · costs {naira(costs)}</Txt>
+          </Hearth>
+        ) : <Banner icon="chart-line" title="No revenue in this period" body="Margin appears once a Marketplace sale is delivered. Costs and production are tracked below." />}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Stat label="Feed used" value={qty(t.feedKg) + ' kg'} />
+          <Stat label="Birds lost" value={qty(t.dead)} />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Stat label="Eggs" value={qty(t.eggs)} />
+          <Stat label="Meat" value={qty(t.meatKg) + ' kg'} />
+        </View>
+        <Card>
+          <Txt v="label">Costs · {label.toLowerCase()}</Txt>
+          {costs ? <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', gap: 2 }}>
+            <View style={{ flex: feed || 0.0001, backgroundColor: c.ember }} /><View style={{ flex: vet || 0.0001, backgroundColor: c.yolk }} /><View style={{ flex: other || 0.0001, backgroundColor: c.line2 }} /></View> : <Txt v="small">No costs logged in this period.</Txt>}
+          {[['Feed', feed, c.ember], ['Vet & drugs', vet, c.yolk], ['Other', other, c.line2]].map(([l, v, col]) => (
+            <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: col }} /><Txt v="body">{l}</Txt></View><Txt v="mono" style={{ fontSize: 14 }}>{naira(v)}</Txt></View>))}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: c.line, paddingTop: 8 }}><Txt v="bold">Total</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(costs)}</Txt></View>
+        </Card>
+        <Txt v="label">By flock</Txt>
+        {t.byFlock.length ? <Group>{t.byFlock.map((x, i) => (
+          <Row key={x.flock.id} last={i === t.byFlock.length - 1} icon={x.closed ? 'archive-outline' : 'egg-outline'} iconColor={x.closed ? c.mute : undefined} title={x.flock.code + ' · ' + (x.flock.breed || x.flock.type)}
+            subtitle={(x.closed ? 'Closed · ' : '') + qty(x.output) + ' ' + x.outputUnit + ' · ' + qty(x.dead) + ' lost'}
+            onPress={() => navigation.navigate('FlockDetail', { id: x.flock.id })} right={<Txt v="mono" style={{ fontSize: 14 }}>{naira(x.cost)}</Txt>} />))}</Group>
+          : <Card><Txt v="small">No flock had any entries in this period. Try a longer period above.</Txt></Card>}
+        {data.flocks.length - running > 0 ? <Button variant="ghost" icon="archive-outline" title="Flock history" onPress={() => navigation.navigate('FlockHistory')} /> : null}
+      </>}
     </Screen>
   );
 }

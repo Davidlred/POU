@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { supabase, rpc } from '@p360/shared';
+import { supabase, rpc, liveChannel } from '@p360/shared';
 
 const Ctx = createContext(null);
 
@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
   // Push verification decisions straight into the UI (approved banner / rejected reason).
   useEffect(() => {
     const uid = session?.user?.id; if (!uid) return;
-    const ch = supabase.channel('vendor-' + uid)
+    const ch = liveChannel('vendor-' + uid)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vendor_profiles', filter: 'user_id=eq.' + uid }, (p) => setVendor(p.new))
       .subscribe();
     return () => { supabase.removeChannel(ch); };

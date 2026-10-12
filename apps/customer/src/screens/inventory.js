@@ -27,10 +27,10 @@ export function itemAlert(it) {
   return null;
 }
 
-export function InventoryScreen({ navigation }) {
+export function InventoryScreen({ navigation, route }) {
   const { c } = useTheme();
   const { data } = useFarm();
-  const [tab, setTab] = useState('feed');
+  const [tab, setTab] = useState(route.params?.tab || 'feed');   // Vet care opens this straight on Drugs & vaccines
   const [sel, setSel] = useState(null);       // item being adjusted
   const [amount, setAmount] = useState('');
   const items = useMemo(() => (data.farm_inventory || []).filter((x) => x.status !== 'removed').sort((a, b) => a.name.localeCompare(b.name)), [data]);
@@ -58,12 +58,14 @@ export function InventoryScreen({ navigation }) {
         {!shown.length ? <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'pill' : 'tools'}
           title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No drugs or vaccines recorded yet' : 'Nothing recorded here yet'}
           body={tab === 'feed' ? 'Add the feed you have in store so you know when to restock.' : tab === 'health' ? 'Add what is in your store, with expiry dates, so nothing goes off unnoticed.' : 'Feeders, drinkers, crates, shavings and anything else you keep.'}
-          action="Add an item" onAction={() => navigation.navigate('InventoryForm', { tab })} />
+          action={tab === 'health' ? 'Add what you have' : 'Add an item'} onAction={() => navigation.navigate('InventoryForm', { tab })} />
           : <Group>{shown.map((it, i) => { const a = itemAlert(it); return (
             <Row key={it.id} last={i === shown.length - 1} icon={cat(it.category).icon} title={it.name}
               subtitle={cat(it.category).label + (it.expiry_date ? ' · expires ' + shortDate(it.expiry_date) : '') + (it._pending ? ' · saving' : '')}
               onPress={() => { setSel(it.id); setAmount(''); }}
               right={<View style={{ alignItems: 'flex-end', gap: 4 }}><Txt v="mono" style={{ fontSize: 15 }}>{num(it.quantity)} <Txt v="small">{it.unit || ''}</Txt></Txt>{a ? <Pill tone={a.tone} label={a.label} /> : null}</View>} />); })}</Group>}
+        {tab === 'health' ? <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} /> : null}
+        {tab === 'feed' ? <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} /> : null}
       </ScrollView>
       <Pressable accessibilityLabel="Add an item" onPress={() => navigation.navigate('InventoryForm', { tab })} style={{ position: 'absolute', right: 20, bottom: 20, height: 56, paddingHorizontal: 20, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', elevation: 4 }}>
         <Icon name="plus" size={24} color={c.onyolk} /><Txt v="bold" color={c.onyolk}>Add item</Txt></Pressable>

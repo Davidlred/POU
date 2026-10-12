@@ -48,13 +48,18 @@ export function RoleScreen({ navigation, route }) {
     return [...s, id];
   });
   const needsBizName = sel.includes('buyer') && buyerType === 'business' && !bizName.trim();
+  const needsName = !adding && !name.trim();
+  // What is stopping them, in plain words. The button stays tappable and says why, instead of sitting greyed out.
+  const problem = !sel.length ? 'Tick at least one option above to continue.' : needsName ? 'Type your name in the box at the top to continue.' : needsBizName ? 'Type your business name to continue.' : null;
+  const [tried, setTried] = useState(false);
   const go = async () => {
+    if (problem) { setTried(true); return; }
     setBusy(true);
     try {
       const sellers = sel.filter((r) => SELLERS.includes(r));
       const plain = sel.filter((r) => PLAIN.includes(r));
-      if (plain.length) await rpc('set_roles', { p_roles: plain, p_name: name || null });
-      else if (name) await supabase.from('profiles').update({ full_name: name }).eq('id', profile.id);
+      if (plain.length) await rpc('set_roles', { p_roles: plain, p_name: name.trim() || null });
+      else if (name.trim()) await supabase.from('profiles').update({ full_name: name.trim() }).eq('id', profile.id);
       if (sel.includes('buyer')) await rpc('set_buyer_type', { p_type: buyerType, p_business_name: buyerType === 'business' ? bizName.trim() : null });
       if (sellers.length) navigation.navigate('Business', { roles: sellers });
       else if (sel.includes('vet')) navigation.navigate('VetApply');   // the vet role is added when the application is submitted
@@ -63,13 +68,13 @@ export function RoleScreen({ navigation, route }) {
   };
   return (
     <Screen scroll footer={<>
-      {!sel.length ? <Txt v="small" style={{ textAlign: 'center' }}>Choose at least one role to continue</Txt> : null}
-      <Button title="Continue" onPress={go} loading={busy} disabled={!sel.length || (!adding && !name) || needsBizName} />
+      {problem ? <Txt v="small" color={tried ? c.err : undefined} style={{ textAlign: 'center', fontSize: 14 }}>{problem}</Txt> : null}
+      <Button title={sel.length === 1 && sel[0] === 'buyer' ? 'Continue as a buyer' : 'Continue'} onPress={go} loading={busy} />
     </>}>
       {adding ? <AppBar title="Add a role" /> : <View style={{ height: 56 }} />}
       <Txt v="display">How will you use Poultry360?</Txt>
-      <Txt v="small" style={{ fontSize: 15 }}>Choose all that apply. You can add roles later from your profile.</Txt>
-      {!adding ? <Input label="Your name" value={name} onChangeText={setName} placeholder="Adaeze Okafor" autoCapitalize="words" /> : null}
+      <Txt v="small" style={{ fontSize: 15 }}>{adding ? 'Choose what to add.' : 'Pick one or more. Just buying is fine: you can add other roles later from your profile.'}</Txt>
+      {!adding ? <Input label="Your name" value={name} onChangeText={setName} placeholder="Adaeze Okafor" autoCapitalize="words" error={tried && needsName ? 'Enter your name' : null} /> : null}
       {ROLES.filter((r) => !owned.includes(r.id)).map((r) => {
         const on = sel.includes(r.id);
         return (
@@ -85,7 +90,7 @@ export function RoleScreen({ navigation, route }) {
         <View style={{ gap: 10 }}>
           <Txt v="strong" style={{ fontSize: 13 }}>Are you buying for yourself or a business?</Txt>
           <Segmented options={[{ value: 'individual', label: 'Myself' }, { value: 'business', label: 'A business' }]} value={buyerType} onChange={setBuyerType} />
-          {buyerType === 'business' ? <Input label="Business name" value={bizName} onChangeText={setBizName} placeholder="Mama T's Kitchen" autoCapitalize="words" hint="Restaurants, caterers, hotels, retailers and other resellers." /> : null}
+          {buyerType === 'business' ? <Input label="Business name" value={bizName} onChangeText={setBizName} placeholder="Mama T's Kitchen" autoCapitalize="words" error={tried && needsBizName ? 'Enter your business name' : null} hint="Restaurants, caterers, hotels, retailers and other resellers." /> : null}
         </View>
       ) : null}
       <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="shield-check-outline" size={18} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>Farms, suppliers and vets are verified before buyers and farmers can see them.</Txt></View>
@@ -202,7 +207,7 @@ export function PendingScreen({ navigation }) {
         <Txt v="label" color={c.ember}>Available now</Txt>
         <Txt v="h2" color={c.hink}>Run your farm in Farm Hub while you wait</Txt>
         <Txt v="small" color={c.hmute}>Track flocks, feed, mortality and production. No approval needed.</Txt>
-        <Button title="Open Farm Hub" onPress={() => navigation.navigate('Tabs', { screen: 'FarmHome' })} />
+        <Button title="Open Farm Hub" onPress={() => navigation.popTo('Tabs', { screen: 'FarmHome' })} />
       </Hearth>
       {__DEV__ ? <Card><Txt v="label">Developer only</Txt><View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Approve" onPress={() => dev('approved')} style={{ flex: 1 }} /><Button small variant="outline" title="Reject" onPress={() => dev('rejected')} style={{ flex: 1 }} /></View></Card> : null}
     </Screen>

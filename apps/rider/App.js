@@ -6,7 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { ThemeProvider, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, Pill, Stat,
+import { ThemeProvider, liveChannel, ErrorBoundary, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, Pill, Stat,
   Stars, Sheet, OtpBoxes, supabase, rpc, uploadImage, friendlyError, timeAgo, naira } from '@p360/shared';
 
 const Stack = createNativeStackNavigator();
@@ -35,7 +35,7 @@ function useRider() {
   }, []);
   useEffect(() => {
     load();
-    const ch = supabase.channel('rider')
+    const ch = liveChannel('rider')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_assignments' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'riders' }, load)
       .subscribe();
@@ -211,7 +211,7 @@ function Trip({ navigation, ctx }) {
   const [me, setMe] = useState(null);
   const orders = (trip?.orders || []).filter((o) => LIVE.includes(o.status) && o.status !== 'offered');
   useEffect(() => { Location.getLastKnownPositionAsync().then((p) => p && setMe(p.coords)); }, [orders.length]);
-  useEffect(() => { if (!orders.length) { stopTracking(); navigation.navigate('Home'); } }, [orders.length]);
+  useEffect(() => { if (!orders.length) { stopTracking(); navigation.popTo('Home'); } }, [orders.length]);   // back to the existing Home, not a second copy
   if (!orders.length) return <Loading />;
 
   const step = async (o, s) => { setBusy(true); try { await rpc('rider_advance', { p_assignment: o.id, p_step: s }); await reload(); } catch (e) { Alert.alert('Could not update', friendlyError(e)); } finally { setBusy(false); } };
@@ -458,5 +458,5 @@ function Signed() {
 
 export default function App() {
   const fonts = useP360Fonts();
-  return <SafeAreaProvider><ThemeProvider>{fonts ? <NavigationContainer><Root /></NavigationContainer> : <Loading />}</ThemeProvider></SafeAreaProvider>;
+  return <SafeAreaProvider><ThemeProvider>{fonts ? <ErrorBoundary><NavigationContainer><Root /></NavigationContainer></ErrorBoundary> : <Loading />}</ThemeProvider></SafeAreaProvider>;
 }

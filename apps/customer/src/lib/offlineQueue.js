@@ -93,9 +93,22 @@ async function push() {
   return false;
 }
 
+// The whole table, a page at a time: history and the dashboard need every entry, not just the latest few hundred.
+const PAGE = 1000, MAX_ROWS = 20000;
+async function fetchTable(t) {
+  const rows = [];
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    const { data, error } = await supabase.from(t).select('*').order('updated_at', { ascending: false }).order('id').range(from, from + PAGE - 1);
+    if (error) return { error };
+    rows.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return { data: rows };
+}
+
 async function fetchAll() {
   if (!uid) return;
-  const res = await Promise.all(TABLES.map((t) => supabase.from(t).select('*').order('updated_at', { ascending: false }).limit(500)));
+  const res = await Promise.all(TABLES.map(fetchTable));
   if (res.every((r) => r.error)) return;
   // A table that fails (say, a migration not run yet) must not stop the others refreshing.
   TABLES.forEach((t, i) => { if (!res[i].error) cache[t] = res[i].data; });
@@ -161,7 +174,8 @@ export function flockStats(flock, logs) {
   const mine = logs.filter((l) => l.flock_id === flock.id);
   const dead = mine.filter((l) => l.kind === 'mortality').reduce((s, l) => s + Number(l.quantity), 0);
   const alive = flock.size - dead;
-  const days = Math.max(0, Math.floor((Date.now() - new Date(flock.start_date).getTime()) / 864e5));
+  const until = flock.status === 'inactive' && flock.updated_at ? new Date(flock.updated_at).getTime() : Date.now();   // a closed flock stops ageing
+  const days = Math.max(0, Math.floor((until - new Date(flock.start_date).getTime()) / 864e5));
   const prod = mine.filter((l) => l.kind === 'production').sort((a, b) => (a.log_date < b.log_date ? 1 : -1));
   return { alive, dead, mortality: flock.size ? (dead / flock.size) * 100 : 0, days, week: Math.floor(days / 7) + 1,
     lastProduction: prod[0]?.quantity, pending: mine.filter((l) => l._pending).length };

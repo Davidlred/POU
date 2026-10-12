@@ -30,7 +30,7 @@ export function VetHomeScreen({ navigation }) {
         </Card>))}</> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {[['Find a vet', 'stethoscope', 't2', () => navigation.navigate('VetList')], ['On-site visit', 'home-heart', 't4', () => navigation.navigate('VetList', { onsite: true })],
-          ['Drugs & vaccines', 'pill', 't1', () => navigation.navigate('Listings', { category: 'drugs' })], ['Health records', 'folder-heart-outline', 't3', () => navigation.navigate('HealthRecords')]].map(([l, i, t, fn]) => (
+          ['Drugs & vaccines', 'pill', 't1', () => navigation.navigate('Inventory', { tab: 'health' })], ['Health records', 'folder-heart-outline', 't3', () => navigation.navigate('HealthRecords')]].map(([l, i, t, fn]) => (
           <Pressable key={l} onPress={fn} style={{ flexBasis: '45%', flexGrow: 1, minHeight: 96, borderRadius: 20, backgroundColor: c[t], padding: 14, gap: 10, justifyContent: 'space-between' }}><Icon name={i} size={26} color={c[t + 'i']} /><Txt v="bold" style={{ fontSize: 14 }}>{l}</Txt></Pressable>))}
       </View>
     </Screen>
@@ -77,9 +77,10 @@ export function VetProfileScreen({ navigation, route }) {
   const [method, setMethod] = useState('wallet'); const [busy, setBusy] = useState(false); const [err, setErr] = useState(null);
   useEffect(() => {
     supabase.from('vets').select('*').eq('id', route.params.id).single().then(({ data: d }) => setV(d));
-    supabase.from('vet_slots').select('*').eq('vet_id', route.params.id).eq('booked', false).gt('starts_at', new Date().toISOString()).order('starts_at').then(({ data: d }) => { setSlots(d || []); if (d?.length) setDay(isoDate(new Date(d[0].starts_at))); });
+    // Open any slots due from the vet's weekly schedule first, so there is always something to book.
+    rpc('vet_refresh_slots', { p_vet: route.params.id }).catch(() => {}).then(() => supabase.from('vet_slots').select('*').eq('vet_id', route.params.id).eq('booked', false).gt('starts_at', new Date().toISOString()).order('starts_at')).then(({ data: d }) => { setSlots(d || []); if (d?.length) setDay(isoDate(new Date(d[0].starts_at))); });
   }, []);
-  const days = useMemo(() => [...new Set((slots || []).map((s) => isoDate(new Date(s.starts_at))))].slice(0, 6), [slots]);
+  const days = useMemo(() => [...new Set((slots || []).map((s) => isoDate(new Date(s.starts_at))))].slice(0, 14), [slots]);
   const flocks = data.flocks.filter((f) => f.status !== 'inactive');
   if (!v) return <Screen><AppBar /><Skeleton h={200} r={20} /></Screen>;
   const book = async () => {
@@ -104,7 +105,7 @@ export function VetProfileScreen({ navigation, route }) {
           <Pressable key={d} onPress={() => { setDay(d); setSlot(null); }} style={{ width: 64, height: 64, borderRadius: 16, backgroundColor: d === day ? c.hc : c.sf, alignItems: 'center', justifyContent: 'center' }}>
             <Txt v="label" color={d === day ? c.hmute : c.mute}>{new Date(d).toLocaleDateString('en-NG', { weekday: 'short' })}</Txt><Txt v="mono" color={d === day ? c.hink : c.ink} style={{ fontSize: 18 }}>{Number(d.slice(8))}</Txt></Pressable>))}</ScrollView>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{slots.filter((s) => isoDate(new Date(s.starts_at)) === day).map((s) => (
-          <Pressable key={s.id} onPress={() => setSlot(s.id)} style={{ width: '31.5%', height: 48, borderRadius: 14, backgroundColor: c.sf, borderWidth: slot === s.id ? 2 : 0, borderColor: c.ember, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 14 }}>{clock(s.starts_at)}</Txt></Pressable>))}</View>
+          <Pressable key={s.id} onPress={() => setSlot(s.id)} style={{ width: '30%', height: 48, borderRadius: 14, backgroundColor: c.sf, borderWidth: slot === s.id ? 2 : 0, borderColor: c.ember, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 14 }}>{clock(s.starts_at)}</Txt></Pressable>))}</View>
         {flocks.length ? <><Txt v="label">Which flock is this about?</Txt><ChipRow options={flocks.map((f) => f.code)} value={flocks.find((f) => f.id === flock)?.code} onChange={(cd) => setFlock(flocks.find((f) => f.code === cd)?.id)} /></> : null}
         <Txt v="label">Pay with</Txt>
         <Group>

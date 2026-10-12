@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, Image, ScrollView, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Skeleton, Sheet, useTick,
+import { useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Skeleton, Sheet, useTick,
   naira, countdown, rpc, publicUrl, uploadImage, friendlyError, timeAgo, STATUS_LABEL, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
@@ -217,7 +217,7 @@ export function VendorOrdersScreen({ navigation }) {
   const [rows, setRows] = useState(null);
   useTick(1000);
   const load = useCallback(async () => setRows((await rpc('vendor_orders')) || []), []);
-  useFocusEffect(useCallback(() => { load(); const ch = supabase.channel('vo').on('postgres_changes', { event: '*', schema: 'public', table: 'sub_orders' }, load).on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_assignments' }, load).subscribe(); return () => { supabase.removeChannel(ch); }; }, [load]));
+  useFocusEffect(useCallback(() => { load(); const ch = liveChannel('vo').on('postgres_changes', { event: '*', schema: 'public', table: 'sub_orders' }, load).on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_assignments' }, load).subscribe(); return () => { supabase.removeChannel(ch); }; }, [load]));
   const g = { new: (rows || []).filter((r) => r.status === 'placed'), active: (rows || []).filter((r) => ['confirmed', 'ready', 'picked_up', 'out_for_delivery'].includes(r.status)), past: (rows || []).filter((r) => ['delivered', 'refunded', 'cancelled', 'flagged'].includes(r.status)) };
   const list = g[tab];
   return (
@@ -260,7 +260,7 @@ export function VendorOrderScreen({ navigation, route }) {
   useEffect(() => {
     load();
     // Live: rider accepted / arrived / picked up shows here without reopening the order.
-    const ch = supabase.channel('vorder-' + route.params.id)
+    const ch = liveChannel('vorder-' + route.params.id)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_assignments' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sub_orders' }, load)
       .subscribe();

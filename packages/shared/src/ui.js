@@ -356,6 +356,29 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
   );
 }
 
+// Catches an unexpected error in any screen below it and offers a way back, instead of the app closing.
+export class ErrorBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { console.warn('Poultry360 screen error:', error?.message, info?.componentStack); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <ErrorScreen message={String(this.state.error?.message || '')} onRetry={() => this.setState({ error: null })} />;
+  }
+}
+function ErrorScreen({ message, onRetry }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 14 }}>
+      <Icon name="alert-circle-outline" size={48} color={c.ember} />
+      <Txt v="h1" style={{ textAlign: 'center' }}>Something went wrong</Txt>
+      <Txt v="body" color={c.mute} style={{ textAlign: 'center' }}>Nothing you saved was lost. Try again, and if it keeps happening, close the app and open it again.</Txt>
+      <Button title="Try again" onPress={onRetry} style={{ alignSelf: 'stretch' }} />
+      {message ? <Txt v="small" style={{ textAlign: 'center', fontSize: 12 }} numberOfLines={3}>{message}</Txt> : null}
+    </View>
+  );
+}
+
 export function Skeleton({ h = 16, w = '100%', r = 8, style }) {
   const { c } = useTheme();
   return <View style={[{ height: h, width: w, borderRadius: r, backgroundColor: c.sf2 }, style]} />;

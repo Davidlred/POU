@@ -13,7 +13,7 @@ import { CartScreen, CheckoutScreen, OrderSuccessScreen } from '../screens/check
 import { OrdersScreen, TrackingScreen, RateScreen, IssueScreen } from '../screens/orders';
 import { WalletScreen, TopUpScreen, WithdrawScreen, BankScreen } from '../screens/wallet';
 import { VendorHomeScreen, MyListingsScreen, ListingFormScreen, VendorOrdersScreen, VendorOrderScreen } from '../screens/vendor';
-import { FarmHomeScreen, FlockFormScreen, FlockDetailScreen, LogScreen, VaccinationsScreen, FarmDashboardScreen } from '../screens/farm';
+import { FarmHomeScreen, FlockFormScreen, FlockDetailScreen, FlockHistoryScreen, LogScreen, VaccinationsScreen, FarmDashboardScreen } from '../screens/farm';
 import { VetHomeScreen, VetListScreen, VetProfileScreen, ConsultationScreen, SymptomScreen, HealthRecordsScreen, OnsiteScreen } from '../screens/vet';
 import { WasteHomeScreen } from '../screens/waste';
 import { ProfileScreen } from '../screens/profile';
@@ -120,11 +120,13 @@ export default function Navigation() {
   if (loading) return <Splash />;
   const needsRole = session && !(profile?.roles || []).length;
   const farms = (profile?.roles || []).some((r) => r === 'vendor' || r === 'supplier');
+  // The key on Stack.Navigator matters: Role, Business and VetApply exist in both groups (they double as "add a role" later).
+  // Without it, finishing registration keeps you on the same-named screen instead of opening the app. A new key starts the main group at Tabs.
   return (
     <NavigationContainer theme={theme} ref={navRef}>
       {session && farms ? <VaccinationReminders /> : null}
       {!session ? <AuthFlow /> : (
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Navigator key={needsRole ? 'onboarding' : 'app'} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
           {needsRole ? (<>
             <Stack.Screen name="Role" component={RoleScreen} />
             <Stack.Screen name="Business" component={BusinessScreen} />
@@ -147,6 +149,7 @@ export default function Navigation() {
             <Stack.Screen name="VendorOrder" component={VendorOrderScreen} />
             <Stack.Screen name="FlockForm" component={FlockFormScreen} />
             <Stack.Screen name="FlockDetail" component={FlockDetailScreen} />
+            <Stack.Screen name="FlockHistory" component={FlockHistoryScreen} />
             <Stack.Screen name="Log" component={LogScreen} />
             <Stack.Screen name="Vaccinations" component={VaccinationsScreen} />
             <Stack.Screen name="FarmDashboard" component={FarmDashboardScreen} />

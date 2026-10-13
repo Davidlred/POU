@@ -19,7 +19,7 @@ function ago(iso) {
   if (s < 86400) return Math.round(s / 3600) + 'h ago';
   return Math.round(s / 86400) + 'd ago';
 }
-const signInText = (r) => `Hi ${r.name.split(' ')[0]}, you've been added as a Poultry360 rider.\n\n1. Install the Poultry360 Rider app.\n2. Sign in with this email: ${r.email}\n3. Enter the 6-digit code we email you.\n\nThen tap "Go available" to start receiving deliveries.`;
+const signInText = (r) => `Hi ${r.name.split(' ')[0]}, you've been added as a Poultry360 rider.\n\n1. Install the Poultry360 Rider app.\n2. Sign in with this email: ${r.email}\n3. First time: tap \"First time here? Set up with a code\", enter the 6-digit code we email you, then create a password.\n\nThen tap "Go available" to start receiving deliveries.`;
 
 export default function Riders() {
   const [riders, setRiders] = useState(null);
@@ -160,7 +160,7 @@ function RiderForm({ initial, zones, onCancel, onSaved }) {
       <div className="detail-head">
         <button type="button" className="btn ghost sm show-sm" onClick={onCancel}>← Back</button>
         <div className="grow"><h2>{isNew ? 'Add a rider' : 'Edit ' + initial.name}</h2>
-          <p className="muted small">{isNew ? 'They sign in to the rider app with this email and a code we send them.' : 'Changes apply straight away.'}</p></div>
+          <p className="muted small">{isNew ? 'They sign in to the rider app with this email.' : 'Changes apply straight away.'}</p></div>
         <button type="button" className="icon-btn hide-sm" onClick={onCancel} aria-label="Close">×</button>
       </div>
       <form className="form" onSubmit={submit}>
@@ -228,7 +228,7 @@ function RiderDetail({ rider: r, onClose, onEdit, onToast, onChanged }) {
         <ol className="steps">
           <li>Open the <b>Poultry360 Rider</b> app</li>
           <li>Enter <b>{r.email}</b></li>
-          <li>Type the 6-digit code from their email</li>
+          <li>First time: set up with the 6-digit code from their email, then create a password</li>
         </ol>
         <button className="btn outline sm" onClick={copy}>Copy instructions to send</button>
       </div>

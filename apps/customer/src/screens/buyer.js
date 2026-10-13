@@ -45,7 +45,7 @@ function CartButton({ navigation }) {
   return (
     <Pressable onPress={() => navigation.navigate('Cart')} accessibilityLabel={'Cart, ' + count + ' items'} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}>
       <Icon name="shopping-outline" />
-      {count ? <View style={{ position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.ember, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 10, color: '#17120E' }}>{count}</Txt></View> : null}
+      {count ? <View style={{ position: 'absolute', top: 6, right: 6, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.ember, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 10, color: c.onyolk }}>{count}</Txt></View> : null}
     </Pressable>
   );
 }
@@ -95,8 +95,8 @@ export function HomeScreen({ navigation }) {
         {ctx && ctx.primary && !ctx.covered ? <Banner tone="warn" icon="map-marker-off-outline" title={"We don't deliver to " + ctx.primary.area + ' yet'} body="Switch to an address in our coverage area to order." /> : null}
         {live ? (
           <Hearth onPress={() => navigation.navigate('Tracking', { orderId: live.o.id })}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="label" color={c.ember}>● {STATUS_LABEL[live.s.status]}</Txt><Txt v="label" color={c.hmute}>{live.o.code}</Txt></View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Txt v="h2" color={c.hink} style={{ flex: 1 }}>{live.s.vendor}</Txt><View style={{ height: 36, paddingHorizontal: 14, borderRadius: 100, backgroundColor: c.yolk, justifyContent: 'center' }}><Txt v="bold" color="#2A2119" style={{ fontSize: 13 }}>Track</Txt></View></View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="label" color={c.hacc}>● {STATUS_LABEL[live.s.status]}</Txt><Txt v="label" color={c.hmute}>{live.o.code}</Txt></View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Txt v="h2" color={c.hink} style={{ flex: 1 }}>{live.s.vendor}</Txt><View style={{ height: 36, paddingHorizontal: 14, borderRadius: 100, backgroundColor: c.yolk, justifyContent: 'center' }}><Txt v="bold" color={c.onyolk} style={{ fontSize: 13 }}>Track</Txt></View></View>
           </Hearth>
         ) : null}
         <SearchBar onPress={() => navigation.navigate('Listings', { search: true })} />
@@ -186,7 +186,7 @@ export function ListingsScreen({ navigation, route }) {
       ) : <AppBar title={waste ? catLabel(category) || 'Waste & manure' : catLabel(category)} right={
         <Pressable onPress={() => setOpen(true)} style={{ height: 40, paddingHorizontal: 14, marginRight: 8, borderRadius: 100, backgroundColor: c.hc, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="tune-variant" size={18} color={c.hink} /><Txt v="strong" color={c.hink} style={{ fontSize: 13 }}>Filters</Txt>
-          {active ? <View style={{ minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 11, color: '#2A2119' }}>{active}</Txt></View> : null}
+          {active ? <View style={{ minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 11, color: c.onyolk }}>{active}</Txt></View> : null}
         </Pressable>} />}
       {items === null ? <View style={{ padding: 20, gap: 12 }}><Skeleton h={180} r={20} /><Skeleton h={180} r={20} /></View>
         : !items.length ? (search && !q ? <Empty icon="magnify" title="Search the marketplace" body="Try eggs, broilers, turkey or feed." />

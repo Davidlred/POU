@@ -163,7 +163,7 @@ export function CheckoutScreen({ navigation, route }) {
       <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.errbg, alignItems: 'center', justifyContent: 'center' }}><Icon name="credit-card-off-outline" size={32} color={c.err} /></View>
       <Txt v="display">Payment didn't go through</Txt>
       <Txt v="body" color={c.mute}>{state.reason}</Txt>
-      {balance >= total ? <Hearth onPress={() => { setMethod('wallet'); setState({ phase: 'idle' }); }}><View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Icon name="wallet-outline" color={c.yolk} /><View style={{ flex: 1 }}><Txt v="bold" color={c.hink}>Pay from wallet</Txt><Txt v="small" color={c.hmute}>{naira(balance)} available</Txt></View><Icon name="chevron-right" color={c.hink} /></View></Hearth> : null}
+      {balance >= total ? <Hearth onPress={() => { setMethod('wallet'); setState({ phase: 'idle' }); }}><View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Icon name="wallet-outline" color={c.hacc} /><View style={{ flex: 1 }}><Txt v="bold" color={c.hink}>Pay from wallet</Txt><Txt v="small" color={c.hmute}>{naira(balance)} available</Txt></View><Icon name="chevron-right" color={c.hink} /></View></Hearth> : null}
       <Button variant="outline" title="Try another card" onPress={() => setState({ phase: 'idle' })} />
       <Txt v="small">Your cart is saved, so nothing is lost.</Txt>
     </Screen>
@@ -239,7 +239,7 @@ export function OrderSuccessScreen({ navigation, route }) {
   return (
     <Screen scroll footer={<><Button title="Track order" onPress={() => navigation.replace('Tracking', { orderId: route.params.orderId })} /><Button variant="ghost" title="Keep shopping" onPress={() => navigation.popTo('Tabs', { screen: 'Home' })} /></>}>
       <View style={{ height: 32 }} />
-      <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={40} color="#2A2119" /></View>
+      <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={40} color={c.onyolk} /></View>
       <Txt v="display">Order placed</Txt>
       {o ? <Txt v="mono" color={c.mute}>{o.code} · {naira(o.total)} paid</Txt> : <ActivityIndicator color={c.ember} />}
       {o?.subs?.map((s) => (

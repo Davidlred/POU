@@ -139,7 +139,7 @@ export function VetDeskScreen({ navigation }) {
         <Card tone="err"><Txt v="label" color={c.err}>What to fix</Txt><Txt v="body">{v.rejection_reason || 'We could not verify your licence.'}</Txt></Card>
         <Button title="Update and resubmit" onPress={() => navigation.navigate('VetApply')} />
       </> : <>
-        <Hearth><Icon name="shield-check-outline" size={32} color={c.ember} /><Txt v="h2" color={c.hink}>We're checking your licence</Txt><Txt v="small" color={c.hmute}>This usually takes a working day. Farmers will be able to book you as soon as you're approved. This screen updates by itself.</Txt></Hearth>
+        <Hearth><Icon name="shield-check-outline" size={32} color={c.hacc} /><Txt v="h2" color={c.hink}>We're checking your licence</Txt><Txt v="small" color={c.hmute}>This usually takes a working day. Farmers will be able to book you as soon as you're approved. This screen updates by itself.</Txt></Hearth>
         <Card><Steps steps={[{ label: 'Details submitted', state: 'done' }, { label: 'Licence under review', state: 'current' }, { label: 'Open for bookings', state: 'todo' }]} /></Card>
       </>}
       {home ? <Button variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Back to shopping' : 'Back to my farm'} onPress={leave} /> : null}

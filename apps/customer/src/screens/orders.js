@@ -61,8 +61,8 @@ function SubTracking({ s, navigation, address }) {
       {riderLive ? (
         <View style={{ height: 240, borderRadius: 20, overflow: 'hidden' }}>
           <MapView provider={PROVIDER_GOOGLE} style={{ flex: 1 }} region={{ latitude: r.lat, longitude: r.lng, latitudeDelta: 0.04, longitudeDelta: 0.04 }}>
-            <Marker coordinate={{ latitude: r.lat, longitude: r.lng }} title={r.name} pinColor={stale ? 'gray' : '#E9904A'} />
-            {address?.lat ? <Marker coordinate={{ latitude: address.lat, longitude: address.lng }} title="You" pinColor="#17120E" /> : null}
+            <Marker coordinate={{ latitude: r.lat, longitude: r.lng }} title={r.name} pinColor={stale ? 'gray' : c.ember} />
+            {address?.lat ? <Marker coordinate={{ latitude: address.lat, longitude: address.lng }} title="You" pinColor={c.ink} /> : null}
           </MapView>
           {stale ? <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}><Banner tone="warn" icon="signal-off" title="Last known location · updating" body={'Rider location last updated ' + timeAgo(r.updated_at) + '. ETA may change.'} /></View> : null}
         </View>
@@ -81,7 +81,7 @@ function SubTracking({ s, navigation, address }) {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.hline, alignItems: 'center', justifyContent: 'center' }}><Txt v="bold" color={c.hink}>{r.name[0]}</Txt></View>
             <View style={{ flex: 1 }}><Txt v="bold" color={c.hink}>{r.name} · Poultry360 rider</Txt><Txt v="label" color={c.hmute}>{r.vehicle}{r.plate ? ' · ' + r.plate : ''}</Txt></View>
-            <Pressable accessibilityLabel="Call rider" onPress={() => Linking.openURL('tel:+' + r.phone)} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="phone" color="#2A2119" /></Pressable>
+            <Pressable accessibilityLabel="Call rider" onPress={() => Linking.openURL('tel:+' + r.phone)} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="phone" color={c.onyolk} /></Pressable>
           </View>
         </Hearth>
       ) : null}

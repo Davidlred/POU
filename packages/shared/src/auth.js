@@ -60,15 +60,19 @@ function AuthMark() {
   const { c, mode } = useTheme();
   const dark = mode === 'dark';
   return (
-    <View style={{ alignSelf: 'center', width: 56, height: 68, borderRadius: 28, backgroundColor: dark ? c.ember : '#17120E', alignItems: 'center', justifyContent: 'center', paddingTop: 8, marginBottom: 6 }}>
-      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: dark ? '#F7C48A' : c.yolk }} />
+    <View style={{ height: 150, borderRadius: 32, backgroundColor: dark ? c.hc : c.yolk, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+      <View pointerEvents="none" style={{ position: 'absolute', right: -50, top: -70, width: 190, height: 190, borderRadius: 95, backgroundColor: dark ? c.ember : c.onyolk, opacity: dark ? 0.35 : 0.14 }} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: -40, bottom: -80, width: 170, height: 170, borderRadius: 85, backgroundColor: c.hink, opacity: 0.1 }} />
+      <View style={{ width: 58, height: 72, borderRadius: 29, backgroundColor: dark ? c.ember : c.onyolk, alignItems: 'center', justifyContent: 'center', paddingTop: 8 }}>
+        <View style={{ width: 21, height: 21, borderRadius: 11, backgroundColor: dark ? c.hc : c.yolk }} />
+      </View>
     </View>
   );
 }
 
 function Heading({ title, subtitle }) {
   return (
-    <View style={{ gap: 10, alignItems: 'center', marginBottom: 8 }}>
+    <View style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
       <Txt v="display" style={{ textAlign: 'center' }}>{title}</Txt>
       {subtitle ? <Txt v="small" style={{ fontSize: 15, lineHeight: 22, textAlign: 'center' }}>{subtitle}</Txt> : null}
     </View>
@@ -83,7 +87,7 @@ function PasswordField({ label, value, onChangeText, error, autoFocus, newPasswo
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt v="strong" style={{ fontSize: 13 }}>{label}</Txt> : null}
-      <View style={{ minHeight: 52, borderRadius: 14, backgroundColor: error ? c.errbg : c.sf, borderWidth: focus || error ? 2 : 1.5, borderColor: error ? c.err : focus ? c.ember : c.line2, flexDirection: 'row', alignItems: 'center', paddingLeft: 14 }}>
+      <View style={{ minHeight: 54, borderRadius: 16, backgroundColor: error ? c.errbg : c.sf, borderWidth: focus || error ? 2 : 1, borderColor: error ? c.err : focus ? c.ember : c.line2, flexDirection: 'row', alignItems: 'center', paddingLeft: 14 }}>
         <TextInput maxFontSizeMultiplier={MAX_FONT_SCALE} value={value} onChangeText={onChangeText} secureTextEntry={!show} autoCapitalize="none" autoCorrect={false} autoFocus={autoFocus}
           autoComplete={newPassword ? 'new-password' : 'current-password'} textContentType={newPassword ? 'newPassword' : 'password'} placeholder={placeholder} placeholderTextColor={c.mute}
           onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} onSubmitEditing={onSubmitEditing} returnKeyType="done" accessibilityLabel={label || 'Password'}

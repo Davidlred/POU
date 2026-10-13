@@ -147,7 +147,7 @@ export function SetPassword({ email, creating, onDone }) {
         <div className="mark" />
         <p className="eyebrow">Poultry360 Ops</p>
         <h1>{creating ? 'Create a password' : 'Choose a new password'}</h1>
-        <p className="muted">{creating ? <>Next time you'll sign in with <strong>{email}</strong> and this password. It works in the Poultry360 app too.</> : <>This replaces the password for <strong>{email}</strong>, in the app as well.</>}</p>
+        <p className="muted">{creating ? <>Next time you'll sign in with <strong>{email}</strong> and this password.</> : <>This replaces the password for <strong>{email}</strong>.</>}</p>
         <PasswordInput value={pw} onChange={(v) => { setPw(v); setErr(null); }} placeholder={creating ? 'Password' : 'New password'} label="New password" autoFocus isNew />
         <PasswordInput value={again} onChange={(v) => { setAgain(v); setErr(null); }} placeholder="Type it again" label="Type it again" isNew />
         <ul className="rules">

@@ -10,11 +10,11 @@ export function Splash() {
   const dark = mode === 'dark';
   return (
     <View style={{ flex: 1, backgroundColor: dark ? c.bg : c.yolk, alignItems: 'center', justifyContent: 'center', gap: 22 }}>
-      <View style={{ width: 104, height: 128, borderRadius: 52, backgroundColor: dark ? c.ember : '#17120E', alignItems: 'center', justifyContent: 'center', paddingTop: 16 }}>
-        <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: dark ? '#F7C48A' : c.yolk }} />
+      <View style={{ width: 104, height: 128, borderRadius: 52, backgroundColor: dark ? c.ember : c.onyolk, alignItems: 'center', justifyContent: 'center', paddingTop: 16 }}>
+        <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: dark ? c.bg : c.yolk }} />
       </View>
-      <Txt v="display" color={dark ? c.ink : '#2A2119'} style={{ fontSize: 40, lineHeight: 44 }}>Poultry360</Txt>
-      <Txt v="strong" color={dark ? c.mute : '#2A2119'}>Farm to table, verified.</Txt>
+      <Txt v="display" color={dark ? c.ink : c.onyolk} style={{ fontSize: 40, lineHeight: 46 }}>Poultry360</Txt>
+      <Txt v="strong" color={dark ? c.mute : c.onyolk}>Farm to table, verified.</Txt>
     </View>
   );
 }
@@ -82,7 +82,7 @@ export function RoleScreen({ navigation, route }) {
             style={{ backgroundColor: c.sf, borderRadius: 20, padding: 16, flexDirection: 'row', gap: 14, alignItems: 'center', borderWidth: on ? 2 : 1.5, borderColor: on ? c.ember : c.line2 }}>
             <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: c[r.tone], alignItems: 'center', justifyContent: 'center' }}><Icon name={r.icon} size={26} color={c[r.tone + 'i']} /></View>
             <View style={{ flex: 1, gap: 2 }}><Txt v="bold" style={{ fontSize: 16 }}>{r.title}</Txt><Txt v="small">{r.body}</Txt></View>
-            <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: on ? c.ember : 'transparent', borderWidth: on ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{on ? <Icon name="check" size={18} color="#17120E" /> : null}</View>
+            <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: on ? c.ember : 'transparent', borderWidth: on ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{on ? <Icon name="check" size={18} color={c.onember} /> : null}</View>
           </Pressable>
         );
       })}
@@ -150,9 +150,9 @@ export function BusinessScreen({ navigation, route }) {
       {isSupplier ? (
         <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>What do you supply?</Txt>
           <ChipRow options={SUPPLIER_TYPES.map((t) => t.label)} value={SUPPLIER_TYPES.find((t) => t.id === supType)?.label} onChange={(l) => { setSupType(SUPPLIER_TYPES.find((t) => t.label === l).id); setErrs((x) => ({ ...x, sup: undefined })); }} />
-          {errs.sup ? <Txt v="small" color="#B83A26">{errs.sup}</Txt> : null}</View>
+          {errs.sup ? <Txt v="small" color={c.err}>{errs.sup}</Txt> : null}</View>
       ) : null}
-      <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>What do you sell?</Txt><ChipRow options={CATS} value={cats} onChange={setCats} multi />{errs.cats ? <Txt v="small" color="#B83A26">{errs.cats}</Txt> : null}</View>
+      <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>What do you sell?</Txt><ChipRow options={CATS} value={cats} onChange={setCats} multi />{errs.cats ? <Txt v="small" color={c.err}>{errs.cats}</Txt> : null}</View>
       <Input label="Farm location" value={loc} onChangeText={setLoc} placeholder="Igwuruta, Rivers State" error={errs.loc} />
       <Txt v="strong" style={{ fontSize: 13 }}>Government-issued ID</Txt>
       {upload.state === 'failed' ? (
@@ -167,7 +167,7 @@ export function BusinessScreen({ navigation, route }) {
             <View style={{ flex: 1 }}><Txt v="strong">{upload.state === 'done' ? 'ID uploaded' : upload.state === 'uploading' ? 'Uploading…' : "NIN slip, voter card or driver's licence"}</Txt>
               <Txt v="small">{upload.state === 'done' ? 'Tap to replace' : 'All four corners in frame, good light'}</Txt></View>
           </View>
-          {errs.id ? <Txt v="small" color="#B83A26">{errs.id}</Txt> : null}
+          {errs.id ? <Txt v="small" color={c.err}>{errs.id}</Txt> : null}
           <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" icon="camera-outline" title="Take photo" onPress={() => pick(true)} style={{ flex: 1 }} /><Button small variant="outline" icon="image-outline" title="Gallery" onPress={() => pick(false)} style={{ flex: 1 }} /></View>
         </Card>
       )}

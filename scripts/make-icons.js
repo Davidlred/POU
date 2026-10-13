@@ -49,8 +49,8 @@ function png(px) {
 }
 
 const APPS = {
-  customer: { bg: '#F2B33D', egg: '#17120E', yolk: '#F2B33D' },   // Sunrise: dark egg on yolk
-  rider: { bg: '#17120E', egg: '#E9904A', yolk: '#F7C48A' },      // Ember: ember egg on dark
+  customer: { bg: '#0F8A5F', egg: '#FFFFFF', yolk: '#0F8A5F' },   // white egg on green
+  rider: { bg: '#0C0D0D', egg: '#2DCB8C', yolk: '#0C0D0D' },      // green egg on near-black
 };
 for (const [app, col] of Object.entries(APPS)) {
   const dir = path.join(__dirname, '..', 'apps', app, 'assets');

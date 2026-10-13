@@ -1,36 +1,41 @@
-// Design tokens lifted from the Poultry360 flow boards (Sunrise light / Ember night).
+// Design tokens. Light: white surfaces, green primary. Dark: near-black, bright green primary, teal cards. No orange primary in either mode.
+// Token names are historical: `yolk` is the PRIMARY action colour (green in both modes) and `ember` is the
+// highlight used for focus rings, selected days and live dots. Text on those fills is `onyolk` / `onember`.
+// Inside a Hearth card use the h* tokens: hink, hmute, hacc (accent) and herr; the normal accents are too dark there.
 export const palettes = {
   light: {
-    bg: '#F7F2E8', sf: '#FFFFFF', sf2: '#EFE7D8', ink: '#2A2119', mute: '#75685A',
-    line: 'rgba(42,33,25,0.10)', line2: 'rgba(42,33,25,0.20)',
-    hc: '#17120E', hcb: '#17120E', hink: '#F3EADF', hmute: '#A8998A', hline: '#3A2F25',
-    yolk: '#F2B33D', onyolk: '#2A2119', ember: '#E9904A', acc: '#B5603A',
-    sage: '#4F7A40', sagebg: '#E3ECD9', err: '#B83A26', errbg: '#F7DFD7', warn: '#8A5A12', warnbg: '#FBE7C4',
-    t1: '#FBE3B0', t1i: '#8A5A12', t2: '#F1D2C2', t2i: '#8E4426', t3: '#E8E0D2', t3i: '#5A4A38', t4: '#E3E4CF', t4i: '#4E5326',
-    nav: '#FFFFFF', navact: '#F2B33D', navactink: '#2A2119', scrim: 'rgba(23,18,14,0.45)', map: '#EAE2D2',
+    bg: '#F5F7F5', sf: '#FFFFFF', sf2: '#ECF0ED', ink: '#0E1512', mute: '#66706A',
+    line: 'rgba(14,21,18,0.08)', line2: 'rgba(14,21,18,0.16)',
+    hc: '#0A2219', hcb: '#0A2219', hink: '#F2F8F5', hmute: '#9DB7AB', hline: '#1F4335', hacc: '#5FD6A6', herr: '#F5A79E',
+    yolk: '#0F8A5F', onyolk: '#FFFFFF', ember: '#14A06E', onember: '#FFFFFF', acc: '#0B7550',
+    sage: '#0F8A5F', sagebg: '#E1F4EB', err: '#C8372D', errbg: '#FCE8E5', warn: '#8F5B00', warnbg: '#FFF0D2',
+    t1: '#E1F4EB', t1i: '#0B7550', t2: '#FFE8DC', t2i: '#B4532A', t3: '#E6EDFA', t3i: '#3559A8', t4: '#FFF1CC', t4i: '#8A6100',
+    nav: '#FFFFFF', navact: '#E1F4EB', navactink: '#0B7550', seg: '#FFFFFF', scrim: 'rgba(14,21,18,0.45)', map: '#E7ECE8',
   },
   dark: {
-    bg: '#17120E', sf: '#221B15', sf2: '#2C241D', ink: '#F3EADF', mute: '#A8998A',
-    line: '#3A2F25', line2: '#4A3D31',
-    hc: '#2A1E15', hcb: '#4A3626', hink: '#F3EADF', hmute: '#B5A493', hline: '#4A3626',
-    yolk: '#F2B33D', onyolk: '#17120E', ember: '#E9904A', acc: '#E9904A',
-    sage: '#8DB57A', sagebg: '#26321F', err: '#F08A72', errbg: '#3A1F18', warn: '#F2C46A', warnbg: '#3A2C14',
-    t1: '#3A2C14', t1i: '#F2C46A', t2: '#3A231A', t2i: '#F0A27E', t3: '#2E261F', t3i: '#D8C7B0', t4: '#2B2E1D', t4i: '#C5CB8F',
-    nav: '#1E1712', navact: 'rgba(233,144,74,0.18)', navactink: '#E9904A', scrim: 'rgba(0,0,0,0.6)', map: '#1C1612',
+    bg: '#0C0D0D', sf: '#161818', sf2: '#222525', ink: '#F4F5F3', mute: '#9AA09C',
+    line: '#262929', line2: '#3A3E3E',
+    hc: '#15322D', hcb: '#27564C', hink: '#EAF5F1', hmute: '#9FC2B8', hline: '#27564C', hacc: '#5FD6A6', herr: '#F5A79E',
+    yolk: '#2DCB8C', onyolk: '#06140E', ember: '#2DCB8C', onember: '#06140E', acc: '#5FD6A6',
+    sage: '#5FC7A0', sagebg: '#14302A', err: '#F3857A', errbg: '#3A1C19', warn: '#F0C36B', warnbg: '#35290F',
+    t1: '#14302A', t1i: '#7FD9B7', t2: '#3A2118', t2i: '#F0A27E', t3: '#1D2636', t3i: '#9DB8EE', t4: '#33290F', t4i: '#F0C36B',
+    nav: '#111313', navact: 'rgba(45,203,140,0.16)', navactink: '#5FD6A6', seg: '#3A3E3E', scrim: 'rgba(0,0,0,0.65)', map: '#141616',
   },
 };
 
 // Android ignores fontWeight for custom fonts, so each weight is its own family.
+// One family throughout (Hanken Grotesk): `display` for headings, `mono` for money, codes and timers
+// (same face, bold, with tabular figures set where it is used).
 export const fonts = {
-  display: 'BricolageGrotesque_800ExtraBold',
-  displayBold: 'BricolageGrotesque_700Bold',
+  display: 'HankenGrotesk_800ExtraBold',
+  displayBold: 'HankenGrotesk_700Bold',
   regular: 'HankenGrotesk_400Regular',
   medium: 'HankenGrotesk_500Medium',
   semibold: 'HankenGrotesk_600SemiBold',
   bold: 'HankenGrotesk_700Bold',
-  mono: 'JetBrainsMono_600SemiBold',
-  monoMedium: 'JetBrainsMono_500Medium',
+  mono: 'HankenGrotesk_700Bold',
+  monoMedium: 'HankenGrotesk_600SemiBold',
 };
 
-export const radius = { sm: 12, md: 16, lg: 20, xl: 24, pill: 100 };
+export const radius = { sm: 12, md: 16, lg: 22, xl: 28, pill: 100 };
 export const space = (n) => n * 4;

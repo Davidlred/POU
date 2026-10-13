@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { useTheme, Screen, AppBar, Txt, Button, Card, Icon, Banner, ChipRow, Segmented, Pill, isoDate, shortDate } from '@p360/shared';
 import { useFarm, save, flockStats } from '../lib/offlineQueue';
 import { askForNotifications } from '../lib/reminders';
-import { GUIDE_COPY, BIRDS, HEALTH, FEEDS, FEED_RULES, FEED_BRANDS, VACCINE_NOTES, EXPECT, ageDays, ageLabel, addDays, missingVaccinations, rowStatus, feedStage, feedNeed } from '../lib/careGuide';
+import { GUIDE_COPY, BIRDS, HEALTH, FEEDS, FEED_RULES, VACCINE_NOTES, EXPECT, ageDays, ageLabel, addDays, missingVaccinations, rowStatus, feedStage, feedNeed } from '../lib/careGuide';
 
 const VIEWS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feed' }, { value: 'expect', label: 'Output' }];
 const TYPE_OPTIONS = [{ value: 'broilers', label: 'Broilers' }, { value: 'layers', label: 'Layers' }];
@@ -53,7 +53,7 @@ export function CareGuideScreen({ navigation, route }) {
           {label ? <Pill tone={STATUS[st][0]} label={label} /> : null}
         </View>
         <Txt v="bold">{it.name}</Txt>
-        <Txt v="small">{it.route} · protects against: {it.against.charAt(0).toLowerCase() + it.against.slice(1)}</Txt>
+        <Txt v="small">{it.route} · {it.against}</Txt>
         {st && st !== 'next' && when ? <Txt v="small" color={c.mute}>{when}</Txt> : null}
         {it.note ? <Txt v="small" color={c.mute}>{it.note}</Txt> : null}
       </Card>
@@ -72,12 +72,12 @@ export function CareGuideScreen({ navigation, route }) {
         </View>
         <Txt v="bold">{s.name}</Txt>
         <Txt v="small">{s.form} · {s.protein}</Txt>
-        <Txt v="small" color={c.mute}>{s.note}</Txt>
+        {s.note ? <Txt v="small" color={c.mute}>{s.note}</Txt> : null}
         <View style={{ backgroundColor: c.sf2, borderRadius: 12, padding: 10, gap: 2 }}>
           <Txt v="label">{flock ? 'For your ' + birds.toLocaleString() + ' birds' : 'For every 100 birds'}</Txt>
           {need.perDayKg != null
-            ? <Txt v="small">About <Txt v="mono">{kg(need.perDayKg)} kg</Txt> a day{need.bagEveryDays >= 1 ? ', one 25 kg bag every ' + kg(need.bagEveryDays) + ' days' : ', about ' + kg(need.perDayKg / 25) + ' bags (25 kg) a day'}</Txt>
-            : <Txt v="small">About <Txt v="mono">{kg(need.totalKg)} kg</Txt> for the whole stage, roughly <Txt v="mono">{need.bags}</Txt> bags of 25 kg</Txt>}
+            ? <Txt v="small"><Txt v="mono">{kg(need.perDayKg)} kg</Txt> a day{need.bagEveryDays >= 1 ? ' · one 25 kg bag every ' + kg(need.bagEveryDays) + ' days' : ' · ' + kg(need.perDayKg / 25) + ' bags a day'}</Txt>
+            : <Txt v="small"><Txt v="mono">{kg(need.totalKg)} kg</Txt> · about <Txt v="mono">{need.bags}</Txt> bags (25 kg)</Txt>}
         </View>
       </Card>
     );
@@ -86,34 +86,31 @@ export function CareGuideScreen({ navigation, route }) {
   const ex = EXPECT[type];
   return (
     <Screen scroll>
-      <AppBar title="Vaccine & feed chart" subtitle="What to give, and when" />
+      <AppBar title="Vaccine & feed chart" />
       <Segmented options={TYPE_OPTIONS} value={type} onChange={pickType} />
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Icon name={bird.icon} size={28} color={c.acc} />
-        <View style={{ flex: 1 }}><Txt v="bold">{bird.label} · {bird.purpose.toLowerCase()}</Txt><Txt v="small">{bird.cycle}</Txt></View>
+        <View style={{ flex: 1 }}><Txt v="bold">{bird.label} · {bird.purpose}</Txt><Txt v="small">{bird.cycle}</Txt></View>
       </Card>
       {mine.length ? <ChipRow options={[...mine.map((f) => f.code), ALL]} value={flock ? flock.code : ALL} onChange={(v) => { setFlockId(mine.find((f) => f.code === v)?.id || null); setAdded(0); }} /> : null}
-      {flock ? <Txt v="small">{flock.code} · {flock.breed || bird.label} · day {age} (week {Math.floor(age / 7) + 1}) · {birds.toLocaleString()} birds. Dates below are counted from {shortDate(flock.start_date)}, the day the chicks arrived.</Txt>
-        : <Txt v="small">{mine.length ? 'Pick a flock to see its own dates.' : 'Add a ' + (type === 'broilers' ? 'broiler' : 'layer') + ' flock in Farm Hub to see real dates and get reminders.'}</Txt>}
+      {flock ? <Txt v="small">{flock.code} · day {age} (week {Math.floor(age / 7) + 1}) · {birds.toLocaleString()} birds</Txt>
+        : !mine.length ? <Txt v="small">{'Add a ' + (type === 'broilers' ? 'broiler' : 'layer') + ' flock in Farm Hub to see its dates.'}</Txt> : null}
       <Segmented options={VIEWS} value={view} onChange={setView} />
 
       {view === 'health' ? <>
-        <Banner tone="info" icon="stethoscope" title="Check with your vet" body={GUIDE_COPY} />
+        <Txt v="small" color={c.mute}>{GUIDE_COPY}</Txt>
         {flock && missing.length ? <Button icon="calendar-plus" loading={busy} disabled={busy} title={'Add ' + missing.length + ' vaccination' + (missing.length === 1 ? '' : 's') + ' to ' + flock.code + "'s schedule"} onPress={addAll} /> : null}
-        {flock && added ? <Banner tone="ok" title={added + ' added to your schedule'} body="Your phone will remind you 2 days before each one and on the day." action="See schedule" onAction={() => navigation.navigate('Vaccinations', { flockId: flock.id })} /> : null}
+        {flock && added ? <Banner tone="ok" title={added + ' added. You will get reminders.'} action="See schedule" onAction={() => navigation.navigate('Vaccinations', { flockId: flock.id })} /> : null}
         {HEALTH[type].map(healthRow)}
-        <Txt v="label">Buying and handling vaccines</Txt>
+        <Txt v="label">Handling</Txt>
         <Card>{VACCINE_NOTES.map((n) => <View key={n} style={{ flexDirection: 'row', gap: 8 }}><Icon name="check" size={16} color={c.sage} /><Txt v="small" style={{ flex: 1 }}>{n}</Txt></View>)}</Card>
-        <Button variant="outline" icon="pill" title="My drugs & vaccines in store" onPress={() => navigation.navigate('Inventory', { tab: 'health' })} />
+        <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} />
       </> : null}
 
       {view === 'feed' ? <>
         {FEEDS[type].map(feedCard)}
-        <Txt v="small" color={c.mute}>Amounts are rough planning figures. Real intake changes with breed, heat and feed quality.</Txt>
-        <Txt v="label">Feeding rules</Txt>
+        <Txt v="small" color={c.mute}>Amounts are estimates.</Txt>
         <Card>{FEED_RULES.map((n) => <View key={n} style={{ flexDirection: 'row', gap: 8 }}><Icon name="check" size={16} color={c.sage} /><Txt v="small" style={{ flex: 1 }}>{n}</Txt></View>)}</Card>
-        <Txt v="label">Brands sold in Nigeria</Txt>
-        <Card><Txt v="small">{FEED_BRANDS.join(' · ')}</Txt><Txt v="small" color={c.mute}>Each makes {FEEDS[type].map((s) => s.name.toLowerCase()).join(', ')}. Listed A to Z, not ranked. Stay with one brand through a stage if you can.</Txt></Card>
         <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} />
       </> : null}
 
@@ -124,7 +121,7 @@ export function CareGuideScreen({ navigation, route }) {
             <Txt v="bold" style={{ width: 110, fontSize: 14 }}>{a}</Txt><Txt v="small" style={{ flex: 1 }}>{b}</Txt>
           </View>))}</Card>
         <Txt v="small" color={c.mute}>{ex.note}</Txt>
-        <Banner tone="info" icon="notebook-edit-outline" title={ex.unit} body={flock ? 'Open ' + flock.code + ' in Farm Hub and use the Output tab.' : 'Use the Output tab on your flock in Farm Hub.'} />
+        <Txt v="small" color={c.mute}>{ex.unit}</Txt>
       </> : null}
     </Screen>
   );

@@ -104,7 +104,7 @@ export function FarmHomeScreen({ navigation }) {
           {past.slice(0, 3).map(({ f, s }) => <PastFlockCard key={f.id} f={f} s={s} onPress={() => navigation.navigate('FlockDetail', { id: f.id })} />)}
         </> : null}
       </ScrollView>
-      {data.flocks.length ? <Pressable accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={26} color="#2A2119" /></Pressable> : null}
+      {data.flocks.length ? <Pressable accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={26} color={c.onyolk} /></Pressable> : null}
     </Screen>
   );
 }
@@ -294,7 +294,7 @@ export function VaccinationsScreen({ navigation, route }) {
       </Card> : null}
       {!notif.granted && upcoming.length ? <Banner tone="warn" icon="bell-off-outline" title="Reminders are turned off" body="Allow notifications and your phone will remind you 2 days before each vaccination and on the day." action="Turn on" onAction={allowNotifs} /> : null}
       {!form ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'health', flockId })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Icon name="calendar-heart" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Vaccination chart</Txt><Txt v="small">See what your birds need by age and add it all to your schedule in one tap</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
+        <Icon name="calendar-heart" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Vaccination chart</Txt><Txt v="small">By age. Add it to your schedule in one tap.</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
       {!list.length && !form ? <Empty icon="needle" title="No schedule set" body="Add upcoming vaccinations and your phone will remind you 2 days before and on the day." /> : null}
       {sec('Overdue', list.filter((v) => !v.administered_date && v.scheduled_date < today), 'err')}
       {sec('Upcoming', list.filter((v) => !v.administered_date && v.scheduled_date >= today).sort((a, b) => (a.scheduled_date > b.scheduled_date ? 1 : -1)))}
@@ -333,7 +333,7 @@ export function FarmDashboardScreen({ navigation }) {
         {rev === null ? null : rev > 0 ? (
           <Hearth>
             <Txt v="label" color={c.hmute}>Net margin · all flocks · {label.toLowerCase()}</Txt>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}><Txt v="monoLg" color={c.hink}>{naira(rev - costs)}</Txt><Txt v="mono" color={margin >= 0 ? '#8DB57A' : '#F08A72'}>{margin.toFixed(0)}%</Txt></View>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}><Txt v="monoLg" color={c.hink}>{naira(rev - costs)}</Txt><Txt v="mono" color={margin >= 0 ? c.hacc : c.herr}>{margin.toFixed(0)}%</Txt></View>
             <Txt v="small" color={c.hmute}>Marketplace revenue {naira(rev)} · costs {naira(costs)}</Txt>
           </Hearth>
         ) : <Banner icon="chart-line" title="No revenue in this period" body="Margin appears once a Marketplace sale is delivered. Costs and production are tracked below." />}
@@ -348,8 +348,8 @@ export function FarmDashboardScreen({ navigation }) {
         <Card>
           <Txt v="label">Costs · {label.toLowerCase()}</Txt>
           {costs ? <View style={{ flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', gap: 2 }}>
-            <View style={{ flex: feed || 0.0001, backgroundColor: c.ember }} /><View style={{ flex: vet || 0.0001, backgroundColor: c.yolk }} /><View style={{ flex: other || 0.0001, backgroundColor: c.line2 }} /></View> : <Txt v="small">No costs logged in this period.</Txt>}
-          {[['Feed', feed, c.ember], ['Vet & drugs', vet, c.yolk], ['Other', other, c.line2]].map(([l, v, col]) => (
+            <View style={{ flex: feed || 0.0001, backgroundColor: c.ember }} /><View style={{ flex: vet || 0.0001, backgroundColor: c.t3i }} /><View style={{ flex: other || 0.0001, backgroundColor: c.line2 }} /></View> : <Txt v="small">No costs logged in this period.</Txt>}
+          {[['Feed', feed, c.ember], ['Vet & drugs', vet, c.t3i], ['Other', other, c.line2]].map(([l, v, col]) => (
             <View key={l} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: col }} /><Txt v="body">{l}</Txt></View><Txt v="mono" style={{ fontSize: 14 }}>{naira(v)}</Txt></View>))}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: c.line, paddingTop: 8 }}><Txt v="bold">Total</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(costs)}</Txt></View>
         </Card>

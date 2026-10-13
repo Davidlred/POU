@@ -317,7 +317,7 @@ export function InvestAmountScreen({ navigation, route }) {
       {short && !fieldErr ? <Banner tone="warn" icon="wallet-plus-outline" title={'You need ' + naira(short) + ' more'} body="Top up and you'll come straight back here with your amount kept."
         action={'Top up ' + naira(short)} onAction={() => navigation.navigate('TopUp', { amount: Math.ceil(short), returnTo: 'InvestAmount' })} /> : null}
       <Pressable onPress={() => setAgree(!agree)} accessibilityRole="checkbox" accessibilityState={{ checked: agree }} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', minHeight: 44 }}>
-        <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: agree ? c.ember : 'transparent', borderWidth: agree ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{agree ? <Icon name="check" size={18} color="#17120E" /> : null}</View>
+        <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: agree ? c.ember : 'transparent', borderWidth: agree ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{agree ? <Icon name="check" size={18} color={c.onyolk} /> : null}</View>
         <Txt v="body" style={{ flex: 1 }}>I understand returns are not guaranteed and I could lose some or all of this money.</Txt>
       </Pressable>
     </Screen>
@@ -329,7 +329,7 @@ export function InvestSuccessScreen({ navigation, route }) {
   const { amount, title, profit, months } = route.params;
   return (
     <Screen style={{ justifyContent: 'center', gap: 14 }}>
-      <View style={{ alignSelf: 'center', width: 88, height: 88, borderRadius: 44, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={48} color="#2A2119" /></View>
+      <View style={{ alignSelf: 'center', width: 88, height: 88, borderRadius: 44, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={48} color={c.onyolk} /></View>
       <Txt v="display" style={{ textAlign: 'center' }}>You've invested {naira(amount)}</Txt>
       <Txt v="body" color={c.mute} style={{ textAlign: 'center' }}>in {title}</Txt>
       <Card>
@@ -422,7 +422,7 @@ export function KycScreen({ navigation, route }) {
   if (kyc?.status === 'pending' && !editing) return (
     <Screen scroll>
       <AppBar title="Verification in review" />
-      <Hearth><Icon name="shield-account-outline" size={32} color={c.ember} /><Txt v="h2" color={c.hink}>We're checking your details</Txt><Txt v="small" color={c.hmute}>This usually takes less than a day. This screen updates by itself when it's done{then ? ', and you can then finish your investment' : ''}.</Txt></Hearth>
+      <Hearth><Icon name="shield-account-outline" size={32} color={c.hacc} /><Txt v="h2" color={c.hink}>We're checking your details</Txt><Txt v="small" color={c.hmute}>This usually takes less than a day. This screen updates by itself when it's done{then ? ', and you can then finish your investment' : ''}.</Txt></Hearth>
       <Card><Steps steps={[{ label: 'Details submitted', state: 'done' }, { label: 'Documents under review', state: 'current' }, { label: 'Approved to invest', state: 'todo' }]} /></Card>
       {__DEV__ ? <Card><Txt v="label">Developer only</Txt><View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Approve" onPress={() => dev('approved')} style={{ flex: 1 }} /><Button small variant="outline" title="Reject" onPress={() => dev('rejected')} style={{ flex: 1 }} /></View></Card> : null}
     </Screen>

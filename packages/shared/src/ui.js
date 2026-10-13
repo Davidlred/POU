@@ -14,16 +14,16 @@ export function Icon({ name, size = 22, color, style }) {
 export const MAX_FONT_SCALE = 1.3;
 
 const VARIANTS = (f, c) => ({
-  display: { fontFamily: f.display, fontSize: 30, lineHeight: 33, letterSpacing: -0.6, color: c.ink },
-  h1: { fontFamily: f.display, fontSize: 24, lineHeight: 28, letterSpacing: -0.4, color: c.ink },
-  h2: { fontFamily: f.displayBold, fontSize: 18, lineHeight: 23, color: c.ink },
+  display: { fontFamily: f.display, fontSize: 32, lineHeight: 37, letterSpacing: -0.8, color: c.ink },
+  h1: { fontFamily: f.display, fontSize: 24, lineHeight: 29, letterSpacing: -0.4, color: c.ink },
+  h2: { fontFamily: f.displayBold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: c.ink },
   body: { fontFamily: f.regular, fontSize: 15, lineHeight: 22, color: c.ink },
   strong: { fontFamily: f.semibold, fontSize: 15, lineHeight: 21, color: c.ink },
   bold: { fontFamily: f.bold, fontSize: 15, lineHeight: 21, color: c.ink },
   small: { fontFamily: f.medium, fontSize: 13, lineHeight: 18, color: c.mute },
-  label: { fontFamily: f.mono, fontSize: 11, letterSpacing: 0.8, color: c.mute, textTransform: 'uppercase' },
-  mono: { fontFamily: f.mono, fontSize: 15, color: c.ink },
-  monoLg: { fontFamily: f.mono, fontSize: 32, letterSpacing: -1, color: c.ink },
+  label: { fontFamily: f.semibold, fontSize: 13, lineHeight: 18, color: c.mute },
+  mono: { fontFamily: f.mono, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
+  monoLg: { fontFamily: f.display, fontSize: 34, lineHeight: 40, letterSpacing: -1, color: c.ink, fontVariant: ['tabular-nums'] },
 });
 export function Txt({ v = 'body', color, style, children, ...p }) {
   const { c, f } = useTheme();
@@ -48,12 +48,13 @@ export function Screen({ children, scroll, pad = true, edges = ['top'], style, f
 
 export function AppBar({ title, subtitle, right, close, onBack }) {
   const nav = useNavigation();
+  const { c } = useTheme();
   return (
     <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack || (() => nav.goBack())} style={s.iconBtn} hitSlop={8}>
-        <Icon name={close ? 'close' : 'arrow-left'} size={24} />
+        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={close ? 'close' : 'arrow-left'} size={22} /></View>
       </Pressable>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, marginLeft: 4 }}>
         {title ? <Txt v="h2" numberOfLines={1}>{title}</Txt> : null}
         {subtitle ? <Txt v="label">{subtitle}</Txt> : null}
       </View>
@@ -80,7 +81,7 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 }, style]}>
       {loading ? <ActivityIndicator color={fg} /> : <>
         {icon ? <Icon name={icon} size={20} color={fg} /> : null}
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: variant === 'outline' || variant === 'ghost' ? f.semibold : f.bold, fontSize: small ? 14 : 16, flexShrink: 1 }}>{title}</Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: f.bold, fontSize: small ? 14 : 16, flexShrink: 1 }}>{title}</Text>
       </>}
     </Pressable>
   );
@@ -89,7 +90,7 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
 export function Card({ children, onPress, style, tone }) {
   const { c } = useTheme();
   const bg = tone === 'err' ? c.errbg : tone === 'warn' ? c.warnbg : tone === 'ok' ? c.sagebg : c.sf;
-  const body = [{ backgroundColor: bg, borderRadius: 20, padding: 14, gap: 10 }, style];
+  const body = [{ backgroundColor: bg, borderRadius: 22, padding: 16, gap: 10, borderWidth: 1, borderColor: tone ? 'transparent' : c.line }, style];
   return onPress ? <Pressable onPress={onPress} style={({ pressed }) => [body, pressed && { opacity: 0.85 }]}>{children}</Pressable> : <View style={body}>{children}</View>;
 }
 
@@ -98,8 +99,9 @@ export function Hearth({ children, style, onPress }) {
   const { c } = useTheme();
   const C = onPress ? Pressable : View;
   return (
-    <C onPress={onPress} style={[{ backgroundColor: c.hc, borderColor: c.hcb, borderWidth: 1, borderRadius: 24, padding: 18, gap: 12, overflow: 'hidden' }, style]}>
-      <View pointerEvents="none" style={{ position: 'absolute', right: -90, top: -110, width: 240, height: 240, borderRadius: 120, backgroundColor: c.ember, opacity: 0.16 }} />
+    <C onPress={onPress} style={[{ backgroundColor: c.hc, borderColor: c.hcb, borderWidth: 1, borderRadius: 26, padding: 20, gap: 12, overflow: 'hidden' }, style]}>
+      <View pointerEvents="none" style={{ position: 'absolute', right: -80, top: -100, width: 230, height: 230, borderRadius: 115, backgroundColor: c.ember, opacity: 0.22 }} />
+      <View pointerEvents="none" style={{ position: 'absolute', left: -60, bottom: -90, width: 170, height: 170, borderRadius: 85, backgroundColor: c.hink, opacity: 0.05 }} />
       {children}
     </C>
   );
@@ -110,9 +112,9 @@ export function Chip({ label, selected, onPress, icon }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }}
       style={{ height: 40, paddingHorizontal: 14, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 4,
-        backgroundColor: selected ? c.hc : 'transparent', borderWidth: 1.5, borderColor: selected ? c.hc : c.line2 }}>
-      {selected ? <Icon name="check" size={16} color={c.hink} /> : icon ? <Icon name={icon} size={16} /> : null}
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: selected ? f.semibold : f.medium, fontSize: 13, color: selected ? c.hink : c.ink }}>{label}</Text>
+        backgroundColor: selected ? c.navact : c.sf, borderWidth: 1, borderColor: selected ? c.navactink : c.line2 }}>
+      {selected ? <Icon name="check" size={16} color={c.navactink} /> : icon ? <Icon name={icon} size={16} /> : null}
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: selected ? f.bold : f.medium, fontSize: 13, color: selected ? c.navactink : c.ink }}>{label}</Text>
     </Pressable>
   );
 }
@@ -128,7 +130,7 @@ export function Input({ label, error, hint, prefix, suffix, mono, style, multili
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt v="strong" style={{ fontSize: 13 }}>{label}</Txt> : null}
-      <View style={[{ minHeight: 52, borderRadius: 14, backgroundColor: error ? c.errbg : c.sf, borderWidth: focus || error ? 2 : 1.5,
+      <View style={[{ minHeight: 54, borderRadius: 16, backgroundColor: error ? c.errbg : c.sf, borderWidth: focus || error ? 2 : 1,
         borderColor: error ? c.err : focus ? c.ember : c.line2, flexDirection: 'row', alignItems: multiline ? 'flex-start' : 'center', paddingHorizontal: 14, gap: 8 }, style]}>
         {prefix ? <Txt v="mono" color={c.mute}>{prefix}</Txt> : null}
         <TextInput maxFontSizeMultiplier={MAX_FONT_SCALE} placeholderTextColor={c.mute} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} multiline={multiline}
@@ -145,7 +147,7 @@ export function Banner({ tone = 'info', icon, title, body, action, onAction }) {
   const { c } = useTheme();
   const t = { ok: [c.sagebg, c.sage, 'check-circle'], warn: [c.warnbg, c.warn, 'clock-outline'], err: [c.errbg, c.err, 'alert-circle'], info: [c.sf2, c.ink, 'information-outline'] }[tone];
   return (
-    <View style={{ backgroundColor: t[0], borderRadius: 16, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+    <View style={{ backgroundColor: t[0], borderRadius: 18, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
       <Icon name={icon || t[2]} size={20} color={t[1]} />
       <View style={{ flex: 1, gap: 2 }}>
         {title ? <Txt v="bold" color={t[1]} style={{ fontSize: 14 }}>{title}</Txt> : null}
@@ -158,7 +160,7 @@ export function Banner({ tone = 'info', icon, title, body, action, onAction }) {
 
 export function Pill({ label, tone = 'neutral' }) {
   const { c, f } = useTheme();
-  const t = { ok: [c.sagebg, c.sage], warn: [c.warnbg, c.warn], err: [c.errbg, c.err], live: ['rgba(233,144,74,0.16)', c.acc], neutral: [c.sf2, c.mute] }[tone];
+  const t = { ok: [c.sagebg, c.sage], warn: [c.warnbg, c.warn], err: [c.errbg, c.err], live: [c.navact, c.navactink], neutral: [c.sf2, c.mute] }[tone];
   return <View style={{ alignSelf: 'flex-start', backgroundColor: t[0], borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 }}>
     <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: t[1], fontFamily: f.semibold, fontSize: 12 }}>{label}</Text></View>;
 }
@@ -166,11 +168,11 @@ export function Pill({ label, tone = 'neutral' }) {
 export function Segmented({ options, value, onChange }) {
   const { c, f } = useTheme();
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: c.sf, borderRadius: 100, padding: 4 }}>
+    <View style={{ flexDirection: 'row', backgroundColor: c.sf2, borderRadius: 100, padding: 4 }}>
       {options.map((o) => {
         const on = (o.value ?? o) === value;
-        return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.hc : 'transparent' }}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 13, color: on ? c.hink : c.mute }}>{o.label ?? o}</Text></Pressable>;
+        return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0 }}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 13, color: on ? c.ink : c.mute }}>{o.label ?? o}</Text></Pressable>;
       })}
     </View>
   );
@@ -187,13 +189,13 @@ export function Row({ icon, iconColor, title, subtitle, right, onPress, last }) 
     </C>
   );
 }
-export const Group = ({ children, style }) => { const { c } = useTheme(); return <View style={[{ backgroundColor: c.sf, borderRadius: 20, overflow: 'hidden' }, style]}>{children}</View>; };
+export const Group = ({ children, style }) => { const { c } = useTheme(); return <View style={[{ backgroundColor: c.sf, borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: c.line }, style]}>{children}</View>; };
 
 export function Empty({ icon, title, body, action, onAction }) {
   const { c } = useTheme();
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 }}>
-      <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: c.sf2, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={34} color={c.mute} /></View>
+      <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={34} color={c.navactink} /></View>
       <Txt v="h1" style={{ textAlign: 'center' }}>{title}</Txt>
       {body ? <Txt v="small" style={{ textAlign: 'center', fontSize: 14, lineHeight: 21 }}>{body}</Txt> : null}
       {action ? <Button title={action} onPress={onAction} style={{ marginTop: 6, alignSelf: 'stretch' }} /> : null}
@@ -211,7 +213,7 @@ export function Steps({ steps }) {
           <View key={st.label} style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ alignItems: 'center' }}>
               {st.state === 'done' ? <View style={[s.dot, { backgroundColor: c.sage }]}><Icon name="check" size={14} color="#fff" /></View>
-                : st.state === 'current' ? <View style={[s.dot, { backgroundColor: c.ember, borderWidth: 4, borderColor: 'rgba(233,144,74,0.25)' }]} />
+                : st.state === 'current' ? <View style={[s.dot, { backgroundColor: c.ember, borderWidth: 4, borderColor: c.navact }]} />
                 : <View style={[s.dot, { borderWidth: 2, borderColor: c.line2 }]} />}
               {!last ? <View style={{ width: 2, height: 24, backgroundColor: st.state === 'done' ? c.sage : c.line2 }} /> : null}
             </View>
@@ -233,8 +235,8 @@ export function OtpBoxes({ value, onChange, length = 6, error, autoFocus = true 
     <Pressable onPress={() => ref.current?.focus()} style={{ flexDirection: 'row', gap: 8 }}>
       {Array.from({ length }).map((_, i) => {
         const ch = value[i]; const active = i === value.length;
-        return <View key={i} style={{ flex: 1, height: 58, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: error ? c.errbg : c.sf,
-          borderWidth: active || error ? 2 : 1.5, borderColor: error ? c.err : active ? c.ember : c.line2 }}>
+        return <View key={i} style={{ flex: 1, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: error ? c.errbg : c.sf,
+          borderWidth: active || error ? 2 : 1, borderColor: error ? c.err : active ? c.ember : c.line2 }}>
           <Text maxFontSizeMultiplier={1} style={{ fontFamily: f.mono, fontSize: 24, color: error ? c.err : c.ink }}>{ch || ''}</Text></View>;
       })}
       <TextInput ref={ref} value={value} onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, length))} keyboardType="number-pad"
@@ -251,7 +253,7 @@ export function Toggle({ value, onValueChange }) {
 export function Stars({ value, onChange, size = 36 }) {
   const { c } = useTheme();
   return <View style={{ flexDirection: 'row', gap: 6 }}>{[1, 2, 3, 4, 5].map((n) =>
-    <Pressable key={n} onPress={() => onChange?.(n)} hitSlop={4} accessibilityLabel={n + ' stars'}><Icon name={n <= value ? 'star' : 'star-outline'} size={size} color={n <= value ? c.yolk : c.line2} /></Pressable>)}</View>;
+    <Pressable key={n} onPress={() => onChange?.(n)} hitSlop={4} accessibilityLabel={n + ' stars'}><Icon name={n <= value ? 'star' : 'star-outline'} size={size} color={n <= value ? c.warn : c.line2} /></Pressable>)}</View>;
 }
 
 export function Sheet({ visible, onClose, children }) {
@@ -259,7 +261,7 @@ export function Sheet({ visible, onClose, children }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: c.scrim }} onPress={onClose} />
-      <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: 32, gap: 16 }}>
+      <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 20, paddingBottom: 32, gap: 16 }}>
         <View style={{ width: 36, height: 4, borderRadius: 4, backgroundColor: c.line2, alignSelf: 'center' }} />
         {children}
       </View>
@@ -304,7 +306,7 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
     <View style={{ gap: 6 }}>
       {label ? <Txt v="strong" style={{ fontSize: 13 }}>{label}</Txt> : null}
       <Pressable onPress={show} accessibilityRole="button" accessibilityLabel={(label || 'Date') + ', ' + (shown || 'not set')}
-        style={{ minHeight: 52, borderRadius: 14, backgroundColor: error ? c.errbg : c.sf, borderWidth: error ? 2 : 1.5, borderColor: error ? c.err : c.line2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 }}>
+        style={{ minHeight: 54, borderRadius: 16, backgroundColor: error ? c.errbg : c.sf, borderWidth: error ? 2 : 1, borderColor: error ? c.err : c.line2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 }}>
         <Icon name="calendar-month-outline" size={22} color={c.acc} />
         <Txt v={shown ? 'strong' : 'body'} color={shown ? c.ink : c.mute} style={{ flex: 1 }}>{shown || placeholder}</Txt>
         <Icon name="chevron-down" size={20} color={c.mute} />
@@ -324,7 +326,7 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
             {years.map((y) => (
               <Pressable key={y} onPress={() => { setView((v) => ({ ...v, y })); setPickYear(false); }}
                 style={{ flexBasis: '22%', flexGrow: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: y === view.y ? c.ember : c.sf, borderWidth: 1.5, borderColor: y === view.y ? c.ember : c.line2 }}>
-                <Txt v="mono" color={y === view.y ? '#17120E' : c.ink} style={{ fontSize: 14 }}>{y}</Txt></Pressable>))}
+                <Txt v="mono" color={y === view.y ? c.onember : c.ink} style={{ fontSize: 14 }}>{y}</Txt></Pressable>))}
           </ScrollView>
         ) : (
           <View style={{ gap: 4 }}>
@@ -337,7 +339,7 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
                   return (
                     <Pressable key={i} disabled={!ok} onPress={() => pick(iso)} accessibilityLabel={d + ' ' + MONTHS[view.m] + ' ' + view.y} accessibilityState={{ selected: on, disabled: !ok }} style={{ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                       <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.ember : 'transparent', borderWidth: iso === today && !on ? 1.5 : 0, borderColor: c.ember }}>
-                        <Txt v={on ? 'bold' : 'body'} color={on ? '#17120E' : ok ? c.ink : c.line2} maxFontSizeMultiplier={1.1}>{d}</Txt>
+                        <Txt v={on ? 'bold' : 'body'} color={on ? c.onember : ok ? c.ink : c.line2} maxFontSizeMultiplier={1.1}>{d}</Txt>
                       </View>
                     </Pressable>
                   );
@@ -391,8 +393,8 @@ export function Loading() {
 
 export function Stat({ label, value, sub, subColor }) {
   const { c } = useTheme();
-  return <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 16, padding: 12, gap: 2 }}>
-    <Txt v="label">{label}</Txt><Txt v="mono" style={{ fontSize: 20 }}>{value}</Txt>{sub ? <Txt v="small" color={subColor}>{sub}</Txt> : null}</View>;
+  return <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 20, padding: 14, gap: 2, borderWidth: 1, borderColor: c.line }}>
+    <Txt v="label">{label}</Txt><Txt v="mono" style={{ fontSize: 22, letterSpacing: -0.4 }}>{value}</Txt>{sub ? <Txt v="small" color={subColor}>{sub}</Txt> : null}</View>;
 }
 
 export function PhotoBox({ uri, size = 72, radius = 14 }) {

@@ -88,24 +88,24 @@ function Home({ navigation, ctx }) {
   if (offered.length) {
     const pay = offered.reduce((s, o) => s + Number(o.earning || 0), 0);
     return (
-      <Screen bg="#17120E" scroll style={{ paddingTop: 24, gap: 18 }}>
+      <Screen bg="#0C0D0D" scroll style={{ paddingTop: 24, gap: 18 }}>
         <View style={{ alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 132, height: 132, borderRadius: 66, borderWidth: 8, borderColor: left > 20 ? '#E9904A' : '#F08A72', alignItems: 'center', justifyContent: 'center' }}>
-            <Txt v="monoLg" color="#F3EADF">0:{String(Math.max(0, left)).padStart(2, '0')}</Txt><Txt v="label" color="#A8998A">to accept</Txt></View>
-          <Txt v="h1" color="#F3EADF">{offered.length > 1 ? offered.length + ' deliveries, one pickup' : 'New delivery'}</Txt>
-          <Txt v="mono" color="#F2B33D" style={{ fontSize: 18 }}>You earn {naira(pay)}</Txt>
+          <View style={{ width: 132, height: 132, borderRadius: 66, borderWidth: 8, borderColor: left > 20 ? '#2DCB8C' : '#F3857A', alignItems: 'center', justifyContent: 'center' }}>
+            <Txt v="monoLg" color="#F4F5F3">0:{String(Math.max(0, left)).padStart(2, '0')}</Txt><Txt v="label" color="#9AA09C">to accept</Txt></View>
+          <Txt v="h1" color="#F4F5F3">{offered.length > 1 ? offered.length + ' deliveries, one pickup' : 'New delivery'}</Txt>
+          <Txt v="mono" color="#5FC7A0" style={{ fontSize: 18 }}>You earn {naira(pay)}</Txt>
         </View>
-        <View style={{ backgroundColor: '#221B15', borderColor: '#3A2F25', borderWidth: 1, borderRadius: 22, padding: 16, gap: 14 }}>
-          <View style={{ gap: 2 }}><Txt v="label" color="#A8998A">Pickup</Txt><Txt v="bold" color="#F3EADF" style={{ fontSize: 16 }}>{trip.pickup.name}</Txt><Txt v="small" color="#A8998A">{trip.pickup.location}</Txt></View>
+        <View style={{ backgroundColor: '#161818', borderColor: '#262929', borderWidth: 1, borderRadius: 22, padding: 16, gap: 14 }}>
+          <View style={{ gap: 2 }}><Txt v="label" color="#9AA09C">Pickup</Txt><Txt v="bold" color="#F4F5F3" style={{ fontSize: 16 }}>{trip.pickup.name}</Txt><Txt v="small" color="#9AA09C">{trip.pickup.location}</Txt></View>
           {offered.map((o, i) => (
-            <View key={o.id} style={{ gap: 2, borderTopWidth: 1, borderColor: '#3A2F25', paddingTop: 12 }}>
-              <Txt v="label" color="#A8998A">Drop-off {offered.length > 1 ? i + 1 : ''} · {o.code}</Txt>
-              <Txt v="bold" color="#F3EADF" style={{ fontSize: 16 }}>{o.dropoff.area || o.dropoff.line}</Txt>
-              <Txt v="small" color="#A8998A">{itemsText(o)}</Txt>
+            <View key={o.id} style={{ gap: 2, borderTopWidth: 1, borderColor: '#262929', paddingTop: 12 }}>
+              <Txt v="label" color="#9AA09C">Drop-off {offered.length > 1 ? i + 1 : ''} · {o.code}</Txt>
+              <Txt v="bold" color="#F4F5F3" style={{ fontSize: 16 }}>{o.dropoff.area || o.dropoff.line}</Txt>
+              <Txt v="small" color="#9AA09C">{itemsText(o)}</Txt>
             </View>
           ))}
         </View>
-        <Button title={offered.length > 1 ? 'Accept all ' + offered.length : 'Accept delivery'} loading={busy} onPress={() => respond(true)} style={{ backgroundColor: '#E9904A', height: 60 }} />
+        <Button title={offered.length > 1 ? 'Accept all ' + offered.length : 'Accept delivery'} loading={busy} onPress={() => respond(true)} style={{ backgroundColor: '#2DCB8C', height: 60 }} />
         <Button variant="ghost" title="Can't take this" disabled={busy} onPress={() => respond(false)} style={{ marginBottom: 12 }} />
       </Screen>
     );
@@ -113,7 +113,7 @@ function Home({ navigation, ctx }) {
   if (needLoc) return (
     <Screen scroll footer={<><Button title="Open settings" onPress={() => Linking.openSettings()} /><Button variant="ghost" title="Stay offline" onPress={() => setNeedLoc(false)} /></>}>
       <View style={{ height: 32 }} />
-      <Hearth><Icon name="crosshairs-gps" size={36} color={c.ember} /></Hearth>
+      <Hearth><Icon name="crosshairs-gps" size={36} color={c.hacc} /></Hearth>
       <Txt v="display">Allow location to start your shift</Txt>
       <Txt v="body" color={c.mute}>Dispatch only sends pickups to riders it can locate. Location is shared only while you're available or on a delivery, and stops when a delivery completes.</Txt>
     </Screen>
@@ -251,7 +251,7 @@ function Trip({ navigation, ctx }) {
     <Screen pad={false} edges={[]}>
       <MapView provider={PROVIDER_GOOGLE} style={{ flex: 1 }} showsUserLocation
         initialRegion={{ latitude: dest.lat || me?.latitude || PH.latitude, longitude: dest.lng || me?.longitude || PH.longitude, latitudeDelta: 0.06, longitudeDelta: 0.06 }}>
-        {dest.lat ? <Marker coordinate={{ latitude: dest.lat, longitude: dest.lng }} title={dest.name} pinColor={heading ? '#F2B33D' : '#E9904A'} /> : null}
+        {dest.lat ? <Marker coordinate={{ latitude: dest.lat, longitude: dest.lng }} title={dest.name} pinColor={heading ? '#5FC7A0' : '#2DCB8C'} /> : null}
       </MapView>
       <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -24, padding: 20, paddingBottom: 32, gap: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

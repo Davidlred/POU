@@ -15,7 +15,7 @@ function RoleSwitch() {
   return (
     <View style={{ flexDirection: 'row', backgroundColor: c.sf, borderRadius: 100, padding: 3, borderWidth: 1, borderColor: c.line }}>
       <Pressable onPress={() => setActiveRole('buyer')} style={{ paddingHorizontal: 14, height: 40, justifyContent: 'center' }}><Txt v="strong" color={c.mute} style={{ fontSize: 12 }}>Buy</Txt></Pressable>
-      <View style={{ paddingHorizontal: 14, height: 40, justifyContent: 'center', borderRadius: 100, backgroundColor: c.yolk }}><Txt v="bold" color="#2A2119" style={{ fontSize: 12 }}>Sell</Txt></View>
+      <View style={{ paddingHorizontal: 14, height: 40, justifyContent: 'center', borderRadius: 100, backgroundColor: c.yolk }}><Txt v="bold" color={c.onyolk} style={{ fontSize: 12 }}>Sell</Txt></View>
     </View>
   );
 }
@@ -115,7 +115,7 @@ export function MyListingsScreen({ navigation }) {
           ))}
       </ScrollView>
       <Pressable onPress={() => navigation.navigate('ListingForm')} style={{ position: 'absolute', right: 20, bottom: 20, height: 56, paddingHorizontal: 20, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', alignItems: 'center', gap: 8, elevation: 4 }}>
-        <Icon name="plus" color="#2A2119" /><Txt v="bold" color="#2A2119">Add listing</Txt>
+        <Icon name="plus" color={c.onyolk} /><Txt v="bold" color={c.onyolk}>Add listing</Txt>
       </Pressable>
     </Screen>
   );
@@ -286,7 +286,7 @@ export function VendorOrderScreen({ navigation, route }) {
   if (o.status === 'placed') return (
     <Screen scroll footer={<View style={{ flexDirection: 'row', gap: 10 }}><Button variant="outline" title="Decline" onPress={() => setDecl(true)} style={{ width: 120 }} /><Button title="Accept order" loading={busy} onPress={() => act(() => rpc('vendor_respond', { p_sub: o.id, p_accept: true }))} style={{ flex: 1 }} /></View>}>
       <AppBar title={o.code} />
-      <Hearth><View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}><Icon name="timer-outline" size={30} color={c.ember} /><View><Txt v="monoLg" color={c.hink} style={{ fontSize: 26 }}>{cd.text}</Txt><Txt v="small" color={c.hmute}>left to accept · auto-refunds after 24 h</Txt></View></View></Hearth>
+      <Hearth><View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}><Icon name="timer-outline" size={30} color={c.hacc} /><View><Txt v="monoLg" color={c.hink} style={{ fontSize: 26 }}>{cd.text}</Txt><Txt v="small" color={c.hmute}>left to accept · auto-refunds after 24 h</Txt></View></View></Hearth>
       <Txt v="h1">{summary}</Txt>
       <Card style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Icon name="account-outline" /><View><Txt v="bold">{o.buyer}</Txt><Txt v="small">{o.area}</Txt></View></Card>
       {money}
@@ -307,7 +307,7 @@ export function VendorOrderScreen({ navigation, route }) {
       <Txt v="display">Prepare {summary} for pickup</Txt>
       <Card style={{ padding: 0 }}>{['Count the items against the order', 'Remove anything damaged or below grade', 'Pack and place by the farm gate'].map((t, i) => (
         <Pressable key={t} onPress={() => setChecks(checks.map((v, j) => (j === i ? !v : v)))} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', padding: 16, borderBottomWidth: i < 2 ? 1 : 0, borderColor: c.line }}>
-          <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: checks[i] ? c.ember : 'transparent', borderWidth: checks[i] ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{checks[i] ? <Icon name="check" size={18} color="#17120E" /> : null}</View>
+          <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: checks[i] ? c.ember : 'transparent', borderWidth: checks[i] ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{checks[i] ? <Icon name="check" size={18} color={c.onyolk} /> : null}</View>
           <Txt v="body" style={{ flex: 1 }}>{t}</Txt></Pressable>))}</Card>
       <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="clipboard-check-outline" size={18} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>The rider checks quantity and condition against your listing at pickup.</Txt></View>
       <Sheet visible={choose} onClose={() => setChoose(false)}>

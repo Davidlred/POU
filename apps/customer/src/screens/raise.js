@@ -107,7 +107,7 @@ export function BadgeScreen({ navigation }) {
       <AppBar title="Investment badge" />
       {badge === 'approved' ? <Banner tone="ok" icon="check-decagram" title="Your farm holds an investment badge" body="Investors see this badge next to your farm name." />
         : badge === 'rejected' ? <Card tone="err"><Txt v="label" color={c.err}>What to fix</Txt><Txt v="body">{vendor.investment_badge_reason || 'We could not approve your documents.'}</Txt></Card>
-        : <Hearth><Icon name="clock-outline" size={32} color={c.ember} /><Txt v="h2" color={c.hink}>Application submitted</Txt><Txt v="small" color={c.hmute}>We review badge applications within a few working days. This screen updates by itself.</Txt></Hearth>}
+        : <Hearth><Icon name="clock-outline" size={32} color={c.hacc} /><Txt v="h2" color={c.hink}>Application submitted</Txt><Txt v="small" color={c.hmute}>We review badge applications within a few working days. This screen updates by itself.</Txt></Hearth>}
       <Card><Txt v="label">Documents on file</Txt><Txt v="bold">{(vendor?.investment_docs || []).length} uploaded</Txt></Card>
       {__DEV__ && badge === 'pending' ? <Card><Txt v="label">Developer only</Txt><View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Approve" onPress={() => dev('approved')} style={{ flex: 1 }} /><Button small variant="outline" title="Reject" onPress={() => dev('rejected')} style={{ flex: 1 }} /></View></Card> : null}
     </Screen>

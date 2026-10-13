@@ -60,7 +60,9 @@ function TabBar({ state, descriptors, navigation }) {
           return (
             <Pressable key={r.key} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={o.title}
               onPress={() => navigation.navigate(r.name)} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-              <View style={{ width: 56, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.navact : 'transparent' }}>
+              <View style={{ width: 68, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+                {/* The pill is its own view with fixed styles: toggling backgroundColor on one view rendered square corners on Android. */}
+                {on ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 17, overflow: 'hidden', backgroundColor: c.navact }} /> : null}
                 <Icon name={on ? o.icon : o.iconOff || o.icon} size={22} color={on ? c.navactink : c.mute} />
               </View>
               <Text maxFontSizeMultiplier={1.15} numberOfLines={1} style={{ fontFamily: on ? f.bold : f.medium, fontSize: 12, color: on ? c.ink : c.mute }}>{o.title}</Text>

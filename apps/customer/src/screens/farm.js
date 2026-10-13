@@ -293,6 +293,8 @@ export function VaccinationsScreen({ navigation, route }) {
         <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Cancel" onPress={() => setForm(false)} style={{ flex: 1 }} /><Button small title="Save" onPress={add} style={{ flex: 1 }} /></View>
       </Card> : null}
       {!notif.granted && upcoming.length ? <Banner tone="warn" icon="bell-off-outline" title="Reminders are turned off" body="Allow notifications and your phone will remind you 2 days before each vaccination and on the day." action="Turn on" onAction={allowNotifs} /> : null}
+      {!form ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'health', flockId })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Icon name="calendar-heart" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Vaccination chart</Txt><Txt v="small">See what your birds need by age and add it all to your schedule in one tap</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
       {!list.length && !form ? <Empty icon="needle" title="No schedule set" body="Add upcoming vaccinations and your phone will remind you 2 days before and on the day." /> : null}
       {sec('Overdue', list.filter((v) => !v.administered_date && v.scheduled_date < today), 'err')}
       {sec('Upcoming', list.filter((v) => !v.administered_date && v.scheduled_date >= today).sort((a, b) => (a.scheduled_date > b.scheduled_date ? 1 : -1)))}

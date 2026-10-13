@@ -120,7 +120,7 @@ export function HomeScreen({ navigation }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="h2">Fresh today</Txt><Txt v="bold" color={c.acc} onPress={() => navigation.navigate('Market')} style={{ fontSize: 13 }}>See all</Txt></View>
         {fresh === null ? <><Skeleton h={88} r={20} /><Skeleton h={88} r={20} /></>
           : fresh.length ? fresh.map((l) => <ListRow key={l.id} l={l} hideFarm onPress={() => navigation.navigate('Product', { id: l.id, viaSearch: true })} />)
-          : <Empty icon="egg-outline" title="No listings yet" body="Verified farms near you will appear here." />}
+          : <Empty icon="egg-outline" title="Nothing listed yet" body="Products from verified farms will appear here as soon as they are published." />}
       </ScrollView>
     </Screen>
   );
@@ -189,10 +189,10 @@ export function ListingsScreen({ navigation, route }) {
           {active ? <View style={{ minWidth: 18, height: 18, borderRadius: 9, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" style={{ fontSize: 11, color: '#2A2119' }}>{active}</Txt></View> : null}
         </Pressable>} />}
       {items === null ? <View style={{ padding: 20, gap: 12 }}><Skeleton h={180} r={20} /><Skeleton h={180} r={20} /></View>
-        : !items.length ? (search && !q ? <Empty icon="magnify" title="Search 2,000+ listings" body="Try eggs, broilers, turkey or feed." />
+        : !items.length ? (search && !q ? <Empty icon="magnify" title="Search the marketplace" body="Try eggs, broilers, turkey or feed." />
           : search ? <View style={{ padding: 20 }}><Empty icon="magnify-close" title={'Nothing for "' + q + '"'} body="Try a shorter word, or browse a category instead." />
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{CATEGORIES.slice(0, 4).map((k) => <Chip key={k.id} label={k.label} onPress={() => navigation.replace('Listings', { category: k.id })} />)}</View></View>
-          : <View style={{ padding: 20 }}><Empty icon="basket-off-outline" title={'No ' + (catLabel(category) || 'listings').toLowerCase() + ' near you yet'} body="Try a related category." />
+          : <View style={{ padding: 20 }}><Empty icon="basket-off-outline" title={'No ' + (catLabel(category) || 'products').toLowerCase() + ' listed yet'} body={active ? 'Nothing matches your filters. Clear them, or try another category.' : 'Farms add new products often. Check back soon, or try another category.'} />
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{CATEGORIES.filter((k) => k.id !== category).slice(0, 3).map((k) => <Chip key={k.id} label={k.label} onPress={() => navigation.replace('Listings', { category: k.id })} />)}</View></View>)
         : <FlatList data={items} keyExtractor={(x) => x.id} numColumns={2} columnWrapperStyle={{ gap: 12 }} contentContainerStyle={{ padding: 20, gap: 12 }}
             ListHeaderComponent={search ? <Txt v="small" style={{ marginBottom: 4 }}>{items.length} results</Txt> : null}

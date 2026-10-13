@@ -6,7 +6,7 @@ Context file for an AI coding assistant working in this repo. Read it fully befo
 Poultry360 is an Android-first marketplace and farm-management app for Nigeria (launching in **Port Harcourt, Rivers State**). Buyers order poultry products from verified farms. **Poultry360 owns delivery**: its own riders pick up from farms and deliver. Farms also get Farm Hub (offline flock records), vet booking and a waste/manure marketplace.
 
 - Currency is NGN (₦), phone numbers are +234, timezone is Africa/Lagos (the IANA name for all of Nigeria/WAT; keep it even though the launch city is Port Harcourt). Delivery areas, examples and the map default are Port Harcourt.
-- Stack: **Expo (React Native, JavaScript, no TypeScript)**, **Supabase** (Postgres, email OTP auth, realtime, storage), **react-native-maps** (Google).
+- Stack: **Expo (React Native, JavaScript, no TypeScript)**, **Supabase** (Postgres, email code + password auth, realtime, storage), **react-native-maps** (Google).
 - Payments are **simulated** (Paystack stand-in). There is no real money movement.
 
 ## Repo layout (npm workspaces)
@@ -23,7 +23,7 @@ poultry360-mobile/
 │  ├─ theme.js               # palettes.light / palettes.dark, fonts, radius
 │  ├─ ThemeProvider.js       # useTheme() → { c, f, mode, pref, setPref, toggle }
 │  ├─ ui.js                  # UI kit (see below)
-│  ├─ auth.js                # EmailScreen, OtpScreen (email code + 3-strike 15-min lockout)
+│  ├─ auth.js                # SignInScreen, EmailScreen, OtpScreen (3-strike 15-min lockout), PasswordScreen, usePasswordGate()
 │  ├─ format.js              # naira(), countdown(), timeAgo(), normalizeNgPhone(), normalizeEmail(), STATUS_LABEL…
 │  └─ fonts.js               # useP360Fonts()
 ├─ apps/customer/            # Buyer + Vendor/Farm + Supplier app (role switch inside)
@@ -78,8 +78,8 @@ The app reads, in order: `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON
 ## Supabase setup
 1. **SQL Editor → New query** → paste the *contents* of `supabase/schema.sql` → Run. (Pasting the path `supabase/schema.sql` gives `syntax error at or near "supabase"`.)
 2. If you get `relation "profiles" already exists`, run `supabase/reset.sql` first, then `schema.sql` again. reset.sql **deletes all Poultry360 data**.
-3. **Email sign-in** (6-digit code by email; phone/SMS auth is no longer used):
-   - **Authentication → Sign In / Providers → Email**: enabled. **Email OTP Length = 6** (the app's code boxes are 6).
+3. **Sign-in: email code + password** (phone/SMS auth is no longer used). New account: email → 6-digit code → create a password. Returning: email + password. Forgot: email → code → new password. The code proves the email; the password is what they sign in with afterwards. `usePasswordGate(session)` (in `auth.js`) returns `'create'` while `user_metadata.has_password` is missing (so accounts made before passwords existed are asked for one on next open) or `'change'` after a reset / Profile → Change password; both apps then render `PasswordScreen` **instead of** the navigator. Password rules live in `passwordProblem()`: 8+ characters with a letter and a number. Settings needed:
+   - **Authentication → Sign In / Providers → Email**: enabled (this also enables password sign-in). **Email OTP Length = 6** (the app's code boxes are 6). Keep **Minimum password length** at 8 or lower, and leave **Secure password change** off (the app sets the password straight after the code).
    - **Authentication → Emails → Templates**: in both **Magic Link** and **Confirm signup**, put the code in the body, e.g. `<p>Your Poultry360 code is <strong>{{ .Token }}</strong></p>`. Without `{{ .Token }}` users get a link instead of a code.
    - Supabase's built-in mailer is for testing only: it sends just a few emails per hour and only to addresses of your Supabase **team members**. For real users, set **Authentication → Emails → SMTP Settings** to a free SMTP provider (e.g. Resend or Brevo free tier).
    - Existing project that ran the old phone-based schema: run `supabase/migrations/001_email_auth.sql`.
@@ -104,7 +104,7 @@ The app reads, in order: `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON
 ```powershell
 npm run admin                         # from the repo root → http://localhost:5173
 ```
-- Sign in with an admin's email (6-digit code). Non-admins see a "Not an ops account" screen.
+- Sign in with an admin's email and password (the same account and password as the app). "Forgot password, or never set one?" emails a 6-digit code, then `SetPassword` (in `SignIn.jsx`) asks for a new password; admins with no password yet are asked to create one; the **Password** button in the top bar changes it. Non-admins see a "Not an ops account" screen.
 - **Riders**: add / edit / deactivate riders. The email entered is the rider's login for the rider app (email code); `admin_save_rider` links an existing account immediately, otherwise `rider_claim()` links it at first sign-in. Changing a rider's email unlinks the old login. "Copy instructions" gives a message to send the rider.
 - **Vets**: review vet registrations and licences; approve, reject with a reason, or remove from the vet list.
 - **Invest**: review KYC and farm badges (documents open via signed URLs), approve/reject offerings, start a funded term (releases money to the farm wallet), pay out returns (optionally final, returning principal), create pools from badge-approved farms.
@@ -151,6 +151,7 @@ npm run admin                         # from the repo root → http://localhost:
 - **Vaccination reminders** (`lib/reminders.js`, `expo-notifications`): **local** notifications scheduled on the phone, so they fire with no signal. Each pending vaccination gets one at 9am two days before and one at 7am on the day (`planReminders()` is pure and tested). `VaccinationReminders` in `navigation/index.js` re-syncs whenever the schedule changes (farm accounts only), cancels them on sign-out, and opens the Vaccinations screen when one is tapped. Permission is requested when the farmer schedules a vaccination, never at app start. These are not push notifications: nothing is sent from a server.
 - Vet care's **Drugs & vaccines** tile opens the farm's own inventory on that tab (`Inventory` with `{ tab: 'health' }`), which has a "Shop for drugs & vaccines" button to the marketplace.
 - **Farm inventory** (`screens/inventory.js`, table `farm_inventory`, synced through the same queue): feed, drugs, vaccines, equipment and other stock with quantity, unit, optional low-stock level and expiry date. `itemAlert()` flags expired / expiring in 30 days / out of stock / running low. Items are soft-removed (`status = removed`) because the queue only upserts. Logging feed used on a flock does **not** deduct from inventory yet.
+- **Vaccine & feed chart** (`screens/careguide.js`, data in `lib/careGuide.js`, pure and Node-testable): for **broilers (meat) and layers (eggs) only**, three views: vaccines and routine drugs by age, feed by age (with rough amounts for the flock's bird count and a list of Nigerian brands), and expected output (weekly weights for broilers, laying curve for layers). Opened from Inventory (Drugs & vaccines and Feed tabs) and from Vaccinations. Ages are days since `start_date` (day 0), the same count Farm Hub shows. With a flock picked, rows show real dates and status, and "Add N vaccinations to schedule" writes the missing future ones through `save('vaccinations', …)` (hatchery vaccines and drugs are not scheduled), so the existing reminders fire. The content is a general Nigerian programme (NVRI vaccines): every view of it must show `GUIDE_COPY` ("a guide, not a prescription"), and it must not recommend routine antibiotics.
 - **Symptom checker** output must always be framed as "preliminary triage, not a diagnosis".
 - RLS is on for every table. If a query returns empty unexpectedly, check policies before changing client code.
 - Storage buckets: `listing-photos` (public), `proofs` (public), `id-docs` (private), `symptom-photos` (private). Paths must start with `<auth.uid()>/`.

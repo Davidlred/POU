@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabase';
-import SignIn from './SignIn';
+import SignIn, { SetPassword } from './SignIn';
 import Farms from './Farms';
 import Riders from './Riders';
 import Invest from './Invest';
@@ -9,6 +9,7 @@ import Vets from './Vets';
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = still loading
   const [admin, setAdmin] = useState(undefined);
+  const [reset, setReset] = useState(false);          // true while the signed-in user is choosing a new password
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -17,6 +18,7 @@ export default function App() {
   }, []);
 
   const uid = session?.user?.id;
+  const hasPassword = !!session?.user?.user_metadata?.has_password;   // set by the apps and by SetPassword
   useEffect(() => {
     if (!uid) { setAdmin(undefined); return; }
     let live = true;
@@ -25,14 +27,18 @@ export default function App() {
   }, [uid]);
 
   if (session === undefined || (session && admin === undefined)) return <div className="center"><div className="spinner" aria-label="Loading" /></div>;
-  if (!session) return <SignIn />;
+  if (!session) return <SignIn onResetStarted={setReset} />;
+  // Came in with a code (forgot password) or pressed "Password" in the top bar: choose a new one first.
+  if (reset) return <SetPassword email={session.user.email} creating={!hasPassword} onDone={() => setReset(false)} />;
   if (!admin) return <NotAdmin email={session.user.email} />;
-  return <Shell user={session.user} />;
+  // Admin account from before passwords existed: create one before using the dashboard.
+  if (!hasPassword) return <SetPassword email={session.user.email} creating onDone={() => {}} />;
+  return <Shell user={session.user} onChangePassword={() => setReset(true)} />;
 }
 
 const SECTIONS = [{ id: 'farms', label: 'Farms' }, { id: 'riders', label: 'Riders' }, { id: 'vets', label: 'Vets' }, { id: 'invest', label: 'Invest' }];
 
-function Shell({ user }) {
+function Shell({ user, onChangePassword }) {
   const [section, setSection] = useState(() => (SECTIONS.some((s) => '#' + s.id === window.location.hash) ? window.location.hash.slice(1) : 'farms'));
   const go = (id) => { setSection(id); window.location.hash = id; };
   return (
@@ -46,6 +52,7 @@ function Shell({ user }) {
         </div>
         <div className="row gap">
           <span className="muted small hide-sm">{user.email}</span>
+          <button className="btn ghost sm" onClick={onChangePassword} title="Change your password">Password</button>
           <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>

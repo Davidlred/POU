@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -23,6 +23,7 @@ import { INVEST_ENABLED } from '../lib/roi';
 import { FarmBookScreen, CreditLogScreen, CreditEntryScreen, CreditCustomerScreen, CreditAllowScreen, MyCreditScreen } from '../screens/farmbook';
 import { VetApplyScreen, VetDeskScreen, VetBookingScreen } from '../screens/vetdesk';
 import { InventoryScreen, InventoryFormScreen } from '../screens/inventory';
+import { CareGuideScreen } from '../screens/careguide';
 import { useFarm } from '../lib/offlineQueue';
 import { syncVaccinationReminders, cancelVaccinationReminders, isVaccinationTap } from '../lib/reminders';
 
@@ -104,7 +105,8 @@ function Tabs(props) {
 function AuthFlow() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Email">{({ navigation }) => <EmailScreen onSent={(email) => navigation.navigate('Otp', { email })} />}</Stack.Screen>
+      <Stack.Screen name="SignIn">{({ navigation }) => <SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} />}</Stack.Screen>
+      <Stack.Screen name="Email">{({ navigation, route }) => <EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} />}</Stack.Screen>
       <Stack.Screen name="Otp">{({ navigation, route }) => <OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} />}</Stack.Screen>
     </Stack.Navigator>
   );
@@ -115,8 +117,11 @@ export default function Navigation() {
   const { session, profile, loading } = useAuth();
   // Signed out: this phone stops reminding about that account's flocks. (Kept above the early return: hooks must run every render.)
   useEffect(() => { if (session === null) cancelVaccinationReminders(); }, [session]);
+  const gate = usePasswordGate(session);   // 'create' for accounts with no password yet, 'change' after a reset or from Profile
   const base = mode === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: c.bg, card: c.bg, text: c.ink, border: c.line, primary: c.ember } };
+  // Signed in but no password yet (or choosing a new one): that comes before anything else in the app.
+  if (session && gate) return <PasswordScreen mode={gate} email={session.user?.email} />;
   if (loading) return <Splash />;
   const needsRole = session && !(profile?.roles || []).length;
   const farms = (profile?.roles || []).some((r) => r === 'vendor' || r === 'supplier');
@@ -168,6 +173,7 @@ export default function Navigation() {
             <Stack.Screen name="TxDetail" component={TxDetailScreen} />
             <Stack.Screen name="FarmBook" component={FarmBookScreen} />
             <Stack.Screen name="Inventory" component={InventoryScreen} />
+            <Stack.Screen name="CareGuide" component={CareGuideScreen} />
             <Stack.Screen name="InventoryForm" component={InventoryFormScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreditLog" component={CreditLogScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="CreditEntry" component={CreditEntryScreen} />

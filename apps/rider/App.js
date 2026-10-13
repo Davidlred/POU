@@ -6,7 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { ThemeProvider, liveChannel, ErrorBoundary, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, Pill, Stat,
+import { ThemeProvider, liveChannel, ErrorBoundary, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, startPasswordChange, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, Pill, Stat,
   Stars, Sheet, OtpBoxes, supabase, rpc, uploadImage, friendlyError, timeAgo, naira } from '@p360/shared';
 
 const Stack = createNativeStackNavigator();
@@ -357,6 +357,7 @@ function Profile({ navigation }) {
       <Txt v="label">Details</Txt>
       <Group>
         <Row icon="email-outline" title={r.email} subtitle="Sign-in email" />
+        <Row icon="lock-outline" title="Change password" subtitle="The password you sign in with" onPress={startPasswordChange} />
         <Row icon="phone-outline" title={r.phone ? '+' + r.phone : 'No phone on file'} subtitle="Contact number" />
         <Row icon="bank-outline" title={r.bank_verified ? r.bank_name + ' •••• ' + r.bank_account_last4 : 'Add payout account'} subtitle="Payout account" onPress={() => navigation.navigate('Bank')} />
         <Row last icon="calendar-outline" title={'Rider since ' + new Date(r.since).toLocaleDateString('en-NG', { month: 'long', year: 'numeric' })} subtitle="Details are managed by Poultry360 ops" />
@@ -431,10 +432,16 @@ function Bank({ navigation }) {
 function Root() {
   const [session, setSession] = useState(undefined);
   useEffect(() => { supabase.auth.getSession().then(({ data }) => setSession(data.session)); const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s)); return () => data.subscription.unsubscribe(); }, []);
+  const gate = usePasswordGate(session);
   if (session === undefined) return <Loading />;
+  if (session && gate) return <PasswordScreen mode={gate} email={session.user?.email} />;
   if (!session) return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Email">{({ navigation }) => <EmailScreen title="Rider sign-in" subtitle="Use the email Poultry360 ops registered for you." onSent={(email) => navigation.navigate('Otp', { email })} />}</Stack.Screen>
+      <Stack.Screen name="SignIn">{({ navigation }) => <SignInScreen title="Rider sign-in" subtitle="Use the email Poultry360 ops registered for you, and your password." createLabel="First time here? Set up with a code"
+        onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} />}</Stack.Screen>
+      <Stack.Screen name="Email">{({ navigation, route }) => <EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()}
+        title={route.params?.mode === 'reset' ? undefined : 'Set up your rider account'} subtitle={route.params?.mode === 'reset' ? undefined : "Enter the email Poultry360 ops registered for you. We'll send a 6-digit code, then you'll create a password."}
+        onSent={(email) => navigation.navigate('Otp', { email })} />}</Stack.Screen>
       <Stack.Screen name="Otp">{({ navigation, route }) => <OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} />}</Stack.Screen>
     </Stack.Navigator>
   );

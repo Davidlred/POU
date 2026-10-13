@@ -48,6 +48,12 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .auth { width: 100%; max-width: 400px; background: var(--sf); border: 1px solid var(--line); border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; gap: 14px; align-items: stretch; text-align: center; box-shadow: 0 12px 40px rgba(42, 33, 25, .08); }
 .auth .mark { align-self: center; margin-bottom: 4px; }
 .auth .btn { margin-top: 4px; }
+.pw { position: relative; }
+.pw .input { padding-right: 64px; }
+.pw .input:focus { padding-right: 63.5px; }
+.pw-eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; }
+.rules { list-style: none; margin: 0; padding: 0; text-align: left; font-size: 14px; color: var(--mute); display: grid; gap: 4px; }
+.rules .ok { color: var(--ok); }
 .otp { text-align: center; font-size: 26px; letter-spacing: .5em; padding-left: .5em; }
 .code { text-align: left; font: 12px/1.6 var(--mono); background: var(--sf2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; overflow-x: auto; margin: 0; }
 

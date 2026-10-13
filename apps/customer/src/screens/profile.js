@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Alert } from 'react-native';
-import { useTheme, Screen, AppBar, Txt, Button, Group, Row, Pill, Segmented, Icon, Sheet, Input, rpc, friendlyError } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Group, Row, Pill, Segmented, Icon, Sheet, Input, rpc, friendlyError, startPasswordChange } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
 export function ProfileScreen({ navigation }) {
@@ -45,6 +45,7 @@ export function ProfileScreen({ navigation }) {
       <Txt v="label">Settings</Txt>
       <Group>
         {vendor ? <Row icon="bank-outline" title="Payout account" subtitle={vendor.bank_verified ? vendor.bank_name + ' ••' + vendor.bank_account_last4 : 'Not added'} onPress={() => navigation.navigate('Bank')} /> : null}
+        <Row icon="lock-outline" title="Change password" subtitle="The password you sign in with" onPress={startPasswordChange} />
         <Row icon="shield-check-outline" title="Two-factor authentication" subtitle="Required for every withdrawal" right={<Pill tone="ok" label="On" />} />
         <Row icon="lifebuoy" title="Help & support" last onPress={() => {}} />
       </Group>

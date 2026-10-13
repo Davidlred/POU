@@ -55,6 +55,10 @@ export function InventoryScreen({ navigation, route }) {
           </View>
         ) : null}
         <Segmented options={TABS} value={tab} onChange={setTab} />
+        {tab === 'health' ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'health' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Icon name="calendar-heart" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Vaccination chart</Txt><Txt v="small">Which vaccines and drugs broilers and layers need, by age</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
+        {tab === 'feed' ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'feed' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Icon name="sack" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Feed chart</Txt><Txt v="small">The right feed for broilers and layers at each age, and how much</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
         {!shown.length ? <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'pill' : 'tools'}
           title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No drugs or vaccines recorded yet' : 'Nothing recorded here yet'}
           body={tab === 'feed' ? 'Add the feed you have in store so you know when to restock.' : tab === 'health' ? 'Add what is in your store, with expiry dates, so nothing goes off unnoticed.' : 'Feeders, drinkers, crates, shavings and anything else you keep.'}

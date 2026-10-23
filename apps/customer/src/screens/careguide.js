@@ -1,37 +1,33 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Icon, Banner, ChipRow, Segmented, Pill, isoDate, shortDate } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Card, Icon, Banner, Chip, Segmented, Pill, isoDate, shortDate } from '@p360/shared';
 import { useFarm, save, flockStats } from '../lib/offlineQueue';
 import { askForNotifications } from '../lib/reminders';
-import { GUIDE_COPY, BIRDS, HEALTH, FEEDS, FEED_RULES, VACCINE_NOTES, EXPECT, ageDays, ageLabel, addDays, missingVaccinations, rowStatus, feedStage, feedNeed } from '../lib/careGuide';
+import { GUIDE_COPY, BIRDS, HEALTH, FEEDS, FEED_RULES, VACCINE_NOTES, EXPECT, ageDays, ageLabel, addDays, missingVaccinations, rowStatus, feedStage, feedNeed, generalHealth } from '../lib/careGuide';
 
 const VIEWS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feed' }, { value: 'expect', label: 'Output' }];
-const TYPE_OPTIONS = [{ value: 'broilers', label: 'Broilers' }, { value: 'layers', label: 'Layers' }];
-const ALL = 'General chart';
+const TYPES = ['broilers', 'layers'];
+const FOR = { all: ['neutral', 'All flocks'], broilers: ['live', 'Broilers only'], layers: ['live', 'Layers only'] };
 const kg = (n) => Number(n).toLocaleString('en-NG', { maximumFractionDigits: 1 });
 
-// Vaccination, routine drug and feed chart by bird type and age. With one of the farmer's flocks picked,
-// it shows real dates, where the flock is today, and can put the vaccines on that flock's schedule.
+// Vaccine, drug, feed and output chart.
+// Opened with a flockId (from a flock or its vaccinations): only that flock's type, with its real dates.
+// Opened without one (from Inventory): the general chart for every flock type, each row saying which flocks take it.
 export function CareGuideScreen({ navigation, route }) {
   const { c } = useTheme();
   const { data } = useFarm();
   const today = isoDate();
-  const flocks = data.flocks.filter((f) => f.status !== 'inactive' && BIRDS[f.type]);
-  const first = flocks.find((f) => f.id === route.params?.flockId) || flocks[0];
-  const [type, setType] = useState(first?.type || 'broilers');
-  const [flockId, setFlockId] = useState(first?.id || null);
   const [view, setView] = useState(route.params?.view || 'health');
   const [added, setAdded] = useState(0);
   const [busy, setBusy] = useState(false);
 
-  const mine = flocks.filter((f) => f.type === type);
-  const flock = mine.find((f) => f.id === flockId) || null;
+  const flocks = data.flocks.filter((f) => f.status !== 'inactive' && BIRDS[f.type]);
+  const flock = flocks.find((f) => f.id === route.params?.flockId) || null;
+  const type = flock?.type || null;                       // null = general chart
   const age = flock ? ageDays(flock, today) : null;
   const birds = flock ? flockStats(flock, data.farm_logs).alive : 100;
-  const bird = BIRDS[type];
   const missing = flock ? missingVaccinations(flock, data.vaccinations, today) : [];
 
-  const pickType = (t) => { setType(t); setFlockId(flocks.find((f) => f.type === t)?.id || null); setAdded(0); };
   const addAll = async () => {
     setBusy(true);
     for (const m of missing) await save('vaccinations', { flock_id: flock.id, vaccine: m.vaccine, scheduled_date: m.scheduled_date });
@@ -50,7 +46,7 @@ export function CareGuideScreen({ navigation, route }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Icon name={it.kind === 'vaccine' ? 'needle' : 'pill'} size={18} color={it.kind === 'vaccine' ? c.acc : c.mute} />
           <Txt v="label" style={{ flex: 1 }}>{ageLabel(it)} · {it.kind === 'vaccine' ? 'Vaccine' : 'Drug / care'}</Txt>
-          {label ? <Pill tone={STATUS[st][0]} label={label} /> : null}
+          {label ? <Pill tone={STATUS[st][0]} label={label} /> : it.for ? <Pill tone={FOR[it.for][0]} label={FOR[it.for][1]} /> : null}
         </View>
         <Txt v="bold">{it.name}</Txt>
         <Txt v="small">{it.route} · {it.against}</Txt>
@@ -60,12 +56,12 @@ export function CareGuideScreen({ navigation, route }) {
     );
   };
 
-  const feedCard = (s) => {
-    const on = flock && feedStage(type, age) === s;
+  const feedCard = (t) => (s) => {
+    const on = flock && feedStage(t, age) === s;
     const need = feedNeed(s, birds);
-    const span = s.to == null ? 'From week ' + (Math.floor(s.from / 7) + 1) + (type === 'broilers' ? ' to sale' : ' onwards') : 'Weeks ' + (Math.floor(s.from / 7) + 1) + ' to ' + Math.round(s.to / 7);
+    const span = s.to == null ? 'From week ' + (Math.floor(s.from / 7) + 1) + (t === 'broilers' ? ' to sale' : ' onwards') : 'Weeks ' + (Math.floor(s.from / 7) + 1) + ' to ' + Math.round(s.to / 7);
     return (
-      <Card key={s.name} tone={on ? 'ok' : undefined}>
+      <Card key={t + s.name} tone={on ? 'ok' : undefined}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <Icon name="sack" size={18} color={c.acc} /><Txt v="label" style={{ flex: 1 }}>{span}</Txt>
           {on ? <Pill tone="ok" label={flock.code + ' is here'} /> : null}
@@ -83,46 +79,62 @@ export function CareGuideScreen({ navigation, route }) {
     );
   };
 
-  const ex = EXPECT[type];
+  const expect = (t) => {
+    const ex = EXPECT[t];
+    return (
+      <View key={t} style={{ gap: 10 }}>
+        <Txt v="label">{flock ? ex.title : BIRDS[t].label + ' · ' + ex.title.toLowerCase()}</Txt>
+        <Card>{ex.rows.map(([a, b], i) => (
+          <View key={a} style={{ flexDirection: 'row', gap: 12, paddingVertical: 6, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}>
+            <Txt v="bold" style={{ width: 110, fontSize: 14 }}>{a}</Txt><Txt v="small" style={{ flex: 1 }}>{b}</Txt>
+          </View>))}</Card>
+        <Txt v="small" color={c.mute}>{ex.note} {ex.unit}.</Txt>
+      </View>
+    );
+  };
+
+  const shown = type ? [type] : TYPES;
   return (
     <Screen scroll>
-      <AppBar title="Vaccine & feed chart" />
-      <Segmented options={TYPE_OPTIONS} value={type} onChange={pickType} />
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Icon name={bird.icon} size={28} color={c.acc} />
-        <View style={{ flex: 1 }}><Txt v="bold">{bird.label} · {bird.purpose}</Txt><Txt v="small">{bird.cycle}</Txt></View>
-      </Card>
-      {mine.length ? <ChipRow options={[...mine.map((f) => f.code), ALL]} value={flock ? flock.code : ALL} onChange={(v) => { setFlockId(mine.find((f) => f.code === v)?.id || null); setAdded(0); }} /> : null}
-      {flock ? <Txt v="small">{flock.code} · day {age} (week {Math.floor(age / 7) + 1}) · {birds.toLocaleString()} birds</Txt>
-        : !mine.length ? <Txt v="small">{'Add a ' + (type === 'broilers' ? 'broiler' : 'layer') + ' flock in Farm Hub to see its dates.'}</Txt> : null}
+      <AppBar title={flock ? flock.code + ' · ' + BIRDS[type].label : 'Vaccine & feed chart'} subtitle={flock ? 'Day ' + age + ' · week ' + (Math.floor(age / 7) + 1) + ' · ' + birds.toLocaleString() + ' birds' : 'All flock types'} />
+      {flock ? (
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Icon name={BIRDS[type].icon} size={28} color={c.acc} />
+          <View style={{ flex: 1 }}><Txt v="bold">{BIRDS[type].label} · {BIRDS[type].purpose}</Txt><Txt v="small">{BIRDS[type].cycle}</Txt></View>
+        </Card>
+      ) : flocks.length ? (
+        <View style={{ gap: 8 }}>
+          <Txt v="label">Open a flock's chart</Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {flocks.map((f) => <Chip key={f.id} icon={BIRDS[f.type].icon} label={f.code + ' · ' + BIRDS[f.type].label} onPress={() => navigation.push('CareGuide', { flockId: f.id, view })} />)}
+          </View>
+        </View>
+      ) : null}
       <Segmented options={VIEWS} value={view} onChange={setView} />
 
       {view === 'health' ? <>
         <Txt v="small" color={c.mute}>{GUIDE_COPY}</Txt>
         {flock && missing.length ? <Button icon="calendar-plus" loading={busy} disabled={busy} title={'Add ' + missing.length + ' vaccination' + (missing.length === 1 ? '' : 's') + ' to ' + flock.code + "'s schedule"} onPress={addAll} /> : null}
         {flock && added ? <Banner tone="ok" title={added + ' added. You will get reminders.'} action="See schedule" onAction={() => navigation.navigate('Vaccinations', { flockId: flock.id })} /> : null}
-        {HEALTH[type].map(healthRow)}
+        {(flock ? HEALTH[type] : generalHealth()).map(healthRow)}
         <Txt v="label">Handling</Txt>
         <Card>{VACCINE_NOTES.map((n) => <View key={n} style={{ flexDirection: 'row', gap: 8 }}><Icon name="check" size={16} color={c.sage} /><Txt v="small" style={{ flex: 1 }}>{n}</Txt></View>)}</Card>
         <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} />
       </> : null}
 
       {view === 'feed' ? <>
-        {FEEDS[type].map(feedCard)}
+        {shown.map((t) => (
+          <View key={t} style={{ gap: 10 }}>
+            {!flock ? <Txt v="h2">{BIRDS[t].label}</Txt> : null}
+            {FEEDS[t].map(feedCard(t))}
+          </View>
+        ))}
         <Txt v="small" color={c.mute}>Amounts are estimates.</Txt>
         <Card>{FEED_RULES.map((n) => <View key={n} style={{ flexDirection: 'row', gap: 8 }}><Icon name="check" size={16} color={c.sage} /><Txt v="small" style={{ flex: 1 }}>{n}</Txt></View>)}</Card>
         <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} />
       </> : null}
 
-      {view === 'expect' ? <>
-        <Txt v="label">{ex.title}</Txt>
-        <Card>{ex.rows.map(([a, b], i) => (
-          <View key={a} style={{ flexDirection: 'row', gap: 12, paddingVertical: 6, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}>
-            <Txt v="bold" style={{ width: 110, fontSize: 14 }}>{a}</Txt><Txt v="small" style={{ flex: 1 }}>{b}</Txt>
-          </View>))}</Card>
-        <Txt v="small" color={c.mute}>{ex.note}</Txt>
-        <Txt v="small" color={c.mute}>{ex.unit}</Txt>
-      </> : null}
+      {view === 'expect' ? shown.map(expect) : null}
     </Screen>
   );
 }

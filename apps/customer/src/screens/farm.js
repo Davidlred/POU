@@ -209,7 +209,10 @@ export function FlockDetailScreen({ navigation, route }) {
         <Button small variant="outline" icon="heart-minus-outline" title="Loss" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'mortality' })} style={{ flex: 1 }} />
       </View> : null}
       {tab === 'expenses' && !closed ? <Button small variant="outline" icon="cash-plus" title="Log vet or other cost" onPress={() => navigation.navigate('Log', { flockId: f.id, kind: 'expense' })} /> : null}
-      {tab === 'health' ? <Button small variant="outline" icon="folder-heart-outline" title="Health records" onPress={() => navigation.navigate('HealthRecords', { flockId: f.id })} /> : null}
+      {tab === 'health' ? <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button small variant="outline" icon="folder-heart-outline" title="Health records" onPress={() => navigation.navigate('HealthRecords', { flockId: f.id })} style={{ flex: 1 }} />
+        {!closed && (f.type === 'broilers' || f.type === 'layers') ? <Button small variant="outline" icon="calendar-heart" title="Vaccine chart" onPress={() => navigation.navigate('CareGuide', { flockId: f.id, view: 'health' })} style={{ flex: 1 }} /> : null}
+      </View> : null}
       {rows.length ? <Group>{rows.slice(0, shown).map((l, i) => (
         <Row key={l.id} last={i === Math.min(rows.length, shown) - 1} title={(l.kind === 'expense' || (l.kind === 'feed' && l.cost) ? naira(l.cost) + (l.kind === 'feed' ? ' · ' + l.quantity + ' kg' : '') : Number(l.quantity).toLocaleString() + ' ' + (l.unit || unit)) + (l.cause ? ' · ' + l.cause : '')}
           subtitle={(closed ? dmy(l.log_date) : shortDate(l.log_date)) + (l.updated_by ? ' · by ' + l.updated_by : '')}
@@ -264,6 +267,7 @@ export function VaccinationsScreen({ navigation, route }) {
   const code = (id) => data.flocks.find((f) => f.id === id)?.code;
   const [form, setForm] = useState(false); const [vac, setVac] = useState(''); const [date, setDate] = useState(today); const [fl, setFl] = useState(flockId || active[0]?.id);
   const done = async (v) => {
+    if (v.scheduled_date > today) return;   // not before the day it is due
     await save('vaccinations', { ...v, _pending: undefined, _failed: undefined, administered_date: today });
     save('health_records', { flock_id: v.flock_id, source: 'vaccination', author: 'Self', title: v.vaccine + ' administered' });
   };
@@ -281,7 +285,9 @@ export function VaccinationsScreen({ navigation, route }) {
     <Card key={v.id} tone={tone === 'err' ? 'err' : undefined}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="bold" style={{ flex: 1 }}>{v.vaccine} · {code(v.flock_id)}</Txt>{tone === 'err' ? <Txt v="label" color={c.err}>{Math.round((Date.now() - new Date(v.scheduled_date)) / 864e5)} days late</Txt> : null}</View>
       <Txt v="small">{v.administered_date ? 'Given ' + shortDate(v.administered_date) + ' · logged to health record' : shortDate(v.scheduled_date) + (tone ? '' : notif.granted ? ' · you\'ll be reminded 2 days before and on the day' : ' · reminders are off')}</Txt>
-      {!v.administered_date ? <Button small variant={tone === 'err' ? 'dark' : 'outline'} title="Mark administered" onPress={() => done(v)} /> : null}
+      {!v.administered_date ? (v.scheduled_date > today
+        ? <Button small variant="outline" title={'Can be marked from ' + shortDate(v.scheduled_date)} disabled />
+        : <Button small variant={tone === 'err' ? 'dark' : 'outline'} title="Mark administered" onPress={() => done(v)} />) : null}
     </Card>))}</View> : null;
   return (
     <Screen scroll footer={form ? null : <Button icon="plus" title="Schedule a vaccination" disabled={!active.length} onPress={() => setForm(true)} />}>

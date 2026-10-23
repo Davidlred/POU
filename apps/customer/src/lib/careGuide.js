@@ -148,3 +148,21 @@ export function feedNeed(stage, birds) {
   const kg = stage.kgPerBird * birds;
   return { totalKg: kg, bags: Math.ceil(kg / 25) };
 }
+
+// One list for every flock type, for the general chart: each row says which flocks take it
+// (`for`: 'all' | 'broilers' | 'layers'), sorted by age with the "while laying" note last.
+export function generalHealth() {
+  const key = (it) => it.name + '|' + it.day;
+  const inB = new Set(HEALTH.broilers.map(key));
+  const inL = new Set(HEALTH.layers.map(key));
+  const seen = new Set();
+  const out = [];
+  for (const it of [...HEALTH.broilers, ...HEALTH.layers]) {
+    const k = key(it);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ ...it, for: inB.has(k) && inL.has(k) ? 'all' : inB.has(k) ? 'broilers' : 'layers' });
+  }
+  const rank = (it) => (it.laying ? 1e6 : it.day);
+  return out.sort((a, b) => rank(a) - rank(b));
+}

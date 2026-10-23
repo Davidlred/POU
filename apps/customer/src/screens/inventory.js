@@ -3,13 +3,13 @@ import { View, Pressable, ScrollView, Alert } from 'react-native';
 import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate } from '@p360/shared';
 import { useFarm, save } from '../lib/offlineQueue';
 
-const TABS = [{ value: 'feed', label: 'Feed' }, { value: 'health', label: 'Drugs & vaccines' }, { value: 'other', label: 'Other' }];
+const TABS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feeds' }, { value: 'other', label: 'Farm assets' }];
 const CATEGORIES = [
   { id: 'feed', label: 'Feed', tab: 'feed', icon: 'sack', units: ['bags', 'kg', 'tonnes'], ideas: ['Starter', 'Grower', 'Finisher', 'Layer mash', 'Maize', 'Soya', 'Concentrate'] },
   { id: 'medicine', label: 'Drug', tab: 'health', icon: 'pill', units: ['sachets', 'bottles', 'litres', 'ml', 'tablets', 'kg'], ideas: ['Antibiotic', 'Coccidiostat', 'Dewormer', 'Vitamins', 'Disinfectant'] },
   { id: 'vaccine', label: 'Vaccine', tab: 'health', icon: 'needle', units: ['doses', 'vials', 'bottles'], ideas: ['Lasota', 'Gumboro', 'Fowl pox', "Marek's", 'Fowl typhoid'] },
   { id: 'equipment', label: 'Equipment', tab: 'other', icon: 'tools', units: ['pieces', 'sets'], ideas: ['Feeders', 'Drinkers', 'Egg crates', 'Battery cage', 'Brooder', 'Generator'] },
-  { id: 'other', label: 'Other', tab: 'other', icon: 'package-variant-closed', units: ['pieces', 'bags', 'kg', 'litres'], ideas: ['Wood shavings', 'Charcoal', 'Diesel', 'Egg trays'] },
+  { id: 'other', label: 'Supplies', tab: 'other', icon: 'package-variant-closed', units: ['pieces', 'bags', 'kg', 'litres'], ideas: ['Wood shavings', 'Charcoal', 'Diesel', 'Egg trays'] },
 ];
 const cat = (id) => CATEGORIES.find((k) => k.id === id) || CATEGORIES[4];
 const num = (n) => Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
@@ -30,7 +30,7 @@ export function itemAlert(it) {
 export function InventoryScreen({ navigation, route }) {
   const { c } = useTheme();
   const { data } = useFarm();
-  const [tab, setTab] = useState(route.params?.tab || 'feed');   // Vet care opens this straight on Drugs & vaccines
+  const [tab, setTab] = useState(route.params?.tab || 'health');   // first tab: Vaccines (Vet care also opens it here)
   const [sel, setSel] = useState(null);       // item being adjusted
   const [amount, setAmount] = useState('');
   const items = useMemo(() => (data.farm_inventory || []).filter((x) => x.status !== 'removed').sort((a, b) => a.name.localeCompare(b.name)), [data]);
@@ -60,7 +60,7 @@ export function InventoryScreen({ navigation, route }) {
         {tab === 'feed' ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'feed' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Icon name="sack" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Feed chart</Txt><Txt v="small">Broilers and layers, by age</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
         {!shown.length ? <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'pill' : 'tools'}
-          title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No drugs or vaccines recorded yet' : 'Nothing recorded here yet'}
+          title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No vaccines or drugs recorded yet' : 'No farm assets recorded yet'}
           body={tab === 'feed' ? 'Add the feed you have in store so you know when to restock.' : tab === 'health' ? 'Add what is in your store, with expiry dates, so nothing goes off unnoticed.' : 'Feeders, drinkers, crates, shavings and anything else you keep.'}
           action={tab === 'health' ? 'Add what you have' : 'Add an item'} onAction={() => navigation.navigate('InventoryForm', { tab })} />
           : <Group>{shown.map((it, i) => { const a = itemAlert(it); return (

@@ -305,9 +305,7 @@ export function InvestAmountScreen({ navigation, route }) {
       </Card>
       <Input label="Amount" prefix="₦" keyboardType="number-pad" value={amt} onChangeText={(x) => { setAmt(x.replace(/\D/g, '')); setErr(null); }} mono autoFocus={!route.params.amount} error={fieldErr} hint={'Minimum ' + naira(min)} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {chips.map((v) => <Chip key={v} label={naira(v)} selected={n === v} onPress={() => setAmt(String(v))} />)}
-        <Chip label="Remaining" selected={n === remaining} onPress={() => setAmt(String(Math.floor(remaining)))} />
-      </View>
+        {chips.map((v) => <Chip key={v} label={naira(v)} selected={n === v} onPress={() => setAmt(String(v))} />)}      </View>
       {r ? <Card>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body">Projected profit</Txt><Txt v="mono" color={c.sage} style={{ fontSize: 14 }}>{naira(r.profit, { sign: true })}</Txt></View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: c.line, paddingTop: 8 }}><Txt v="bold">Projected total at maturity</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(r.total)}</Txt></View>

@@ -7,7 +7,7 @@ const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLa
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, pendingInviteNow, getPendingInvite } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -24,7 +24,7 @@ import { RaiseHomeScreen, BadgeScreen, OfferingFormScreen } from '../screens/rai
 import { INVEST_ENABLED } from '../lib/roi';
 import { FarmBookScreen, CreditLogScreen, CreditEntryScreen, CreditCustomerScreen, CreditAllowScreen, MyCreditScreen } from '../screens/farmbook';
 import { VetApplyScreen, VetDeskScreen, VetBookingScreen } from '../screens/vetdesk';
-import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, StoreAgentsScreen, StoreAgentScreen } from '../screens/agents';
+import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, StoreAgentsScreen, StoreAgentScreen, JoinStoreScreen } from '../screens/agents';
 import { LandingScreen, WebNav } from '../screens/landing';
 import { ExploreScreen } from '../screens/explore';
 import { InventoryScreen, InventoryFormScreen } from '../screens/inventory';
@@ -37,6 +37,20 @@ const navRef = createNavigationContainerRef();
 
 // Keeps the phone's vaccination reminders in step with the farm's schedule, and opens the schedule when one is tapped.
 // Renders nothing. Mounted only for farm accounts.
+// Someone who opened a store's invite link and then signed in: take them to the join page once.
+function InviteOpener() {
+  useEffect(() => {
+    let alive = true;
+    getPendingInvite().then((code) => {
+      if (!alive || !code) return;
+      const go = () => (navRef.isReady() ? navRef.navigate('JoinStore', { code }) : setTimeout(go, 200));
+      setTimeout(go, 300);
+    });
+    return () => { alive = false; };
+  }, []);
+  return null;
+}
+
 function VaccinationReminders() {
   const { data } = useFarm();
   // Only re-plan when something that affects reminders changes.
@@ -149,8 +163,9 @@ function WebAuth({ navigation, children }) {
 
 function AuthFlow() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={Platform.OS === 'web' ? 'Landing' : 'SignIn'}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={Platform.OS !== 'web' ? 'SignIn' : pendingInviteNow() ? 'JoinStore' : 'Landing'}>
       {Platform.OS === 'web' ? <Stack.Screen name="Landing" component={LandingScreen} /> : null}
+      {Platform.OS === 'web' ? <Stack.Screen name="JoinStore">{(p) => <WebAuth navigation={p.navigation}><JoinStoreScreen {...p} /></WebAuth>}</Stack.Screen> : null}
       <Stack.Screen name="SignIn">{({ navigation }) => <WebAuth navigation={navigation}><SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} /></WebAuth>}</Stack.Screen>
       <Stack.Screen name="Email">{({ navigation, route }) => <WebAuth navigation={navigation}><EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} /></WebAuth>}</Stack.Screen>
       <Stack.Screen name="Otp">{({ navigation, route }) => <WebAuth navigation={navigation}><OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} /></WebAuth>}</Stack.Screen>
@@ -176,6 +191,7 @@ export default function Navigation() {
   return (
     <NavigationContainer theme={theme} ref={navRef}>
       {session && farms ? <VaccinationReminders /> : null}
+      {session && !needsRole ? <InviteOpener /> : null}
       {!session ? <AuthFlow /> : (
         <Stack.Navigator key={needsRole ? 'onboarding' : 'app'} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
           {needsRole ? (<>
@@ -233,6 +249,7 @@ export default function Navigation() {
             <Stack.Screen name="AgentSale" component={AgentSaleScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="StoreAgents" component={StoreAgentsScreen} />
             <Stack.Screen name="Explore" component={ExploreScreen} />
+            <Stack.Screen name="JoinStore" component={JoinStoreScreen} />
             <Stack.Screen name="StoreAgent" component={StoreAgentScreen} />
             {INVEST_ENABLED ? (<>
               <Stack.Screen name="InvestHome" component={InvestHomeScreen} />

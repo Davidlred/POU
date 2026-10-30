@@ -1,22 +1,50 @@
-import React, { useCallback, useState } from 'react';
-import { View, Pressable, BackHandler, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Pressable, BackHandler, Alert, Image, Linking } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Clipboard from 'expo-clipboard';
 import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Empty, Input, Chip, Segmented, Pill, Group, Row, Skeleton, Sheet, Stat,
-  naira, shortDate, timeAgo, rpc, friendlyError, shareText } from '@p360/shared';
+  naira, shortDate, timeAgo, rpc, friendlyError, shareText, useWide, inviteLink, agentLink, pendingInviteNow, clearPendingInvite, PLAY_STORE_URL, LOGO_MARK } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
 // Store agents: people who sell for a store (the "mother store") and earn a commission set per product.
 // Agent side: AgentJoin, AgentDesk (root screen in agent mode), AgentSale.
 // Store side: StoreAgents (invite code + leaderboard), StoreAgent (one agent: sales, payouts).
 
+// Share a link: copy it, or send it with the phone's / browser's share options (WhatsApp, SMS…).
+// Either choice closes the pop-up; onCopied lets the screen say "Link copied".
+function ShareLinkSheet({ visible, onClose, onCopied, title, link, message }) {
+  const { c } = useTheme();
+  const copy = async () => {
+    onClose();
+    try { await Clipboard.setStringAsync(link); onCopied?.(); } catch { Alert.alert("Couldn't copy", link); }
+  };
+  return (
+    <Sheet visible={visible} onClose={onClose}>
+      <Txt v="h2">{title}</Txt>
+      <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: 14, padding: 14, backgroundColor: c.sf }}>
+        <Txt v="body" selectable numberOfLines={2}>{link}</Txt>
+      </View>
+      <Button icon="content-copy" title="Copy link" onPress={copy} />
+      <Button variant="outline" icon="share-variant-outline" title="Share" onPress={() => { onClose(); shareText(message); }} />
+    </Sheet>
+  );
+}
+
+// true for a moment after flash(): the "Link copied" confirmation
+function useFlash(ms = 2500) {
+  const [on, setOn] = useState(false);
+  useEffect(() => { if (!on) return undefined; const t = setTimeout(() => setOn(false), ms); return () => clearTimeout(t); }, [on, ms]);
+  return [on, () => setOn(true)];
+}
+
 const plural = (u, q) => (Number(q) === 1 || !u || u === 'kg' || u.endsWith('s') ? u : u + 's');
 const itemsText = (items) => (items || []).map((i) => Number(i.qty).toLocaleString() + ' ' + plural(i.unit || 'unit', i.qty) + ' ' + i.name).join(', ');
 
 // ---------- Agent side ----------
-export function AgentJoinScreen({ navigation }) {
+export function AgentJoinScreen({ navigation, route }) {
   const { refresh, profile } = useAuth();
   const [onboarding] = useState(() => !(profile?.roles || []).length);   // first sign-up: the app opens on its own once the role exists
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => route?.params?.code || pendingInviteNow() || '');   // filled in when they came from an invite link
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const join = async () => {
@@ -24,6 +52,7 @@ export function AgentJoinScreen({ navigation }) {
     setBusy(true);
     try {
       const r = await rpc('agent_join', { p_code: code.trim() });
+      await clearPendingInvite();
       await refresh();
       Alert.alert("You're in", 'You now sell for ' + r.store + '.');
       if (!onboarding) navigation.popTo('Tabs');
@@ -51,6 +80,8 @@ export function AgentDeskScreen({ navigation }) {
   }, [home, leaveMode]));
   const [d, setD] = useState(undefined);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [copied, flashCopied] = useFlash();
   const load = useCallback(async () => { setBusy(true); try { setD(await rpc('agent_home')); } catch { setD(null); } finally { setBusy(false); } }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -71,7 +102,7 @@ export function AgentDeskScreen({ navigation }) {
     </Screen>
   );
   const owed = Number(d.earned) - Number(d.paid);
-  const share = () => shareText('Buying from ' + d.store.name + ' on Poultry360? Enter my agent code ' + d.code + ' at checkout.');
+
   const leaveStore = () => Alert.alert('Leave ' + d.store.name + '?', 'You will stop selling for this store. Your past sales stay on record.', [{ text: 'Cancel', style: 'cancel' },
     { text: 'Leave', style: 'destructive', onPress: async () => { try { await rpc('agent_leave'); load(); } catch (e) { Alert.alert("Couldn't leave", friendlyError(e)); } } }]);
   const cancel = (s) => Alert.alert('Cancel this sale?', 'The stock goes back to the store.', [{ text: 'Keep it', style: 'cancel' },
@@ -87,7 +118,7 @@ export function AgentDeskScreen({ navigation }) {
       <Button icon="plus" title="Log a sale" onPress={() => navigation.navigate('AgentSale')} />
       <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ flex: 1 }}><Txt v="label">Your agent code</Txt><Txt v="mono" style={{ fontSize: 22 }}>{d.code}</Txt></View>
-        <Button small variant="outline" icon="share-variant-outline" title="Share" onPress={share} />
+        <Button small variant="outline" icon={copied ? 'check' : 'share-variant-outline'} title={copied ? 'Link copied' : 'Share'} onPress={() => setSharing(true)} />
       </Card>
       <Txt v="h2">Recent sales</Txt>
       {!d.recent.length ? <Card><Txt v="small">No sales yet.</Txt></Card> : (
@@ -103,6 +134,8 @@ export function AgentDeskScreen({ navigation }) {
         })}</Group>
       )}
       <Button variant="ghost" title="Leave this store" onPress={leaveStore} />
+      <ShareLinkSheet visible={sharing} onClose={() => setSharing(false)} onCopied={flashCopied} title="Your shop link" link={agentLink(d.code)}
+        message={'Shop ' + d.store.name + ' on Poultry360 with my agent code ' + d.code + ': ' + agentLink(d.code)} />
     </Screen>
   );
 }
@@ -160,14 +193,65 @@ export function AgentSaleScreen({ navigation }) {
   );
 }
 
+// Where a store's invite link lands: "Join <store> as an agent".
+// Signed out (website): create an account or sign in, and the code is filled in afterwards.
+// Signed in: one tap joins.
+export function JoinStoreScreen({ navigation, route }) {
+  const { c } = useTheme();
+  const { session, refresh } = useAuth();
+  const [code] = useState(() => route.params?.code || pendingInviteNow());
+  const [store, setStore] = useState(undefined);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!code) { setStore(null); return; }
+    // An invalid link is forgotten, so the next visit opens the normal home page.
+    rpc('store_by_invite', { p_code: code }).then((r) => { setStore(r || null); if (!r) clearPendingInvite(); }).catch(() => { setStore(null); clearPendingInvite(); });
+  }, [code]);
+  const join = async () => {
+    setBusy(true); setErr(null);
+    try {
+      await rpc('agent_join', { p_code: code });
+      await clearPendingInvite();
+      await refresh();
+      navigation.popTo('Tabs');
+    } catch (e) { setErr(friendlyError(e)); } finally { setBusy(false); }
+  };
+  const later = async () => { await clearPendingInvite(); if (navigation.canGoBack()) navigation.goBack(); else navigation.navigate(session ? 'Tabs' : 'Landing'); };
+  return (
+    <Screen scroll style={{ flexGrow: 1, justifyContent: 'center', gap: 18, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
+      <View style={{ alignSelf: 'center', width: 96, height: 96, borderRadius: 28, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}><Image source={LOGO_MARK} style={{ width: 80, height: 80 }} /></View>
+      {store === undefined ? <Skeleton h={80} r={20} /> : !store ? <>
+        <Txt v="display" style={{ textAlign: 'center' }}>This invite link isn't valid</Txt>
+        <Txt v="body" color={c.mute} style={{ textAlign: 'center' }}>Ask the store for a new link.</Txt>
+        <Button variant="outline" title="Go to Poultry360" onPress={later} />
+      </> : <>
+        <Txt v="display" style={{ textAlign: 'center' }}>{'Join ' + store.name + ' as an agent'}</Txt>
+        <Txt v="body" color={c.mute} style={{ textAlign: 'center' }}>Sell their products and earn commission on every sale.</Txt>
+        {err ? <Txt v="small" color={c.err} style={{ textAlign: 'center' }}>{err}</Txt> : null}
+        {session ? <Button title="Join store" loading={busy} onPress={join} />
+          : <>
+            <Button title="Create an account" onPress={() => navigation.navigate('Email', { mode: 'signup' })} />
+            <Button variant="outline" title="I have an account" onPress={() => navigation.navigate('SignIn')} />
+          </>}
+        {PLAY_STORE_URL ? <Button variant="ghost" icon="google-play" title="Get the Android app" onPress={() => Linking.openURL(PLAY_STORE_URL)} /> : null}
+        <Pressable onPress={later} accessibilityRole="button" style={{ alignSelf: 'center', paddingVertical: 8 }}><Txt v="small">Not now</Txt></Pressable>
+      </>}
+    </Screen>
+  );
+}
+
 // ---------- Store side ----------
 const PERIODS = [{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: 'all', label: 'All time' }];
 
 export function StoreAgentsScreen({ navigation }) {
   const { c } = useTheme();
+  const wide = useWide();
   const [period, setPeriod] = useState('30');
   const [d, setD] = useState(undefined);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [copied, flashCopied] = useFlash();
   const load = useCallback(async () => {
     setBusy(true);
     try {
@@ -176,39 +260,104 @@ export function StoreAgentsScreen({ navigation }) {
     } catch (e) { setD(null); Alert.alert("Couldn't load agents", friendlyError(e)); } finally { setBusy(false); }
   }, [period]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
-  const share = () => shareText('Join my store as an agent on Poultry360: open the app, choose "Sell for a store" and enter the code ' + d.invite_code + '.');
-  const newCode = () => Alert.alert('Make a new code?', 'The old code stops working. Agents who already joined stay.', [{ text: 'Cancel', style: 'cancel' },
+  const newCode = () => Alert.alert('Make a new code?', 'The old code and link stop working. Agents who already joined stay.', [{ text: 'Cancel', style: 'cancel' },
     { text: 'New code', onPress: async () => { try { await rpc('store_new_invite_code'); load(); } catch (e) { Alert.alert("Couldn't change it", friendlyError(e)); } } }]);
   const active = (d?.agents || []).filter((a) => a.status === 'active');
+  const periodLabel = PERIODS.find((x) => x.value === period).label;
+  const count = (n, one) => n + ' ' + one + (Number(n) === 1 ? '' : 's');
+
+  if (d === undefined) return <Screen scroll><AppBar title="Agents" /><Skeleton h={140} r={26} /><Skeleton h={180} r={22} /></Screen>;
+  if (d === null) return <Screen scroll><AppBar title="Agents" /><Empty icon="wifi-off" title="Couldn't load agents" action="Try again" onAction={load} /></Screen>;
+
+  const money = (
+    <Hearth>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16, columnGap: 24 }}>
+        <View style={{ flexBasis: '40%', flexGrow: 1, minWidth: 220, gap: 2 }}>
+          <Txt v="label" color={c.hmute}>Commission owed</Txt>
+          <Txt v="monoLg" color={c.hink}>{naira(d.owed)}</Txt>
+          <Txt v="small" color={c.hmute}>All time</Txt>
+        </View>
+        <View style={{ flexBasis: '40%', flexGrow: 1, minWidth: 220, gap: 2 }}>
+          <Txt v="label" color={c.hmute}>Agent sales</Txt>
+          <Txt v="monoLg" color={c.hink}>{naira(d.totals.total)}</Txt>
+          <Txt v="small" color={c.hmute}>{periodLabel + ' · ' + count(d.totals.sales, 'sale')}</Txt>
+        </View>
+      </View>
+    </Hearth>
+  );
+
+  const invite = (
+    <Card style={{ gap: 14, padding: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-plus-outline" size={22} color={c.navactink} /></View>
+        <Txt v="strong" style={{ flex: 1 }}>Invite agents</Txt>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.sf2, borderRadius: 16, paddingVertical: 10, paddingLeft: 16, paddingRight: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Txt v="label">Invite code</Txt>
+          <Txt v="mono" selectable style={{ fontSize: 22, letterSpacing: 1 }}>{d.invite_code}</Txt>
+        </View>
+        <Pressable onPress={newCode} accessibilityRole="button" hitSlop={6} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 }}>
+          <Txt v="bold" color={c.navactink} style={{ fontSize: 14 }}>New code</Txt>
+        </Pressable>
+      </View>
+      <Button small icon={copied ? 'check' : 'share-variant-outline'} title={copied ? 'Link copied' : 'Share invite link'} onPress={() => setSharing(true)} />
+    </Card>
+  );
+
+  const note = (
+    <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 4 }}>
+      <Icon name="information-outline" size={18} color={c.mute} />
+      <Txt v="small" style={{ flex: 1 }}>Set each product's agent commission when you add or edit a listing.</Txt>
+    </View>
+  );
+
+  const board = (
+    <View style={{ gap: 12 }}>
+      <View style={wide ? { flexDirection: 'row', alignItems: 'center', gap: 10 } : { gap: 10 }}>
+        <Txt v="h2" style={wide ? { flex: 1 } : null}>Top agents</Txt>
+        <View style={wide ? { width: 320 } : null}><Segmented options={PERIODS} value={period} onChange={setPeriod} /></View>
+      </View>
+      {!active.length ? (
+        <Card style={{ alignItems: 'center', paddingVertical: 28, gap: 8 }}>
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-group-outline" size={26} color={c.navactink} /></View>
+          <Txt v="strong">No agents yet</Txt>
+          <Txt v="small" style={{ textAlign: 'center' }}>Share your invite link to add your first agent.</Txt>
+        </Card>
+      ) : (
+        <Group style={{ opacity: busy ? 0.6 : 1 }}>{active.map((a, i) => {
+          const lead = i === 0 && Number(a.period_total) > 0;
+          return (
+            <Pressable key={a.agent_id} onPress={() => navigation.navigate('StoreAgent', { agentId: a.agent_id })} accessibilityRole="button"
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 16, minHeight: 64,
+                borderBottomWidth: i === active.length - 1 ? 0 : 1, borderColor: c.line, opacity: pressed ? 0.8 : 1 })}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: lead ? c.navact : c.sf2 }}>
+                {lead ? <Icon name="trophy-outline" size={18} color={c.navactink} /> : <Txt v="bold" color={c.mute} style={{ fontSize: 14 }}>{i + 1}</Txt>}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt v="strong" numberOfLines={1}>{a.name}</Txt>
+                <Txt v="small" numberOfLines={1}>{count(a.period_sales, 'sale') + ' · owed ' + naira(Number(a.earned) - Number(a.paid))}</Txt>
+              </View>
+              <Txt v="mono" style={{ fontSize: 16 }}>{naira(a.period_total)}</Txt>
+              <Icon name="chevron-right" size={20} color={c.mute} />
+            </Pressable>
+          );
+        })}</Group>
+      )}
+    </View>
+  );
+
   return (
     <Screen scroll>
-      <AppBar title="Agents" />
-      {d === undefined ? <Skeleton h={160} r={24} /> : d === null ? null : <>
-        <Card>
-          <Txt v="label">Invite code</Txt>
-          <Txt v="mono" style={{ fontSize: 24 }}>{d.invite_code}</Txt>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button small icon="share-variant-outline" title="Share" onPress={share} style={{ flex: 1 }} />
-            <Button small variant="outline" title="New code" onPress={newCode} style={{ flex: 1 }} />
-          </View>
-        </Card>
-        <Segmented options={PERIODS} value={period} onChange={setPeriod} />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Stat label="Agent sales" value={naira(d.totals.total)} sub={d.totals.sales + ' sale' + (d.totals.sales === 1 ? '' : 's')} />
-          <Stat label="Commission owed" value={naira(d.owed)} sub="All time" />
+      <AppBar title="Agents" subtitle={active.length ? count(active.length, 'agent') : undefined} />
+      {wide ? (
+        <View style={{ flexDirection: 'row', gap: 20, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1.6, gap: 20 }}>{money}{board}</View>
+          <View style={{ flex: 1, gap: 14 }}>{invite}{note}</View>
         </View>
-        <Txt v="h2">Top agents</Txt>
-        {!active.length ? <Empty icon="account-group-outline" title="No agents yet" body="Share your invite code. Agents join in the Poultry360 app." /> : (
-          <Group>{active.map((a, i) => (
-            <Row key={a.agent_id} last={i === active.length - 1}
-              icon={i === 0 && Number(a.period_total) > 0 ? 'trophy-outline' : 'account-outline'} iconColor={i === 0 && Number(a.period_total) > 0 ? c.warn : undefined}
-              title={(i + 1) + '. ' + a.name}
-              subtitle={naira(a.period_total) + ' · ' + a.period_sales + ' sale' + (Number(a.period_sales) === 1 ? '' : 's') + ' · owed ' + naira(Number(a.earned) - Number(a.paid))}
-              onPress={() => navigation.navigate('StoreAgent', { agentId: a.agent_id })} />
-          ))}</Group>
-        )}
-        <Txt v="small">Set each product's agent commission when you add or edit a listing.</Txt>
-      </>}
+      ) : <>{money}{invite}{board}{note}</>}
+      <ShareLinkSheet visible={sharing} onClose={() => setSharing(false)} onCopied={flashCopied} title="Agent invite link" link={inviteLink(d.invite_code)}
+        message={'Join my store as an agent on Poultry360: ' + inviteLink(d.invite_code)} />
     </Screen>
   );
 }

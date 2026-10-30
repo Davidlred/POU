@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, Image, ActivityIndicator, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, naira, rpc, publicUrl, friendlyError, supabase } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, naira, rpc, publicUrl, friendlyError, supabase, getPendingAgentCode, clearPendingAgentCode } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { DELIVERY_FEE } from '../lib/catalog';
@@ -140,6 +140,7 @@ export function CheckoutScreen({ navigation, route }) {
   // Pay later: the goods go on credit with the farm; the delivery fee is paid now so the rider is paid.
   const onCredit = method === 'credit' && !!credit;
   const [agentCode, setAgentCode] = useState('');
+  useEffect(() => { getPendingAgentCode().then((v) => v && setAgentCode((x) => x || v)); }, []);   // opened an agent's link
   const creditOk = !!credit && itemsTotal <= Number(credit.available) && balance >= fee;
   const payNow = onCredit ? fee : total;
 
@@ -154,6 +155,7 @@ export function CheckoutScreen({ navigation, route }) {
     try {
       const res = await rpc('place_order', { p_address_id: sel, p_items: live.map((x) => ({ listing_id: x.listing_id, qty: x.qty, via_search: !!x.via_search })), p_method: onCredit ? 'credit' : method === 'wallet' ? 'wallet' : 'card', p_ref: ref });
       clear(); refreshWallet();
+      if (agentCode.trim()) clearPendingAgentCode();
       if (agentCode.trim()) rpc('set_order_agent', { p_order: res.order_id, p_code: agentCode.trim() }).catch((e) => alert('Your order is placed, but the agent code was not added: ' + friendlyError(e)));
       navigation.reset({ index: 1, routes: [{ name: 'Tabs' }, { name: 'OrderSuccess', params: { orderId: res.order_id } }] });
     } catch (e) {

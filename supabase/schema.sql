@@ -3004,3 +3004,12 @@ begin
     active_role = case when v_farm then 'vendor' else 'supplier' end
   where id = auth.uid();
 end $$;
+
+-- Look up a store from its invite link (migration 017)
+create or replace function public.store_by_invite(p_code text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('name', business_name, 'location', location)
+    from vendor_profiles
+   where agent_invite_code = upper(trim(coalesce(p_code, ''))) and verification_status = 'approved';
+$$;
+grant execute on function public.store_by_invite(text) to anon, authenticated;

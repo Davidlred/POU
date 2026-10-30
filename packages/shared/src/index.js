@@ -7,3 +7,4 @@ export * from './auth';
 export * from './fonts';
 export * from './Intro';
 export * from './web';
+export * from './links';

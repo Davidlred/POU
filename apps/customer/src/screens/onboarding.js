@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Pressable, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { ExploreOptions } from './explore';
@@ -32,7 +32,7 @@ export function RoleScreen({ navigation, route }) {
   const { c } = useTheme();
   const { profile, refresh } = useAuth();
   const adding = !!route.params?.adding;
-  const [sel, setSel] = useState(adding ? [] : ['buyer']);
+  const [sel, setSel] = useState(adding ? [] : pendingInviteNow() ? ['agent'] : ['buyer']);   // came from a store's invite link
   const [name, setName] = useState(profile?.full_name || '');
   const [busy, setBusy] = useState(false);
   const [buyerType, setBuyerType] = useState(profile?.buyer_type || 'individual');

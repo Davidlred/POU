@@ -26,9 +26,23 @@ const VARIANTS = (f, c) => ({
   mono: { fontFamily: f.mono, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
   monoLg: { fontFamily: f.display, fontSize: 34, lineHeight: 40, letterSpacing: -1, color: c.ink, fontVariant: ['tabular-nums'] },
 });
+// Hanken Grotesk has no ₦, so phones and browsers borrowed one from another font. Each ₦ is drawn
+// from P360Naira (Hanken's N plus two bars) in the same weight as the text around it.
+const NAIRA_FONT = { HankenGrotesk_400Regular: 'P360Naira_400', HankenGrotesk_500Medium: 'P360Naira_500',
+  HankenGrotesk_600SemiBold: 'P360Naira_600', HankenGrotesk_700Bold: 'P360Naira_700', HankenGrotesk_800ExtraBold: 'P360Naira_800' };
+export function withNaira(children, family) {
+  const nf = NAIRA_FONT[family];
+  if (!nf) return children;
+  const fix = (ch, k) => (typeof ch === 'string' && ch.includes('₦')
+    ? ch.split('₦').flatMap((s, i) => (i ? [<Text key={k + '-' + i} style={{ fontFamily: nf }}>₦</Text>, s] : [s]))
+    : ch);
+  return Array.isArray(children) ? children.map((ch, k) => fix(ch, k)) : fix(children, 'n');
+}
+
 export function Txt({ v = 'body', color, style, children, ...p }) {
   const { c, f } = useTheme();
-  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={[VARIANTS(f, c)[v], color && { color }, style]}>{children}</Text>;
+  const st = [VARIANTS(f, c)[v], color && { color }, style];
+  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={st}>{withNaira(children, StyleSheet.flatten(st).fontFamily)}</Text>;
 }
 
 const PAGE = { width: '100%', maxWidth: 1080, alignSelf: 'center' };
@@ -85,7 +99,7 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 }, style]}>
       {loading ? <ActivityIndicator color={fg} /> : <>
         {icon ? <Icon name={icon} size={20} color={fg} /> : null}
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: f.bold, fontSize: small ? 14 : 16, flexShrink: 1 }}>{title}</Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: f.bold, fontSize: small ? 14 : 16, flexShrink: 1 }}>{withNaira(title, f.bold)}</Text>
       </>}
     </Pressable>
   );
@@ -118,7 +132,7 @@ export function Chip({ label, selected, onPress, icon }) {
       style={{ height: 40, paddingHorizontal: 14, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 4,
         backgroundColor: selected ? c.navact : c.sf, borderWidth: 1, borderColor: selected ? c.navactink : c.line2 }}>
       {selected ? <Icon name="check" size={16} color={c.navactink} /> : icon ? <Icon name={icon} size={16} /> : null}
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: selected ? f.bold : f.medium, fontSize: 13, color: selected ? c.navactink : c.ink }}>{label}</Text>
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: selected ? f.bold : f.medium, fontSize: 13, color: selected ? c.navactink : c.ink }}>{withNaira(label, selected ? f.bold : f.medium)}</Text>
     </Pressable>
   );
 }
@@ -166,7 +180,7 @@ export function Pill({ label, tone = 'neutral' }) {
   const { c, f } = useTheme();
   const t = { ok: [c.sagebg, c.sage], warn: [c.warnbg, c.warn], err: [c.errbg, c.err], live: [c.navact, c.navactink], neutral: [c.sf2, c.mute] }[tone];
   return <View style={{ alignSelf: 'flex-start', backgroundColor: t[0], borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 }}>
-    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: t[1], fontFamily: f.semibold, fontSize: 12 }}>{label}</Text></View>;
+    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: t[1], fontFamily: f.semibold, fontSize: 12 }}>{withNaira(label, f.semibold)}</Text></View>;
 }
 
 export function Segmented({ options, value, onChange }) {
@@ -176,7 +190,7 @@ export function Segmented({ options, value, onChange }) {
       {options.map((o) => {
         const on = (o.value ?? o) === value;
         return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0 }}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 13, color: on ? c.ink : c.mute }}>{o.label ?? o}</Text></Pressable>;
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 13, color: on ? c.ink : c.mute }}>{withNaira(o.label ?? o, on ? f.bold : f.semibold)}</Text></Pressable>;
       })}
     </View>
   );
@@ -262,6 +276,17 @@ export function Stars({ value, onChange, size = 36 }) {
 
 export function Sheet({ visible, onClose, children }) {
   const { c } = useTheme();
+  // Website at desktop width: a small centred dialog instead of an edge-to-edge bottom sheet.
+  if (useWide()) return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: c.scrim }]} onPress={onClose} />
+        <View style={{ width: '100%', maxWidth: 440, maxHeight: '90%', backgroundColor: c.bg, borderRadius: 24, padding: 24, gap: 16 }}>
+          {children}
+        </View>
+      </View>
+    </Modal>
+  );
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: c.scrim }} onPress={onClose} />

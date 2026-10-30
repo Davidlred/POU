@@ -43,9 +43,11 @@ export function AuthProvider({ children }) {
     refreshWallet: async () => { const { data } = await supabase.from('wallets').select('balance').eq('user_id', session.user.id).maybeSingle(); setWallet(data); },
     setActiveRole: async (r) => { if (profile?.active_role && profile.active_role !== r) lastRole.current = profile.active_role; await rpc('set_active_role', { p_role: r }); await refresh(); },
     // Where to send someone who leaves vet mode: the role they came from, else buying, else their farm.
-    homeRole: () => { const others = (profile?.roles || []).filter((x) => x !== 'vet' && x !== 'investor'); return others.includes(lastRole.current) ? lastRole.current : others.includes('buyer') ? 'buyer' : others[0] || null; },
+    homeRole: () => { const others = (profile?.roles || []).filter((x) => x !== 'vet' && x !== 'investor' && x !== 'agent'); return others.includes(lastRole.current) ? lastRole.current : others.includes('buyer') ? 'buyer' : others[0] || null; },
     signOut: () => supabase.auth.signOut(),
     isVendorMode: profile?.active_role === 'vendor' || profile?.active_role === 'supplier',
+    // A store that only sells farm supplies: no Farm Hub, no birds or eggs to list.
+    supplierOnly: (profile?.roles || []).includes('supplier') && !(profile?.roles || []).includes('vendor'),
     multiRole: (profile?.roles || []).length > 1,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -162,7 +162,7 @@ export function VetDeskScreen({ navigation }) {
           <StatBox label="Upcoming" value={open.length} /><StatBox label="Open slots" value={free.length} /><StatBox label="Completed" value={past.filter((k) => k.status === 'completed').length} />
         </View>
         {!free.length ? <Banner tone="warn" icon="calendar-plus" title="You have no open slots" body="Farmers can only book times you've opened." action="Add slots" onAction={() => setTab('slots')} /> : null}
-        <Segmented options={[{ value: 'bookings', label: 'Bookings' }, { value: 'slots', label: 'My slots' }, { value: 'profile', label: 'Profile' }]} value={tab} onChange={setTab} />
+        <Segmented options={[{ value: 'bookings', label: 'Bookings' }, { value: 'slots', label: 'My hours' }, { value: 'profile', label: 'Profile' }]} value={tab} onChange={setTab} />
         {tab === 'bookings' ? <>
           {!open.length ? <Empty icon="calendar-blank-outline" title="No upcoming bookings" body="New video consults and farm-visit requests appear here." /> : <Group>{open.map((k, i) => (
             <Row key={k.id} last={i === open.length - 1} icon={k.type === 'video' ? 'video-outline' : 'map-marker-outline'} title={k.farmer}
@@ -197,9 +197,6 @@ const toWeek = (availability) => Object.fromEntries(WEEK.map((w) => {
 
 function Slots({ slots, availability, reload }) {
   const { c } = useTheme();
-  const days = Array.from({ length: 7 }).map((_, i) => isoDate(new Date(Date.now() + i * 864e5)));
-  const [day, setDay] = useState(days[1]);
-  const [busy, setBusy] = useState(null);
   // Weekly availability form: each day has its own hours
   const [editing, setEditing] = useState(false);
   const [week, setWeek] = useState(() => toWeek(availability));
@@ -218,29 +215,16 @@ function Slots({ slots, availability, reload }) {
       await reload(); setEditing(false);
     } catch (e) { Alert.alert("Couldn't save your availability", friendlyError(e)); } finally { setSaving(false); }
   };
-  const turnOff = () => Alert.alert('Turn off weekly availability?', 'Open slots from your weekly schedule are removed. Booked consults and one-off times you added stay.', [{ text: 'Cancel', style: 'cancel' },
+  const turnOff = () => Alert.alert('Turn off your hours?', 'Farmers will not be able to book you. Consults already booked stay.', [{ text: 'Cancel', style: 'cancel' },
     { text: 'Turn off', style: 'destructive', onPress: async () => { try { await rpc('vet_set_weekly', { p_windows: [], p_slot_minutes: 60 }); await reload(); } catch (e) { Alert.alert("Couldn't turn it off", friendlyError(e)); } } }]);
 
-  // One-off slots
-  const taken = (t) => slots.some((x) => new Date(x.starts_at).getTime() === new Date(lagos(day, t)).getTime());
-  const past = (t) => new Date(lagos(day, t)).getTime() < Date.now() + 30 * 60000;
-  const add = async (t) => {
-    setBusy(t);
-    try { await rpc('vet_add_slot', { p_starts_at: lagos(day, t) }); await reload(); } catch (e) { Alert.alert("Couldn't add that slot", friendlyError(e)); } finally { setBusy(null); }
-  };
-  const remove = async (x) => { try { await rpc('vet_remove_slot', { p_slot: x.id }); await reload(); } catch (e) { Alert.alert("Couldn't remove", friendlyError(e)); } };
-
-  // Upcoming slots, grouped by day
-  const byDay = slots.reduce((m, x) => { const k = isoDate(new Date(x.starts_at)); (m[k] = m[k] || []).push(x); return m; }, {});
-  const dayKeys = Object.keys(byDay).sort();
-  const SHOW = 14;
   const picking = hoursFor === null ? null : WEEK.find((w) => w.d === hoursFor);
   return (
     <>
       <Txt v="label">Weekly availability</Txt>
       {editing ? (
         <Card>
-          <Txt v="strong" style={{ fontSize: 13 }}>Switch on the days you work, then set each day's hours</Txt>
+          <Txt v="strong" style={{ fontSize: 13 }}>Switch on the days you work and set the hours</Txt>
           {WEEK.map((w, i) => {
             const x = week[w.d]; const n = slotsIn(x, len);
             return (
@@ -260,7 +244,7 @@ function Slots({ slots, availability, reload }) {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{LENGTHS.map((m) => <Chip key={m} label={m + ' min'} selected={len === m} onPress={() => setLen(m)} />)}</View>
           {!onDays.length ? <Txt v="small" color={c.err}>Switch on at least one day.</Txt>
             : bad.length ? <Txt v="small" color={c.err}>{bad.map((w) => w.full).join(', ')}: the end time must be after the start, with room for at least one consult.</Txt>
-            : <Txt v="small">{perWeek} slot{perWeek === 1 ? '' : 's'} a week across {onDays.length} day{onDays.length === 1 ? '' : 's'}, opened 4 weeks ahead and kept topped up.</Txt>}
+            : <Txt v="small">{perWeek} consult{perWeek === 1 ? '' : 's'} a week.</Txt>}
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button small variant="outline" title="Cancel" onPress={() => setEditing(false)} style={{ flex: 1 }} />
             <Button small title="Save" loading={saving} disabled={!onDays.length || bad.length > 0} onPress={saveWeekly} style={{ flex: 1 }} />
@@ -274,7 +258,7 @@ function Slots({ slots, availability, reload }) {
           </View>
           {(availability.windows || []).map((x) => (
             <View key={x.weekday} style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body">{WEEK.find((w) => w.d === x.weekday)?.full}</Txt><Txt v="mono" style={{ fontSize: 14 }}>{x.start} – {x.end}</Txt></View>))}
-          <Txt v="small">Slots open automatically 4 weeks ahead. Remove a single time below if you can't make it that day.</Txt>
+          <Txt v="small">Farmers can book these hours up to 4 weeks ahead.</Txt>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Button small variant="outline" title="Change" onPress={startEdit} style={{ flex: 1 }} />
             <Button small variant="ghost" title="Turn off" onPress={turnOff} style={{ flex: 1 }} />
@@ -282,42 +266,11 @@ function Slots({ slots, availability, reload }) {
         </Card>
       ) : (
         <Card>
-          <Txt v="bold">Set the days and hours you're usually free</Txt>
-          <Txt v="small">For example Tuesday 9am to 3pm, Wednesday 10am to 1pm and Friday 12pm to 6pm. Slots open by themselves, so you don't add them one at a time.</Txt>
+          <Txt v="bold">Set the days and hours you're free</Txt>
+          <Txt v="small">Farmers can then book you in those hours.</Txt>
           <Button small icon="calendar-sync-outline" title="Set weekly availability" onPress={startEdit} />
         </Card>
       )}
-
-      <Txt v="label">Add a one-off time</Txt>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {days.map((dd, i) => <Chip key={dd} label={i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : shortDate(dd)} selected={day === dd} onPress={() => setDay(dd)} />)}
-      </ScrollView>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {TIMES.map((t) => {
-          const on = taken(t); const off = past(t);
-          return <Pressable key={t} disabled={on || off || busy === t} onPress={() => add(t)} accessibilityLabel={'Open ' + t}
-            style={{ minWidth: 96, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, backgroundColor: on ? c.sagebg : c.sf, borderWidth: 1.5, borderColor: on ? c.sage : c.line2, opacity: off && !on ? 0.4 : 1 }}>
-            {on ? <Icon name="check" size={16} color={c.sage} /> : <Icon name="plus" size={16} color={c.acc} />}<Txt v="mono" style={{ fontSize: 14 }}>{t}</Txt></Pressable>;
-        })}
-      </View>
-
-      <Txt v="label">Your upcoming slots · {slots.filter((x) => !x.booked).length} open · {slots.filter((x) => x.booked).length} booked</Txt>
-      {!slots.length ? <Card><Txt v="small">No slots yet. Set your weekly availability above, or tap a time to open it.</Txt></Card> : dayKeys.slice(0, SHOW).map((k) => (
-        <Card key={k}>
-          <Txt v="bold">{new Date(k).toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'short' })}</Txt>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {byDay[k].map((x) => (
-              <Pressable key={x.id} disabled={x.booked} onPress={() => remove(x)} accessibilityLabel={x.booked ? clock(x.starts_at) + ', booked' : 'Remove ' + clock(x.starts_at)}
-                style={{ height: 44, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: x.booked ? c.sagebg : c.sf2, borderWidth: 1, borderColor: x.booked ? c.sage : c.line2 }}>
-                <Txt v="mono" style={{ fontSize: 14 }}>{clock(x.starts_at)}</Txt>
-                <Icon name={x.booked ? 'account-check' : 'close'} size={16} color={x.booked ? c.sage : c.mute} />
-              </Pressable>
-            ))}
-          </View>
-        </Card>
-      ))}
-      {dayKeys.length > SHOW ? <Txt v="small" style={{ textAlign: 'center' }}>Showing the next {SHOW} days with slots. {dayKeys.length - SHOW} more day{dayKeys.length - SHOW === 1 ? '' : 's'} are open after that.</Txt> : null}
-      {slots.some((x) => !x.booked) ? <Txt v="small" style={{ textAlign: 'center' }}>Tap an open time to remove it. Booked times can't be removed.</Txt> : null}
 
       <Sheet visible={!!picking} onClose={() => setHoursFor(null)}>
         {picking ? <>

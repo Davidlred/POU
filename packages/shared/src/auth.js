@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 import { normalizeEmail, pad } from './format';
 import { Screen, Txt, Input, Button, Banner, OtpBoxes, AppBar, Icon, MAX_FONT_SCALE } from './ui';
 import { useTheme } from './ThemeProvider';
+import { Logo } from './Intro';
 
 // How sign-in works
 //   New account:  email → 6-digit code (proves the email is theirs) → create a password → in.
@@ -53,21 +54,11 @@ const authError = (e) => {
 };
 
 // Sign-in content sits as one block in the middle of the screen; scrolls if the keyboard squeezes it.
-const CENTERED = { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 64, gap: 18 };
+const CENTERED = { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 64, gap: 18, width: '100%', maxWidth: 460, alignSelf: 'center' };
 
 // Small Poultry360 egg mark (matches the splash) to anchor the sign-in screens.
 function AuthMark() {
-  const { c, mode } = useTheme();
-  const dark = mode === 'dark';
-  return (
-    <View style={{ height: 150, borderRadius: 32, backgroundColor: dark ? c.hc : c.yolk, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-      <View pointerEvents="none" style={{ position: 'absolute', right: -50, top: -70, width: 190, height: 190, borderRadius: 95, backgroundColor: dark ? c.ember : c.onyolk, opacity: dark ? 0.35 : 0.14 }} />
-      <View pointerEvents="none" style={{ position: 'absolute', left: -40, bottom: -80, width: 170, height: 170, borderRadius: 85, backgroundColor: c.hink, opacity: 0.1 }} />
-      <View style={{ width: 58, height: 72, borderRadius: 29, backgroundColor: dark ? c.ember : c.onyolk, alignItems: 'center', justifyContent: 'center', paddingTop: 8 }}>
-        <View style={{ width: 21, height: 21, borderRadius: 11, backgroundColor: dark ? c.hc : c.yolk }} />
-      </View>
-    </View>
-  );
+  return <View style={{ marginBottom: 6 }}><Logo full size={150} /></View>;
 }
 
 function Heading({ title, subtitle }) {

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Alert } from 'react-native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate } from '@p360/shared';
+import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate, naira } from '@p360/shared';
 import { useFarm, save } from '../lib/offlineQueue';
 
 const TABS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feeds' }, { value: 'other', label: 'Farm assets' }];
@@ -12,6 +12,13 @@ const CATEGORIES = [
   { id: 'other', label: 'Supplies', tab: 'other', icon: 'package-variant-closed', units: ['pieces', 'bags', 'kg', 'litres'], ideas: ['Wood shavings', 'Charcoal', 'Diesel', 'Egg trays'] },
 ];
 const cat = (id) => CATEGORIES.find((k) => k.id === id) || CATEGORIES[4];
+
+// Feed maths. A bag is 25 kg unless the item says otherwise; stock can be kept in bags, kg or tonnes.
+export const BAG_KG = 25;
+const kgPerUnit = (it) => (it.unit === 'bags' ? Number(it.bag_kg || BAG_KG) : it.unit === 'tonnes' ? 1000 : 1);
+export const perKg = (it) => (Number(it?.bag_price) > 0 ? Number(it.bag_price) / Number(it.bag_kg || BAG_KG) : null);   // ₦ per kg, or null without a price
+export const stockKg = (it) => Number(it.quantity || 0) * kgPerUnit(it);
+export const afterUsing = (it, kg) => Math.max(0, Math.round((Number(it.quantity || 0) - kg / kgPerUnit(it)) * 1000) / 1000);   // new quantity, in the item's own unit
 const num = (n) => Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
 const daysTo = (d) => Math.ceil((new Date(d + 'T23:59:59') - Date.now()) / 864e5);
 
@@ -65,9 +72,9 @@ export function InventoryScreen({ navigation, route }) {
           action={tab === 'health' ? 'Add what you have' : 'Add an item'} onAction={() => navigation.navigate('InventoryForm', { tab })} />
           : <Group>{shown.map((it, i) => { const a = itemAlert(it); return (
             <Row key={it.id} last={i === shown.length - 1} icon={cat(it.category).icon} title={it.name}
-              subtitle={cat(it.category).label + (it.expiry_date ? ' · expires ' + shortDate(it.expiry_date) : '') + (it._pending ? ' · saving' : '')}
+              subtitle={cat(it.category).label + (it.category === 'feed' && perKg(it) ? ' · ' + naira(it.bag_price) + ' a bag' : '') + (it.expiry_date ? ' · expires ' + shortDate(it.expiry_date) : '') + (it._pending ? ' · saving' : '')}
               onPress={() => { setSel(it.id); setAmount(''); }}
-              right={<View style={{ alignItems: 'flex-end', gap: 4 }}><Txt v="mono" style={{ fontSize: 15 }}>{num(it.quantity)} <Txt v="small">{it.unit || ''}</Txt></Txt>{a ? <Pill tone={a.tone} label={a.label} /> : null}</View>} />); })}</Group>}
+              right={<View style={{ alignItems: 'flex-end', gap: 4 }}><Txt v="mono" style={{ fontSize: 15 }}>{num(it.quantity)} <Txt v="small">{it.unit || ''}</Txt></Txt>{a ? <Pill tone={a.tone} label={a.label} /> : it.category === 'feed' && !perKg(it) ? <Pill tone="warn" label="No price" /> : null}</View>} />); })}</Group>}
         {tab === 'health' ? <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} /> : null}
         {tab === 'feed' ? <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} /> : null}
       </ScrollView>
@@ -95,7 +102,8 @@ export function InventoryFormScreen({ navigation, route }) {
   const existing = route.params?.id ? (data.farm_inventory || []).find((x) => x.id === route.params.id) : null;
   const startCat = existing?.category || (route.params?.tab === 'health' ? 'medicine' : route.params?.tab === 'other' ? 'equipment' : 'feed');
   const [f, setF] = useState({ category: startCat, name: existing?.name || '', quantity: existing ? String(Number(existing.quantity)) : '', unit: existing?.unit || cat(startCat).units[0],
-    low_at: existing?.low_at != null ? String(Number(existing.low_at)) : '', expiry_date: existing?.expiry_date || '', notes: existing?.notes || '' });
+    low_at: existing?.low_at != null ? String(Number(existing.low_at)) : '', expiry_date: existing?.expiry_date || '', notes: existing?.notes || '',
+    bag_price: existing?.bag_price != null ? String(Number(existing.bag_price)) : '' });
   const [errs, setErrs] = useState({});
   const k = cat(f.category);
   const set = (key) => (v) => { setF((x) => ({ ...x, [key]: v })); setErrs((e) => ({ ...e, [key]: undefined })); };
@@ -105,10 +113,13 @@ export function InventoryFormScreen({ navigation, route }) {
     if (!f.name.trim()) e.name = 'Enter a name';
     if (f.quantity === '' || !(Number(f.quantity) >= 0)) e.quantity = 'Enter how much you have';
     if (f.low_at !== '' && !(Number(f.low_at) >= 0)) e.low_at = 'Enter a number, or leave it empty';
+    if (f.category === 'feed' && !(Number(f.bag_price) > 0)) e.bag_price = 'Enter the price of one 25 kg bag';
     if (dated && f.expiry_date && !/^\d{4}-\d{2}-\d{2}$/.test(f.expiry_date)) e.expiry_date = 'Use YYYY-MM-DD, or leave it empty';
     setErrs(e); if (Object.keys(e).length) return;
     await save('farm_inventory', { ...(existing ? { ...existing, _pending: undefined, _failed: undefined } : {}), category: f.category, name: f.name.trim(), quantity: Number(f.quantity), unit: f.unit,
-      low_at: f.low_at === '' ? null : Number(f.low_at), expiry_date: dated && f.expiry_date ? f.expiry_date : null, notes: f.notes.trim() || null, status: 'active' });
+      low_at: f.low_at === '' ? null : Number(f.low_at), expiry_date: dated && f.expiry_date ? f.expiry_date : null, notes: f.notes.trim() || null, status: 'active',
+      bag_price: f.category === 'feed' ? Number(f.bag_price) : null, bag_kg: Number(existing?.bag_kg || BAG_KG) });
+    if (route.params?.from === 'log') return navigation.goBack();
     navigation.goBack();
   };
   const remove = () => Alert.alert('Remove ' + existing.name + '?', 'It will be taken off your inventory.', [{ text: 'Keep it', style: 'cancel' },
@@ -124,6 +135,8 @@ export function InventoryFormScreen({ navigation, route }) {
       {!f.name ? <ChipRow options={k.ideas} value={null} onChange={set('name')} /> : null}
       <Input label="How much do you have?" keyboardType="decimal-pad" value={f.quantity} onChangeText={(t) => set('quantity')(t.replace(/[^\d.]/g, ''))} suffix={f.unit} mono error={errs.quantity} />
       <ChipRow options={k.units} value={f.unit} onChange={set('unit')} />
+      {f.category === 'feed' ? <Input label="Price of one bag (25 kg)" prefix="₦" keyboardType="number-pad" value={f.bag_price} onChangeText={(t) => set('bag_price')(t.replace(/\D/g, ''))} mono error={errs.bag_price}
+        hint="Used to work out the cost of feed you log." /> : null}
       <Input label="Warn me when it drops to (optional)" keyboardType="decimal-pad" value={f.low_at} onChangeText={(t) => set('low_at')(t.replace(/[^\d.]/g, ''))} suffix={f.unit} mono error={errs.low_at} hint="You'll see it marked Running low." />
       {dated ? <DateInput label="Expiry date (optional)" value={f.expiry_date} onChange={set('expiry_date')} clearable placeholder="No expiry date" error={errs.expiry_date} hint="You'll be warned 30 days before it expires." /> : null}
       <Input label="Notes (optional)" value={f.notes} onChangeText={set('notes')} multiline placeholder="Supplier, batch number, where it's stored" />

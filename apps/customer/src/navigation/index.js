@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image, Platform } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
+// Local notifications are phone-only; the browser build has no reminders to open.
+const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLastNotificationResponse;
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -22,6 +24,9 @@ import { RaiseHomeScreen, BadgeScreen, OfferingFormScreen } from '../screens/rai
 import { INVEST_ENABLED } from '../lib/roi';
 import { FarmBookScreen, CreditLogScreen, CreditEntryScreen, CreditCustomerScreen, CreditAllowScreen, MyCreditScreen } from '../screens/farmbook';
 import { VetApplyScreen, VetDeskScreen, VetBookingScreen } from '../screens/vetdesk';
+import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, StoreAgentsScreen, StoreAgentScreen } from '../screens/agents';
+import { LandingScreen, WebNav } from '../screens/landing';
+import { ExploreScreen } from '../screens/explore';
 import { InventoryScreen, InventoryFormScreen } from '../screens/inventory';
 import { CareGuideScreen } from '../screens/careguide';
 import { useFarm } from '../lib/offlineQueue';
@@ -40,7 +45,7 @@ function VaccinationReminders() {
     const t = setTimeout(() => syncVaccinationReminders(data.vaccinations, data.flocks), 1000);
     return () => clearTimeout(t);
   }, [key]);
-  const last = Notifications.useLastNotificationResponse();
+  const last = useLastResponse();
   useEffect(() => {
     if (!isVaccinationTap(last)) return undefined;
     const t = setTimeout(() => { if (navRef.isReady()) navRef.navigate('Vaccinations'); }, 400);
@@ -51,7 +56,33 @@ function VaccinationReminders() {
 const Tab = createBottomTabNavigator();
 
 function TabBar({ state, descriptors, navigation }) {
-  const { c, f } = useTheme();
+  const { c, f, mode, toggle } = useTheme();
+  const wide = useWide();
+  if (wide) return (
+    // Website: a left sidebar with the same sections
+    <View style={{ width: 248, backgroundColor: c.nav, borderRightWidth: 1, borderColor: c.line, paddingVertical: 20, paddingHorizontal: 14, gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, marginBottom: 20 }}>
+        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}><Image source={LOGO_MARK} style={{ width: 34, height: 34 }} /></View>
+        <Txt v="h2" style={{ fontSize: 20 }}>Poultry360</Txt>
+      </View>
+      {state.routes.map((r, i) => {
+        const on = state.index === i; const o = descriptors[r.key].options;
+        return (
+          <Pressable key={r.key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => navigation.navigate(r.name)}
+            style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: on ? c.navact : hovered ? c.sf2 : 'transparent' })}>
+            <Icon name={on ? o.icon : o.iconOff || o.icon} size={22} color={on ? c.navactink : c.mute} />
+            <Text style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 15, color: on ? c.ink : c.mute }}>{o.title}</Text>
+          </Pressable>
+        );
+      })}
+      <View style={{ flex: 1 }} />
+      {[[mode === 'dark' ? 'white-balance-sunny' : 'weather-night', mode === 'dark' ? 'Light mode' : 'Dark mode', toggle], ['account-circle-outline', 'Profile', () => navigation.navigate('Profile')]].map(([i, l, fn]) => (
+        <Pressable key={l} onPress={fn} style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: hovered ? c.sf2 : 'transparent' })}>
+          <Icon name={i} size={22} color={c.mute} /><Text style={{ fontFamily: f.semibold, fontSize: 15, color: c.mute }}>{l}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
   return (
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: c.nav, borderTopWidth: 1, borderColor: c.line }}>
       <View style={{ height: 72, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
@@ -77,8 +108,9 @@ function TabBar({ state, descriptors, navigation }) {
 function BuyerTabs() {
   const { profile } = useAuth();
   const investor = INVEST_ENABLED && (profile?.roles || []).includes('investor');
+  const wide = useWide();
   return (
-    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom' }}>
       <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home', icon: 'home', iconOff: 'home-outline' }} />
       <Tab.Screen name="Market" component={MarketScreen} options={{ title: 'Market', icon: 'storefront', iconOff: 'storefront-outline' }} />
       <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' }} />
@@ -88,12 +120,16 @@ function BuyerTabs() {
   );
 }
 function VendorTabs() {
+  const wide = useWide();
+  const { supplierOnly } = useAuth();
   return (
-    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom' }}>
       <Tab.Screen name="VendorHome" component={VendorHomeScreen} options={{ title: 'Home', icon: 'home', iconOff: 'home-outline' }} />
       <Tab.Screen name="MyListings" component={MyListingsScreen} options={{ title: 'Listings', icon: 'package-variant-closed' }} />
       <Tab.Screen name="VendorOrders" component={VendorOrdersScreen} options={{ title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' }} />
-      <Tab.Screen name="FarmHome" component={FarmHomeScreen} options={{ title: 'Farm Hub', icon: 'barn' }} />
+      {supplierOnly
+        ? <Tab.Screen name="Agents" component={StoreAgentsScreen} options={{ title: 'Agents', icon: 'account-group', iconOff: 'account-group-outline' }} />
+        : <Tab.Screen name="FarmHome" component={FarmHomeScreen} options={{ title: 'Farm Hub', icon: 'barn' }} />}
       <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' }} />
     </Tab.Navigator>
   );
@@ -101,15 +137,23 @@ function VendorTabs() {
 function Tabs(props) {
   const { isVendorMode, profile } = useAuth();
   if (profile?.active_role === 'vet') return <VetDeskScreen {...props} />;
+  if (profile?.active_role === 'agent') return <AgentDeskScreen {...props} />;
   return isVendorMode ? <VendorTabs /> : <BuyerTabs />;
+}
+
+// On the website the sign-in pages carry the site's nav bar.
+function WebAuth({ navigation, children }) {
+  if (Platform.OS !== 'web') return children;
+  return <View style={{ flex: 1 }}><WebNav navigation={navigation} compact /><View style={{ flex: 1 }}>{children}</View></View>;
 }
 
 function AuthFlow() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="SignIn">{({ navigation }) => <SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} />}</Stack.Screen>
-      <Stack.Screen name="Email">{({ navigation, route }) => <EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} />}</Stack.Screen>
-      <Stack.Screen name="Otp">{({ navigation, route }) => <OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} />}</Stack.Screen>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={Platform.OS === 'web' ? 'Landing' : 'SignIn'}>
+      {Platform.OS === 'web' ? <Stack.Screen name="Landing" component={LandingScreen} /> : null}
+      <Stack.Screen name="SignIn">{({ navigation }) => <WebAuth navigation={navigation}><SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} /></WebAuth>}</Stack.Screen>
+      <Stack.Screen name="Email">{({ navigation, route }) => <WebAuth navigation={navigation}><EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} /></WebAuth>}</Stack.Screen>
+      <Stack.Screen name="Otp">{({ navigation, route }) => <WebAuth navigation={navigation}><OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} /></WebAuth>}</Stack.Screen>
     </Stack.Navigator>
   );
 }
@@ -138,6 +182,7 @@ export default function Navigation() {
             <Stack.Screen name="Role" component={RoleScreen} />
             <Stack.Screen name="Business" component={BusinessScreen} />
             <Stack.Screen name="VetApply" component={VetApplyScreen} />
+            <Stack.Screen name="AgentJoin" component={AgentJoinScreen} />
           </>) : (<>
             <Stack.Screen name="Tabs" component={Tabs} />
             <Stack.Screen name="Listings" component={ListingsScreen} />
@@ -184,6 +229,11 @@ export default function Navigation() {
             <Stack.Screen name="MyCredit" component={MyCreditScreen} />
             <Stack.Screen name="VetApply" component={VetApplyScreen} />
             <Stack.Screen name="VetBooking" component={VetBookingScreen} />
+            <Stack.Screen name="AgentJoin" component={AgentJoinScreen} />
+            <Stack.Screen name="AgentSale" component={AgentSaleScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="StoreAgents" component={StoreAgentsScreen} />
+            <Stack.Screen name="Explore" component={ExploreScreen} />
+            <Stack.Screen name="StoreAgent" component={StoreAgentScreen} />
             {INVEST_ENABLED ? (<>
               <Stack.Screen name="InvestHome" component={InvestHomeScreen} />
               <Stack.Screen name="Kyc" component={KycScreen} />

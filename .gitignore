@@ -7,3 +7,4 @@ android
 ios
 builds
 *.apk
+dist-web

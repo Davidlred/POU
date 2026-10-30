@@ -9,7 +9,9 @@
     "customer": "npm --workspace apps/customer run start",
     "rider": "npm --workspace apps/rider run start",
     "admin": "npm --workspace apps/admin run dev",
-    "fix-deps": "cd apps/customer && npx expo install --fix && cd ../rider && npx expo install --fix"
+    "fix-deps": "cd apps/customer && npx expo install --fix && cd ../rider && npx expo install --fix",
+    "web": "npm --prefix apps/customer exec -- expo start --web",
+    "web:build": "cd apps/customer && npx expo export -p web --output-dir dist-web"
   },
   "overrides": {
     "react": "19.2.3",

@@ -1,6 +1,8 @@
 // Builds a CSV of wallet transactions and opens the share sheet.
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
+import { downloadText } from '@p360/shared';
 
 const cell = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
 
@@ -12,6 +14,8 @@ export async function exportCsv(tx) {
       t.type, t.label || '', Number(t.amount).toFixed(2), t.status || 'completed', t.id];
   });
   const csv = [head, ...rows].map((r) => r.map(cell).join(',')).join('\n');
+  const name = 'poultry360-transactions-' + new Date().toISOString().slice(0, 10) + '.csv';
+  if (Platform.OS === 'web') return downloadText(name, csv, 'text/csv');
   const file = new File(Paths.cache, 'poultry360-transactions-' + new Date().toISOString().slice(0, 10) + '.csv');
   file.create({ overwrite: true });
   file.write(csv);

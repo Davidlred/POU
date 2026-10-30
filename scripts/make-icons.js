@@ -49,7 +49,7 @@ function png(px) {
 }
 
 const APPS = {
-  customer: { bg: '#0F8A5F', egg: '#FFFFFF', yolk: '#0F8A5F' },   // white egg on green
+  // customer: no longer drawn here. Its icon is the Poultry360 logo (see CLAUDE.md "Logo"); running this must not overwrite it.
   rider: { bg: '#0C0D0D', egg: '#2DCB8C', yolk: '#0C0D0D' },      // green egg on near-black
 };
 for (const [app, col] of Object.entries(APPS)) {

@@ -6,7 +6,8 @@ import { useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon,
   naira, countdown, rpc, publicUrl, uploadImage, friendlyError, timeAgo, STATUS_LABEL, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
-import { CATEGORIES, WASTE_CATEGORIES, UNITS, catLabel } from '../lib/catalog';
+import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, UNITS, catLabel } from '../lib/catalog';
+import { ExploreOptions } from './explore';
 
 function RoleSwitch() {
   const { c, f } = useTheme();
@@ -21,16 +22,16 @@ function RoleSwitch() {
 }
 
 function VerifyBanner({ navigation }) {
-  const { vendor } = useAuth();
+  const { vendor, supplierOnly } = useAuth();
   if (!vendor || vendor.verification_status === 'approved') return null;
   return vendor.verification_status === 'rejected'
     ? <Banner tone="err" title="Action needed on your verification" body={vendor.rejection_reason} action="Fix" onAction={() => navigation.navigate('Pending')} />
-    : <Banner tone="warn" icon="timer-sand" title="Verification in review" body="Farm Hub is open now. Listings unlock once you're approved." action="Status" onAction={() => navigation.navigate('Pending')} />;
+    : <Banner tone="warn" icon="timer-sand" title="Verification in review" body={supplierOnly ? "Listings unlock once you're approved." : "Farm Hub is open now. Listings unlock once you're approved."} action="Status" onAction={() => navigation.navigate('Pending')} />;
 }
 
 export function VendorHomeScreen({ navigation }) {
   const { c } = useTheme();
-  const { profile, vendor, wallet, refreshWallet } = useAuth();
+  const { profile, vendor, wallet, refreshWallet, supplierOnly } = useAuth();
   const [orders, setOrders] = useState(null);
   const [busy, setBusy] = useState(false);
   useTick(1000);
@@ -66,10 +67,14 @@ export function VendorHomeScreen({ navigation }) {
               </Card>
             );
           })}
-        <Txt v="h2">Run your farm</Txt>
+        {supplierOnly && vendor?.verification_status !== 'approved' ? <><Txt v="h2">While you wait</Txt><ExploreOptions navigation={navigation} /></> : null}
+        <Txt v="h2">{supplierOnly ? 'Run your store' : 'Run your farm'}</Txt>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {[['Farm Hub', 'barn', 't4', () => navigation.navigate('FarmHome')], ['Vet care', 'stethoscope', 't2', () => navigation.navigate('VetHome')], ['Sell waste', 'sprout-outline', 't3', () => navigation.navigate('WasteHome')],
-            ...(INVEST_ENABLED ? [['Raise funds', 'cash-plus', 't1', () => navigation.navigate('RaiseHome')]] : [])].map(([l, i, t, fn]) => (
+          {(supplierOnly
+            ? [['Products', 'package-variant-closed', 't4', () => navigation.navigate('MyListings')], ['Agents', 'account-group-outline', 't1', () => navigation.navigate('StoreAgents')],
+               ['Credit sales', 'notebook-outline', 't2', () => navigation.navigate('FarmBook')], ['Orders', 'receipt-text-outline', 't3', () => navigation.navigate('VendorOrders')]]
+            : [['Farm Hub', 'barn', 't4', () => navigation.navigate('FarmHome')], ['Vet care', 'stethoscope', 't2', () => navigation.navigate('VetHome')], ['Sell waste', 'sprout-outline', 't3', () => navigation.navigate('WasteHome')], ['Agents', 'account-group-outline', 't1', () => navigation.navigate('StoreAgents')],
+            ...(INVEST_ENABLED ? [['Raise funds', 'cash-plus', 't1', () => navigation.navigate('RaiseHome')]] : [])]).map(([l, i, t, fn]) => (
             <Pressable key={l} onPress={fn} style={{ flexBasis: '45%', flexGrow: 1, minHeight: 88, borderRadius: 18, backgroundColor: c[t], padding: 12, gap: 10, justifyContent: 'space-between' }}><Icon name={i} color={c[t + 'i']} /><Txt v="bold" style={{ fontSize: 13 }}>{l}</Txt></Pressable>
           ))}
         </View>
@@ -125,8 +130,9 @@ export function ListingFormScreen({ navigation, route }) {
   const { c } = useTheme();
   const { uid, vendor } = useAuth();
   const id = route.params?.id; const waste = !!route.params?.waste;
-  const cats = waste ? WASTE_CATEGORIES : CATEGORIES;
-  const [f, setF] = useState({ category: cats[0].id, title: '', price: '', unit: waste ? 'bag' : 'crate', quantity: '', description: '', moisture: '' });
+  const { supplierOnly } = useAuth();
+  const cats = waste ? WASTE_CATEGORIES : supplierOnly ? CATEGORIES.filter((k) => SUPPLY_CATEGORIES.includes(k.id)) : CATEGORIES;
+  const [f, setF] = useState({ category: cats[0].id, title: '', price: '', unit: waste || supplierOnly ? 'bag' : 'crate', quantity: '', description: '', moisture: '', agent_pct: '' });
   const [photos, setPhotos] = useState([]); // { uri, path, state }
   const [errs, setErrs] = useState({});
   const [preview, setPreview] = useState(false);
@@ -136,7 +142,7 @@ export function ListingFormScreen({ navigation, route }) {
     if (!id) return;
     supabase.from('listings').select('*').eq('id', id).single().then(({ data: l }) => {
       if (!l) return;
-      setF({ category: l.category, title: l.title, price: String(l.price), unit: l.unit, quantity: String(l.quantity), description: l.description || '', moisture: l.attributes?.moisture ? String(l.attributes.moisture) : '' });
+      setF({ category: l.category, title: l.title, price: String(l.price), unit: l.unit, quantity: String(l.quantity), description: l.description || '', moisture: l.attributes?.moisture ? String(l.attributes.moisture) : '', agent_pct: Number(l.agent_commission_pct) ? String(Number(l.agent_commission_pct)) : '' });
       setPhotos((l.photos || []).map((p) => ({ uri: publicUrl('listing-photos', p), path: p, state: 'done' })));
     });
   }, [id]);
@@ -155,13 +161,14 @@ export function ListingFormScreen({ navigation, route }) {
     if (!f.title.trim()) e.title = 'Add a title';
     if (!(Number(f.price) > 0)) e.price = 'Enter a price';
     if (!(parseInt(f.quantity, 10) > 0)) e.quantity = 'Must be at least 1';
+    if (f.agent_pct !== '' && !(Number(f.agent_pct) >= 0 && Number(f.agent_pct) <= 100)) e.agent_pct = 'Enter 0 to 100';
     setErrs(e); return !Object.keys(e).length;
   };
   const save = async (status) => {
     if (status === 'live' && !validate()) return setPreview(false);
     setBusy(true);
     const row = { vendor_id: uid, category: f.category, is_waste: waste, title: f.title.trim() || 'Untitled draft', description: f.description || null,
-      price: Number(f.price) || 1, unit: f.unit, quantity: parseInt(f.quantity, 10) || 0, status,
+      price: Number(f.price) || 1, unit: f.unit, quantity: parseInt(f.quantity, 10) || 0, status, agent_commission_pct: Math.min(100, Number(f.agent_pct) || 0),
       photos: photos.filter((p) => p.path).map((p) => p.path), attributes: waste && f.moisture ? { moisture: Number(f.moisture) } : {} };
     const { error } = id ? await supabase.from('listings').update(row).eq('id', id) : await supabase.from('listings').insert(row);
     setBusy(false);
@@ -204,6 +211,7 @@ export function ListingFormScreen({ navigation, route }) {
       </View>
       <Txt v="strong" style={{ fontSize: 13 }}>Sold per</Txt>
       <ChipRow options={waste ? ['bag', 'tonne'] : UNITS.filter((u) => u !== 'tonne')} value={f.unit} onChange={set('unit')} />
+      <Input label="Agent commission (optional)" suffix="%" keyboardType="decimal-pad" value={f.agent_pct} onChangeText={(t) => set('agent_pct')(t.replace(/[^\d.]/g, ''))} mono error={errs.agent_pct} hint="What your agents earn when they sell this." />
       {waste ? <Input label="Moisture % (optional)" keyboardType="number-pad" value={f.moisture} onChangeText={(t) => set('moisture')(t.replace(/\D/g, '').slice(0, 2))} mono /> : null}
       <Input label="Description (optional)" value={f.description} onChangeText={set('description')} multiline placeholder="How it's raised, graded or packed" />
       <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="truck-delivery-outline" size={16} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>{waste ? 'Orders over 1 tonne may need a scheduled truck pickup. We confirm the time with you.' : 'No delivery setup needed. Poultry360 riders collect from your farm.'}</Txt></View>

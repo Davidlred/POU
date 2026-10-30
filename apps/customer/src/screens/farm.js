@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, ScrollView, Linking, Alert } from 'react-native';
 import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, naira, isoDate, shortDate, timeAgo, supabase, rpc } from '@p360/shared';
 import { useFarm, save, retryFailed, discardFailed, flockStats } from '../lib/offlineQueue';
-import { itemAlert } from './inventory';
+import { itemAlert, perKg, stockKg, afterUsing } from './inventory';
 import { isClosed, flockSummary, series, farmTotals } from '../lib/flockHistory';
 import { askForNotifications, notificationsAllowed } from '../lib/reminders';
 
@@ -234,21 +234,49 @@ export function LogScreen({ navigation, route }) {
   const [qty, setQty] = useState(''); const [cost, setCost] = useState(''); const [cause, setCause] = useState(null); const [date, setDate] = useState(isoDate()); const [err, setErr] = useState(null);
   const n = Number(qty || 0);
   const over = kind === 'mortality' && n > s.alive;
+  // Feed is costed from the farm's own inventory: pick the feed, enter kg, and the price per kg does the rest.
+  const feeds = (data.farm_inventory || []).filter((x) => x.category === 'feed' && x.status !== 'removed');
+  const [feedId, setFeedId] = useState(null);
+  const feed = feeds.find((x) => x.id === feedId) || feeds.find((x) => perKg(x)) || feeds[0] || null;
+  const price = feed ? perKg(feed) : null;
+  const feedCost = price && n > 0 ? Math.round(n * price) : 0;
+  const feedBlocked = kind === 'feed' && (!feed || !price);
   const submit = async () => {
     if (kind === 'expense' ? !(Number(cost) > 0) : !(n > 0)) return setErr('Enter a value above 0');
-    if (over) return;
-    await save('farm_logs', { flock_id: flockId, kind, quantity: kind === 'expense' ? 1 : n, cost: Number(cost || 0), cause: cause || null, log_date: date, unit: kind === 'production' ? (f?.type === 'layers' ? 'eggs' : 'kg') : kind === 'feed' ? 'kg' : null });
+    if (over || feedBlocked) return;
+    if (kind === 'feed') {
+      await save('farm_logs', { flock_id: flockId, kind, quantity: n, cost: feedCost, cause: feed.name, inventory_id: feed.id, unit_cost: Math.round(price * 100) / 100, log_date: date, unit: 'kg' });
+      await save('farm_inventory', { ...feed, _pending: undefined, _failed: undefined, quantity: afterUsing(feed, n) });   // the feed leaves the store
+      return navigation.goBack();
+    }
+    await save('farm_logs', { flock_id: flockId, kind, quantity: kind === 'expense' ? 1 : n, cost: Number(cost || 0), cause: cause || null, log_date: date, unit: kind === 'production' ? (f?.type === 'layers' ? 'eggs' : 'kg') : null });
     navigation.goBack();
   };
   return (
-    <Screen scroll footer={<><SyncHint /><Button title="Save entry" disabled={over} onPress={submit} /></>}>
+    <Screen scroll footer={<><SyncHint /><Button title="Save entry" disabled={over || feedBlocked} onPress={submit} /></>}>
       <AppBar title={'Log · ' + (f?.code || '')} close />
       <Segmented options={[{ value: 'feed', label: 'Feed' }, { value: 'mortality', label: 'Mortality' }, { value: 'production', label: 'Output' }, { value: 'expense', label: 'Cost' }]} value={kind} onChange={(k) => { setKind(k); setErr(null); setCause(null); }} />
-      {kind !== 'expense' ? <Input label={kind === 'feed' ? 'Feed used (kg)' : kind === 'mortality' ? 'Birds lost' : f?.type === 'layers' ? 'Eggs collected' : 'Output (kg)'} keyboardType="number-pad" value={qty} onChangeText={(t) => { setQty(t.replace(/[^\d.]/g, '')); setErr(null); }} mono autoFocus
+      {kind !== 'expense' ? <Input label={kind === 'feed' ? 'Feed used (kg)' : kind === 'mortality' ? 'Birds lost' : f?.type === 'layers' ? 'Eggs collected' : 'Output (kg)'} keyboardType={kind === 'feed' ? 'decimal-pad' : 'number-pad'} value={qty} onChangeText={(t) => { setQty(t.replace(/[^\d.]/g, '')); setErr(null); }} mono autoFocus
         error={over ? "Can't exceed the " + s.alive.toLocaleString() + ' birds left in this flock' : err} /> : null}
-      {kind === 'feed' || kind === 'expense' ? <Input label={kind === 'feed' ? 'Cost (optional)' : 'Amount'} prefix="₦" keyboardType="number-pad" value={cost} onChangeText={(t) => setCost(t.replace(/\D/g, ''))} mono error={kind === 'expense' ? err : null} /> : null}
+      {kind === 'expense' ? <Input label="Amount" prefix="₦" keyboardType="number-pad" value={cost} onChangeText={(t) => setCost(t.replace(/\D/g, ''))} mono error={err} /> : null}
       {kind === 'mortality' ? <><Txt v="strong" style={{ fontSize: 13 }}>Cause (optional)</Txt><ChipRow options={CAUSES} value={cause} onChange={setCause} /></> : null}
-      {kind === 'feed' ? <><Txt v="strong" style={{ fontSize: 13 }}>Feed type</Txt><ChipRow options={['Starter', 'Grower', 'Finisher', 'Layer mash']} value={cause} onChange={setCause} /></> : null}
+      {kind === 'feed' ? (!feeds.length
+        ? <Banner tone="warn" icon="sack" title="Add your feed price first" body="Add the feed in your inventory with the price of one bag. The cost of every feed entry is worked out from it." action="Add feed" onAction={() => navigation.navigate('InventoryForm', { tab: 'feed', from: 'log' })} />
+        : <>
+          <Txt v="strong" style={{ fontSize: 13 }}>Which feed?</Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {feeds.map((x) => <Chip key={x.id} label={x.name} selected={feed?.id === x.id} onPress={() => setFeedId(x.id)} />)}
+            <Chip icon="plus" label="Add feed" onPress={() => navigation.navigate('InventoryForm', { tab: 'feed', from: 'log' })} />
+          </View>
+          {!price
+            ? <Banner tone="warn" icon="tag-outline" title={'Add the price for ' + feed.name + ' first'} body="Enter the price of one 25 kg bag. The cost is worked out from it." action="Add price" onAction={() => navigation.navigate('InventoryForm', { id: feed.id, from: 'log' })} />
+            : <Card>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Txt v="label">Cost</Txt><Txt v="mono" style={{ fontSize: 20 }}>{naira(feedCost)}</Txt>
+              </View>
+              {n > stockKg(feed) ? <Txt v="small" color={c.warn}>{'More than the ' + Number(stockKg(feed).toFixed(1)).toLocaleString() + ' kg in your inventory.'}</Txt> : null}
+            </Card>}
+        </>) : null}
       {kind === 'expense' ? <><Txt v="strong" style={{ fontSize: 13 }}>Type</Txt><ChipRow options={['Vet & drugs', 'Labour', 'Utilities', 'Other']} value={cause} onChange={setCause} /></> : null}
       <DateInput label="Date" value={date} onChange={setDate} max={isoDate()} />
     </Screen>

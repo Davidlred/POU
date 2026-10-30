@@ -30,8 +30,11 @@ export function ProfileScreen({ navigation }) {
         {roles.includes('vendor') || roles.includes('supplier') ? <Row icon="barn" title={vendor?.business_name || 'Farm'} subtitle={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Needs attention' : 'In review'} onPress={() => (vs === 'approved' ? setActiveRole('vendor') : navigation.navigate('Pending'))}
           right={profile.active_role === 'vendor' ? <Pill tone="ok" label="Active" /> : <Pill tone={vs === 'approved' ? 'ok' : vs === 'rejected' ? 'err' : 'warn'} label={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Rejected' : 'Pending'} />} /> : null}
         {roles.includes('vet') ? <Row icon="stethoscope" title="Vet desk" subtitle="Licence status, bookings and time slots" onPress={() => setActiveRole('vet').then(() => navigation.popTo('Tabs'))} right={profile.active_role === 'vet' ? <Pill tone="ok" label="Active" /> : <Txt v="small">Switch</Txt>} /> : null}
+        {roles.includes('agent') ? <Row icon="account-tie-outline" title="Agent desk" subtitle="Log sales and see your commission" onPress={() => setActiveRole('agent').then(() => navigation.popTo('Tabs'))} /> : null}
+        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon="account-group-outline" title="Agents" subtitle="Your invite code and top agents" onPress={() => navigation.navigate('StoreAgents')} /> : null}
         {roles.includes('investor') ? <Row icon="chart-line" title="Investor" subtitle="Portfolio and identity verification" onPress={() => navigation.navigate('InvestHome')} /> : null}
-        {roles.length < 5 ? <Row icon="plus-circle-outline" iconColor={c.acc} title="Add a role" onPress={() => navigation.navigate('Role', { adding: true })} last /> : null}
+        <Row icon="compass-outline" title="Explore" subtitle="Shop, add a farm, work as a vet or agent" onPress={() => navigation.navigate('Explore')} />
+        {roles.length < 6 ? <Row icon="plus-circle-outline" iconColor={c.acc} title="Add a role" onPress={() => navigation.navigate('Role', { adding: true })} last /> : null}
       </Group>
       {roles.includes('buyer') ? <>
         <Txt v="label">Buying</Txt>

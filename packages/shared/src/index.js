@@ -5,3 +5,5 @@ export * from './format';
 export * from './ui';
 export * from './auth';
 export * from './fonts';
+export * from './Intro';
+export * from './web';

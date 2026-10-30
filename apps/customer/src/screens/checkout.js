@@ -55,6 +55,17 @@ export function CartScreen({ navigation }) {
   );
 }
 
+// Area names are compared exactly when an order is placed, so save them exactly as listed.
+const CITY = 'Port Harcourt';
+const ELSEWHERE = 'Elsewhere in Port Harcourt';
+const OUTSIDE = 'Outside Port Harcourt';
+const squash = (t) => t.toLowerCase().replace(/[^a-z]/g, '');
+export function canonicalArea(typed, areas) {
+  const t = squash(typed || '');
+  if (['portharcourt', 'portharcourtcity', 'ph', 'phc', 'obioakpor'].includes(t)) return CITY;
+  return areas.find((a) => squash(a) === t) || (typed || '').trim();
+}
+
 function AddressForm({ areas, onSaved, onCancel }) {
   const { uid } = useAuth();
   const [label, setLabel] = useState('Home');
@@ -70,7 +81,7 @@ function AddressForm({ areas, onSaved, onCancel }) {
     setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
   };
   const save = async () => {
-    const a = area === 'Other' ? other.trim() : area;
+    const a = area === ELSEWHERE ? CITY : area === OUTSIDE ? canonicalArea(other, areas) : area;
     if (!line.trim() || !a) return alert('Add the street address and area.');
     setBusy(true);
     const { data, error } = await supabase.from('addresses').insert({ user_id: uid, label, line: line.trim(), area: a, lat: geo?.lat, lng: geo?.lng }).select().single();
@@ -84,8 +95,8 @@ function AddressForm({ areas, onSaved, onCancel }) {
       <ChipRow options={['Home', 'Work', 'Restaurant', 'Other']} value={label} onChange={setLabel} />
       <Input label="Street address" value={line} onChangeText={setLine} placeholder="12 Aba Road" />
       <Txt v="strong" style={{ fontSize: 13 }}>Area</Txt>
-      <ChipRow options={[...areas, 'Other']} value={area} onChange={setArea} />
-      {area === 'Other' ? <Input value={other} onChangeText={setOther} placeholder="e.g. Onne" hint="We'll tell you if we deliver there yet." /> : null}
+      <ChipRow options={[...areas.filter((a) => a !== CITY), ELSEWHERE, OUTSIDE]} value={area} onChange={setArea} />
+      {area === OUTSIDE ? <Input value={other} onChangeText={setOther} placeholder="e.g. Onne" /> : null}
       <Button small variant="outline" icon="crosshairs-gps" title={geo ? 'Location pinned' : 'Pin my current location'} onPress={locate} />
       <View style={{ flexDirection: 'row', gap: 8 }}>{onCancel ? <Button small variant="outline" title="Cancel" onPress={onCancel} style={{ flex: 1 }} /> : null}<Button small title="Save address" loading={busy} onPress={save} style={{ flex: 1 }} /></View>
     </Card>
@@ -128,6 +139,7 @@ export function CheckoutScreen({ navigation, route }) {
   const balance = Number(wallet?.balance || 0);
   // Pay later: the goods go on credit with the farm; the delivery fee is paid now so the rider is paid.
   const onCredit = method === 'credit' && !!credit;
+  const [agentCode, setAgentCode] = useState('');
   const creditOk = !!credit && itemsTotal <= Number(credit.available) && balance >= fee;
   const payNow = onCredit ? fee : total;
 
@@ -142,6 +154,7 @@ export function CheckoutScreen({ navigation, route }) {
     try {
       const res = await rpc('place_order', { p_address_id: sel, p_items: live.map((x) => ({ listing_id: x.listing_id, qty: x.qty, via_search: !!x.via_search })), p_method: onCredit ? 'credit' : method === 'wallet' ? 'wallet' : 'card', p_ref: ref });
       clear(); refreshWallet();
+      if (agentCode.trim()) rpc('set_order_agent', { p_order: res.order_id, p_code: agentCode.trim() }).catch((e) => alert('Your order is placed, but the agent code was not added: ' + friendlyError(e)));
       navigation.reset({ index: 1, routes: [{ name: 'Tabs' }, { name: 'OrderSuccess', params: { orderId: res.order_id } }] });
     } catch (e) {
       if (String(e.message).startsWith('ITEM_UNAVAILABLE')) { await validate(); setState({ phase: 'idle' }); alert('Some items sold out while you were checking out. You have not been charged.'); return navigation.navigate('Cart'); }
@@ -212,6 +225,7 @@ export function CheckoutScreen({ navigation, route }) {
       </Card>
       {onCredit ? <Banner tone="info" icon="credit-card-clock-outline" title={naira(itemsTotal) + ' goes on credit'}
         body={'You pay the ' + naira(fee) + ' delivery fee from your wallet now. The ' + naira(itemsTotal) + ' for the goods is due within 14 days: pay it in the app under Pay later, or pay the farm directly.'} /> : null}
+      <Input label="Agent code (optional)" value={agentCode} onChangeText={(t) => setAgentCode(t.toUpperCase())} placeholder="AG7KQ2M" autoCapitalize="characters" autoCorrect={false} mono />
       <Txt v="label">Pay with</Txt>
       {credit ? (
         <Group>

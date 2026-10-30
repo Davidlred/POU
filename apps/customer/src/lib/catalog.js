@@ -7,7 +7,10 @@ export const CATEGORIES = [
   { id: 'live_birds', label: 'Live birds', icon: 'bird', tone: 't3' },
   { id: 'feed', label: 'Feed & supplies', icon: 'sack', tone: 't4' },
   { id: 'drugs', label: 'Drugs & vaccines', icon: 'pill', tone: 't2' },
+  { id: 'equipment', label: 'Equipment', icon: 'tools', tone: 't3' },
 ];
+// What a supplier (feed, drugs, equipment store) can list: farm supplies only, never birds or eggs.
+export const SUPPLY_CATEGORIES = ['feed', 'drugs', 'equipment'];
 export const WASTE_CATEGORIES = [
   { id: 'manure', label: 'Manure', icon: 'sprout-outline' },
   { id: 'litter', label: 'Litter', icon: 'leaf' },

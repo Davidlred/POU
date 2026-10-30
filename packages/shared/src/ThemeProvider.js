@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { palettes, fonts } from './theme';
 
@@ -8,7 +8,7 @@ const KEY = 'p360-theme';
 
 export function ThemeProvider({ children }) {
   const system = useColorScheme();
-  const [pref, setPref] = useState('system'); // 'system' | 'light' | 'dark'
+  const [pref, setPref] = useState(Platform.OS === 'web' ? 'light' : 'system'); // 'system' | 'light' | 'dark'; the website opens in light mode
   useEffect(() => { AsyncStorage.getItem(KEY).then((v) => v && setPref(v)); }, []);
   const mode = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
   const value = useMemo(() => ({

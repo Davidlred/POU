@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from './ThemeProvider';
+import { useWide } from './web';
 
 export function Icon({ name, size = 22, color, style }) {
   const { c } = useTheme();
@@ -30,17 +31,20 @@ export function Txt({ v = 'body', color, style, children, ...p }) {
   return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={[VARIANTS(f, c)[v], color && { color }, style]}>{children}</Text>;
 }
 
+const PAGE = { width: '100%', maxWidth: 1080, alignSelf: 'center' };
 export function Screen({ children, scroll, pad = true, edges = ['top'], style, footer, bg }) {
   const { c, mode } = useTheme();
+  const wide = useWide();
+  const page = wide && pad ? [PAGE, { paddingHorizontal: 40, paddingTop: 28 }] : null;
   const inner = scroll
-    ? <ScrollView contentContainerStyle={[pad && { padding: 20, paddingBottom: 40 }, { gap: 14 }, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
-    : <View style={[{ flex: 1 }, pad && { paddingHorizontal: 20 }, style]}>{children}</View>;
+    ? <ScrollView contentContainerStyle={[pad && { padding: 20, paddingBottom: 40 }, { gap: 14 }, page, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+    : <View style={[{ flex: 1 }, pad && { paddingHorizontal: 20 }, page, style]}>{children}</View>;
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg || c.bg }}>
       <StatusBar barStyle={mode === 'dark' || bg ? 'light-content' : 'dark-content'} backgroundColor={bg || c.bg} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {inner}
-        {footer ? <View style={{ padding: 16, paddingBottom: 20, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.nav, gap: 10 }}>{footer}</View> : null}
+        {footer ? <View style={{ padding: 16, paddingBottom: 20, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.nav }}><View style={[{ gap: 10 }, wide && { ...PAGE, maxWidth: 520 }]}>{footer}</View></View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

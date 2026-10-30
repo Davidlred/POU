@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet,
+import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Toggle,
   naira, isoDate, shortDate, rpc, uploadImage, friendlyError, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
@@ -75,33 +75,61 @@ export function FarmBookScreen({ navigation }) {
 }
 
 // Write down a sale someone took without paying. Works for people who aren't on the app.
+// What one line costs, and how a unit reads ("5 crates", "2.5 kg").
+const plural = (u, q) => (Number(q) === 1 || !u || u === 'kg' || u.endsWith('s') ? u : u + 's');
+let lineKey = 0;
+
 export function CreditLogScreen({ navigation, route }) {
+  const { c } = useTheme();
+  const { uid } = useAuth();
   const [customers, setCustomers] = useState(null);
+  const [products, setProducts] = useState(null);     // the farm's own listings: name, price, unit
   const [sel, setSel] = useState(route.params?.customerId || 'new');
-  const [f, setF] = useState({ name: '', phone: '', type: 'individual', description: '', amount: '', due: isoDate(new Date(Date.now() + 7 * 864e5)) });
+  const [f, setF] = useState({ name: '', phone: '', type: 'individual', due: isoDate(new Date(Date.now() + 7 * 864e5)) });
+  const [lines, setLines] = useState([]);              // { key, listing_id?, name, unit, unit_price, qty }
+  const [discountOn, setDiscountOn] = useState(false);
+  const [discount, setDiscount] = useState('');
   const [errs, setErrs] = useState({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { rpc('farm_book').then((b) => setCustomers(b.customers)).catch(() => setCustomers([])); }, []);
+  useEffect(() => {
+    rpc('farm_book').then((bk) => setCustomers(bk.customers)).catch(() => setCustomers([]));
+    supabase.from('listings').select('id, title, price, unit, status').eq('vendor_id', uid).neq('status', 'unpublished').order('title')
+      .then(({ data }) => setProducts(data || []));
+  }, [uid]);
   const set = (k) => (v) => { setF((x) => ({ ...x, [k]: v })); setErrs((e) => ({ ...e, [k]: undefined })); };
   const isNew = sel === 'new';
+
+  const addProduct = (pr) => { setLines((ls) => ls.some((l) => l.listing_id === pr.id) ? ls : [...ls, { key: ++lineKey, listing_id: pr.id, name: pr.title, unit: pr.unit, unit_price: Number(pr.price), qty: '' }]); setErrs((e) => ({ ...e, items: undefined })); };
+  const addOther = () => { setLines((ls) => [...ls, { key: ++lineKey, listing_id: null, name: '', unit: 'unit', unit_price: '', qty: '' }]); setErrs((e) => ({ ...e, items: undefined })); };
+  const upd = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const drop = (key) => setLines((ls) => ls.filter((l) => l.key !== key));
+
+  const lineTotal = (l) => Math.round(Number(l.qty || 0) * Number(l.unit_price || 0) * 100) / 100;
+  const subtotal = lines.reduce((t, l) => t + lineTotal(l), 0);
+  const pct = discountOn ? Number(discount || 0) : 0;
+  const total = Math.round(subtotal * (100 - pct)) / 100;
+
   const save = async () => {
     const e = {};
     if (isNew && !f.name.trim()) e.name = "Enter the customer's name";
-    if (!f.description.trim()) e.description = 'Say what they took';
-    if (!(Number(f.amount) > 0)) e.amount = 'Enter the amount they owe';
-    if (f.due && !/^\d{4}-\d{2}-\d{2}$/.test(f.due)) e.due = 'Use YYYY-MM-DD, or leave it empty';
+    if (!lines.length) e.items = 'Add what they took';
+    else if (lines.some((l) => !(Number(l.qty) > 0))) e.items = 'Enter how many for each item';
+    else if (lines.some((l) => !l.listing_id && (!l.name.trim() || !(Number(l.unit_price) > 0)))) e.items = 'Give each other item a name and a price';
+    if (discountOn && !(pct > 0 && pct < 100)) e.discount = 'Enter a discount from 1 to 99%';
     setErrs(e); if (Object.keys(e).length) return;
     setBusy(true);
     try {
-      await rpc('farm_book_log_credit', { p_customer: isNew ? null : sel, p_name: isNew ? f.name.trim() : null, p_phone: isNew ? f.phone.trim() || null : null, p_type: f.type,
-        p_description: f.description.trim(), p_amount: Number(f.amount), p_due: f.due || null });
+      await rpc('farm_book_log_sale', { p_customer: isNew ? null : sel, p_name: isNew ? f.name.trim() : null, p_phone: isNew ? f.phone.trim() || null : null, p_type: f.type,
+        p_items: lines.map((l) => (l.listing_id ? { listing_id: l.listing_id, qty: Number(l.qty) } : { name: l.name.trim(), unit: l.unit.trim() || 'unit', unit_price: Number(l.unit_price), qty: Number(l.qty) })),
+        p_discount_pct: pct, p_due: f.due || null });
       navigation.goBack();
     } catch (er) { Alert.alert("Couldn't save", friendlyError(er)); } finally { setBusy(false); }
   };
+
+  const num = (t) => t.replace(/[^\d.]/g, '');
   return (
-    <Screen scroll footer={<Button title="Save as payment pending" loading={busy} onPress={save} />}>
+    <Screen scroll footer={<Button title={'Save · ' + naira(total) + ' owed'} loading={busy} disabled={!lines.length} onPress={save} />}>
       <AppBar title="Log a credit sale" close />
-      <Txt v="small" style={{ fontSize: 14 }}>For goods a customer took and will pay for later. They don't need to have the app.</Txt>
       <Txt v="strong" style={{ fontSize: 13 }}>Customer</Txt>
       {customers === null ? <Skeleton h={44} r={22} /> : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
@@ -114,9 +142,45 @@ export function CreditLogScreen({ navigation, route }) {
         <Input label="Phone (optional)" value={f.phone} onChangeText={set('phone')} placeholder="0803 123 4567" keyboardType="phone-pad" mono />
         <Segmented options={[{ value: 'individual', label: 'Individual' }, { value: 'business', label: 'Business' }]} value={f.type} onChange={set('type')} />
       </> : null}
-      <Input label="What did they take?" value={f.description} onChangeText={set('description')} placeholder="10 crates of eggs" error={errs.description} />
-      <Input label="Amount owed" prefix="₦" keyboardType="number-pad" value={f.amount} onChangeText={(t) => set('amount')(t.replace(/\D/g, ''))} mono error={errs.amount} />
-      <DateInput label="Pay by (optional)" value={f.due} onChange={set('due')} min={isoDate()} clearable placeholder="No date" error={errs.due} hint="You'll see it marked overdue after this date." />
+
+      <Txt v="strong" style={{ fontSize: 13 }}>What did they take?</Txt>
+      {products === null ? <Skeleton h={44} r={22} /> : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {products.map((pr) => <Chip key={pr.id} label={pr.title + ' · ' + naira(pr.price) + '/' + pr.unit} selected={lines.some((l) => l.listing_id === pr.id)} onPress={() => addProduct(pr)} />)}
+          <Chip icon="plus" label="Other item" onPress={addOther} />
+        </View>
+      )}
+      {lines.map((l) => (
+        <Card key={l.key}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Txt v="bold" style={{ flex: 1 }}>{l.listing_id ? l.name : 'Other item'}</Txt>
+            <Pressable onPress={() => drop(l.key)} accessibilityLabel={'Remove ' + (l.name || 'item')} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={20} color={c.mute} /></Pressable>
+          </View>
+          {!l.listing_id ? <>
+            <Input label="Item" value={l.name} onChangeText={(t) => upd(l.key, { name: t })} placeholder="Spent hens" autoCapitalize="sentences" />
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <View style={{ flex: 1 }}><Input label="Price each" prefix="₦" keyboardType="number-pad" value={String(l.unit_price)} onChangeText={(t) => upd(l.key, { unit_price: t.replace(/\D/g, '') })} mono /></View>
+              <View style={{ flex: 1 }}><Input label="Sold per" value={l.unit} onChangeText={(t) => upd(l.key, { unit: t })} placeholder="bird" autoCapitalize="none" /></View>
+            </View>
+          </> : null}
+          <Input label={'How many ' + plural(l.unit || 'unit', 2) + '?'} keyboardType="decimal-pad" value={String(l.qty)} onChangeText={(t) => upd(l.key, { qty: num(t) })} mono autoFocus={!!l.listing_id} />
+          {Number(l.qty) > 0 && Number(l.unit_price) > 0 ? <Txt v="small">{Number(l.qty).toLocaleString() + ' ' + plural(l.unit, l.qty) + ' × ' + naira(l.unit_price) + ' = '}<Txt v="mono" style={{ fontSize: 13 }}>{naira(lineTotal(l))}</Txt></Txt> : null}
+        </Card>
+      ))}
+      {errs.items ? <Txt v="small" color={c.err}>{errs.items}</Txt> : null}
+
+      <Row title="Discount given" right={<Toggle value={discountOn} onValueChange={(v) => { setDiscountOn(v); setErrs((e) => ({ ...e, discount: undefined })); }} />} />
+      {discountOn ? <Input label="Discount" suffix="%" keyboardType="decimal-pad" value={discount} onChangeText={(t) => { setDiscount(num(t)); setErrs((e) => ({ ...e, discount: undefined })); }} mono error={errs.discount} /> : null}
+
+      {lines.length ? <Card>
+        {pct > 0 ? <>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body" color={c.mute}>Subtotal</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(subtotal)}</Txt></View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body" color={c.mute}>{'Discount (' + pct + '%)'}</Txt><Txt v="mono" style={{ fontSize: 14 }}>{'−' + naira(subtotal - total)}</Txt></View>
+        </> : null}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Txt v="bold">Amount owed</Txt><Txt v="mono" style={{ fontSize: 20 }}>{naira(total)}</Txt></View>
+      </Card> : null}
+
+      <DateInput label="Pay by (optional)" value={f.due} onChange={set('due')} min={isoDate()} clearable placeholder="No date" hint="You'll see it marked overdue after this date." />
     </Screen>
   );
 }

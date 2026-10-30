@@ -9,15 +9,17 @@ const PREFIX = 'vac-';
 const TOLD = 'p360-vac-told';   // vaccinations already announced "due today", so it is said once
 const MAX = 40;                 // iOS allows 64 pending notifications per app; stay well inside it
 
-Notifications.setNotificationHandler({
+if (Platform.OS !== 'web') Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
 
 export async function notificationsAllowed() {
+  if (Platform.OS === 'web') return false;   // reminders are phone-only
   try { return (await Notifications.getPermissionsAsync()).granted; } catch { return false; }
 }
 // Shows the system prompt if it can still be shown. { granted, canAskAgain }
 export async function askForNotifications() {
+  if (Platform.OS === 'web') return { granted: false, canAskAgain: false };   // reminders are phone-only
   try {
     let p = await Notifications.getPermissionsAsync();
     if (!p.granted && p.canAskAgain) p = await Notifications.requestPermissionsAsync();
@@ -48,6 +50,7 @@ export function planReminders(vaccinations, flocks, now, told = {}) {
 let chain = Promise.resolve();   // one sync at a time; overlapping runs would double-schedule
 
 export function syncVaccinationReminders(vaccinations, flocks) {
+  if (Platform.OS === 'web') return Promise.resolve();   // reminders are phone-only
   chain = chain.then(() => run(vaccinations, flocks)).catch(() => {});
   return chain;
 }
@@ -79,6 +82,7 @@ async function run(vaccinations, flocks) {
 
 // Signing out: this phone should stop reminding about that account's flocks.
 export function cancelVaccinationReminders() {
+  if (Platform.OS === 'web') return Promise.resolve();   // reminders are phone-only
   chain = chain.then(async () => {
     const all = await Notifications.getAllScheduledNotificationsAsync();
     await Promise.all(all.filter((n) => n.identifier.startsWith(PREFIX)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));

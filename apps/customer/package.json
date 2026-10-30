@@ -12,6 +12,7 @@
     "@expo-google-fonts/bricolage-grotesque": "*",
     "@expo-google-fonts/hanken-grotesk": "*",
     "@expo-google-fonts/jetbrains-mono": "*",
+    "@expo/metro-runtime": "~57.0.17",
     "@expo/vector-icons": "*",
     "@p360/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -32,11 +33,13 @@
     "expo-status-bar": "*",
     "expo-system-ui": "~57.0.4",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-maps": "1.27.2",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-url-polyfill": "^2.0.0"
+    "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3"

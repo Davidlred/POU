@@ -139,10 +139,10 @@ export function BusinessScreen({ navigation, route }) {
     setBusy(true);
     try {
       const supType = isSupplier ? SUPPLIES.find((x) => x.label === supplies[0])?.type || null : null;
-      await rpc('submit_vendor_application', { p_business_name: biz.trim(), p_categories: [...(isFarm ? cats : []), ...(isSupplier ? supplies : [])], p_location: loc.trim(), p_id_doc_path: upload.path, p_supplier_type: supType });
-      const roles = route.params?.roles || ['vendor'];
-      await rpc('set_roles', { p_roles: roles });
-      await rpc('set_active_role', { p_role: 'vendor' });
+      const app = { p_business_name: biz.trim(), p_categories: [...(isFarm ? cats : []), ...(isSupplier ? supplies : [])], p_location: loc.trim(), p_id_doc_path: upload.path, p_supplier_type: supType };
+      // p_is_farm needs migration 016; a database without it still accepts the older call.
+      await rpc('submit_vendor_application', { ...app, p_is_farm: isFarm }).catch((e) => (/p_is_farm|PGRST202|function/i.test(String(e?.message || e?.code)) ? rpc('submit_vendor_application', app) : Promise.reject(e)));
+      // The server adds the farm and/or supplier role and makes the right one active.
       const inMain = navigation.getState().routeNames.includes('Pending');
       await refresh();
       if (inMain) navigation.replace('Pending');

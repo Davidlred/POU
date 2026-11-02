@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Platform } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, StackActions } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, StackActions, getStateFromPath } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 // Local notifications are phone-only; the browser build has no reminders to open.
 const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLastNotificationResponse;
@@ -92,6 +92,41 @@ function useTabItems() {
     ...(investor ? [{ name: 'Invest', component: InvestHomeScreen, title: 'Invest', icon: 'chart-line', iconOff: 'chart-line' }] : []),
     { name: 'Wallet', component: WalletScreen, title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' },
   ];
+}
+
+// Website: every page gets its own address and a browser history entry, so the browser's back (or a phone's
+// swipe back in Chrome) returns to the previous page instead of leaving the site. Paths are the screen names
+// in kebab case (/product, /farm-book); the tabs sit at the top level (/market, /orders).
+const kebab = (n) => n.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'invest', Wallet: 'wallet', VendorHome: 'dashboard', MyListings: 'products', VendorOrders: 'sales', Agents: 'agents', FarmHome: 'farm-hub' };
+// Pages that can be reopened from their address alone after a reload (their params are plain ids).
+// Any other page with params reopens at home: a reload can't bring back what was passed to it.
+const APP_SCREENS = ['Role', 'Business', 'VetApply', 'AgentJoin', 'Listings', 'Product', 'Store', 'Cart', 'Checkout', 'OrderSuccess', 'Tracking', 'Rate', 'Issue',
+  'TopUp', 'Withdraw', 'Bank', 'ListingForm', 'VendorOrder', 'FlockForm', 'FlockDetail', 'FlockHistory', 'Log', 'Vaccinations', 'FarmDashboard', 'VetHome', 'VetList',
+  'VetProfile', 'Consultation', 'Symptom', 'HealthRecords', 'Onsite', 'WasteHome', 'Profile', 'Pending', 'TxDetail', 'FarmBook', 'Inventory', 'CareGuide',
+  'InventoryForm', 'CreditLog', 'CreditEntry', 'CreditCustomer', 'CreditAllow', 'MyCredit', 'VetBooking', 'AgentSale', 'StoreAgents', 'Explore', 'JoinStore',
+  'StoreAgent', 'InvestHome', 'Kyc', 'Offering', 'Pools', 'Pool', 'RoiCalc', 'InvestAmount', 'InvestSuccess', 'Portfolio', 'InvestmentDetail', 'RaiseHome',
+  'Badge', 'OfferingForm'];
+const RELOADABLE = new Set(['Product', 'Store', 'Listings', 'Tracking', 'VendorOrder', 'FlockDetail']);
+function webLinking(signedIn) {
+  if (Platform.OS !== 'web') return undefined;
+  const screens = (names) => Object.fromEntries(names.map((n) => [n, kebab(n)]));
+  const config = signedIn
+    ? { initialRouteName: 'Tabs', screens: { Tabs: { path: '', screens: TAB_PATHS }, ...screens(APP_SCREENS) } }
+    : { initialRouteName: 'Landing', screens: { Landing: '', ...screens(['Market', 'Listings', 'Product', 'Store', 'Cart', 'JoinStore', 'SignIn', 'Email', 'Otp']) } };
+  return {
+    prefixes: [],
+    config,
+    getStateFromPath: (path, options) => {
+      // The site's root opens wherever the navigator starts (the join page when an invite link was opened).
+      if (path === '/' || path === '') return undefined;
+      const state = getStateFromPath(path, options);
+      let leaf = state?.routes?.[state.routes.length - 1];
+      while (leaf?.state) leaf = leaf.state.routes[leaf.state.routes.length - 1];
+      if (leaf?.params && Object.keys(leaf.params).length && !RELOADABLE.has(leaf.name)) return undefined;
+      return state;
+    },
+  };
 }
 
 // The tab the app is on (also while a page is open on top of the tabs), or 'Profile' on the profile page.
@@ -230,7 +265,8 @@ export default function Navigation() {
   // The key on Stack.Navigator matters: Role, Business and VetApply exist in both groups (they double as "add a role" later).
   // Without it, finishing registration keeps you on the same-named screen instead of opening the app. A new key starts the main group at Tabs.
   return (
-    <NavigationContainer theme={theme} ref={navRef} onReady={() => setNavState(navRef.getRootState())} onStateChange={setNavState}>
+    <NavigationContainer theme={theme} ref={navRef} linking={webLinking(!!session && !needsRole)} documentTitle={{ formatter: () => 'Poultry360' }}
+      onReady={() => setNavState(navRef.getRootState())} onStateChange={setNavState}>
       {session && farms ? <VaccinationReminders /> : null}
       {session && !needsRole ? <InviteOpener /> : null}
       <View style={{ flex: 1, flexDirection: 'row' }}>

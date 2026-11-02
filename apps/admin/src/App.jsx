@@ -36,7 +36,7 @@ export default function App() {
   return <Shell user={session.user} onChangePassword={() => setReset(true)} />;
 }
 
-const SECTIONS = [{ id: 'farms', label: 'Farms' }, { id: 'riders', label: 'Riders' }, { id: 'vets', label: 'Vets' }, { id: 'invest', label: 'Invest' }];
+const SECTIONS = [{ id: 'farms', label: 'Farms & stores' }, { id: 'riders', label: 'Riders' }, { id: 'vets', label: 'Vets' }, { id: 'invest', label: 'Invest' }];
 
 function Shell({ user, onChangePassword }) {
   const [section, setSection] = useState(() => (SECTIONS.some((s) => '#' + s.id === window.location.hash) ? window.location.hash.slice(1) : 'farms'));

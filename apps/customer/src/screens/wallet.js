@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Group, Row, Pill, Skeleton, Steps, OtpBoxes, Sheet,
+import { usePage, useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Group, Row, Pill, Skeleton, Steps, OtpBoxes, Sheet,
   naira, rpc, friendlyError, timeAgo, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { TEST_CARDS, chargeCard } from '../lib/payments';
@@ -11,6 +11,7 @@ const TX_ICON = { topup: 'plus', payment: 'arrow-top-right', payout: 'arrow-bott
   investment: 'chart-line', investment_return: 'cash-plus', investment_refund: 'undo-variant', investment_funding: 'hand-coin-outline' };
 
 export function WalletScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
   const { uid, vendor, wallet, refreshWallet } = useAuth();
   const [tx, setTx] = useState(null);
@@ -34,7 +35,7 @@ export function WalletScreen({ navigation }) {
   const doExport = async () => { setExporting(true); try { await exportCsv(tx); } catch (e) { Alert.alert("Couldn't export", friendlyError(e)); } finally { setExporting(false); } };
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+      <ScrollView contentContainerStyle={[{ padding: 20, gap: 16 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         <Txt v="display" style={{ fontSize: 28 }}>Wallet</Txt>
         <Hearth>
           <Txt v="label" color={c.hmute}>Available balance</Txt>

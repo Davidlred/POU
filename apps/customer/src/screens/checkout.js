@@ -17,15 +17,18 @@ function groupByVendor(items) {
 export function CartScreen({ navigation }) {
   const { c } = useTheme();
   const { items, setQty, remove, validate, subtotal } = useCart();
+  const { session } = useAuth();   // website visitors can fill a cart; checking out asks them to sign in
+  const toMarket = () => (session ? navigation.popTo('Tabs', { screen: 'Market' }) : navigation.navigate('Market'));
   const [checking, setChecking] = useState(true);
   useFocusEffect(useCallback(() => { setChecking(true); validate().finally(() => setChecking(false)); }, []));
   const groups = groupByVendor(items);
   const bad = items.filter((x) => x.unavailable);
-  if (!items.length) return <Screen><AppBar title="Cart" /><Empty icon="shopping-outline" title="Your cart is empty" body="Fresh eggs, birds and feed from verified farms." action="Browse the market" onAction={() => navigation.popTo('Tabs', { screen: 'Market' })} /></Screen>;
+  if (!items.length) return <Screen><AppBar title="Cart" /><Empty icon="shopping-outline" title="Your cart is empty" body="Fresh eggs, birds and feed from verified farms." action="Browse the market" onAction={toMarket} /></Screen>;
   return (
     <Screen scroll footer={<>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="small" style={{ fontSize: 14 }}>Subtotal</Txt><Txt v="mono">{naira(subtotal)}</Txt></View>
-      <Button title="Checkout" disabled={checking || subtotal <= 0} loading={checking} onPress={() => navigation.navigate('Checkout')} />
+      {session ? <Button title="Checkout" disabled={checking || subtotal <= 0} loading={checking} onPress={() => navigation.navigate('Checkout')} />
+        : <Button title="Sign in to check out" disabled={checking || subtotal <= 0} onPress={() => navigation.navigate('SignIn')} />}
     </>}>
       <AppBar title="Cart" subtitle={items.length + ' items · ' + groups.length + (groups.length === 1 ? ' source' : ' sources')} />
       {bad.length ? <Banner tone="err" title={bad.length + (bad.length === 1 ? ' item is' : ' items are') + ' no longer available'} body="Remove them to check out with the rest." /> : null}

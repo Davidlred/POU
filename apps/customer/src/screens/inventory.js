@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Alert } from 'react-native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate, naira } from '@p360/shared';
+import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate, naira, Fab } from '@p360/shared';
 import { useFarm, save } from '../lib/offlineQueue';
 
 const TABS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feeds' }, { value: 'other', label: 'Farm assets' }];
@@ -35,6 +35,7 @@ export function itemAlert(it) {
 }
 
 export function InventoryScreen({ navigation, route }) {
+  const page = usePage();
   const { c } = useTheme();
   const { data } = useFarm();
   const [tab, setTab] = useState(route.params?.tab || 'health');   // first tab: Vaccines (Vet care also opens it here)
@@ -53,7 +54,7 @@ export function InventoryScreen({ navigation, route }) {
   };
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }, page]}>
         <View style={{ marginHorizontal: -20 }}><AppBar title="Inventory" subtitle="What you have on the farm" /></View>
         {items.length ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -78,8 +79,7 @@ export function InventoryScreen({ navigation, route }) {
         {tab === 'health' ? <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} /> : null}
         {tab === 'feed' ? <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} /> : null}
       </ScrollView>
-      <Pressable accessibilityLabel="Add an item" onPress={() => navigation.navigate('InventoryForm', { tab })} style={{ position: 'absolute', right: 20, bottom: 20, height: 56, paddingHorizontal: 20, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', elevation: 4 }}>
-        <Icon name="plus" size={24} color={c.onyolk} /><Txt v="bold" color={c.onyolk}>Add item</Txt></Pressable>
+      <Fab label="Add item" accessibilityLabel="Add an item" onPress={() => navigation.navigate('InventoryForm', { tab })} />
       <Sheet visible={!!current} onClose={() => setSel(null)}>
         {current ? <>
           <Txt v="h1">{current.name}</Txt>

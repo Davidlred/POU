@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, TextInput, ScrollView, ActivityIndicator, StatusBar, Switch, Modal, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -46,14 +46,24 @@ export function Txt({ v = 'body', color, style, children, ...p }) {
 }
 
 const PAGE = { width: '100%', maxWidth: 1080, alignSelf: 'center' };
-export function Screen({ children, scroll, pad = true, edges = ['top'], style, footer, bg }) {
+const WIDE_PAGE = [PAGE, { paddingHorizontal: 40, paddingTop: 28 }];
+// Screens that scroll their own content (<Screen pad={false}>) add this to their scroll's contentContainerStyle,
+// so on the wide website the content is centred at page width like every other screen (null on phones).
+export function usePage() { return useWide() ? WIDE_PAGE : null; }
+// True inside a Screen whose content is already in the centred page column (so AppBar doesn't centre itself twice).
+const InPage = createContext(false);
+
+// column: with pad={false}, keep the whole screen in a centred page-wide column on the wide website
+// (for screens whose layout isn't one scroll area, e.g. search results and the product page).
+export function Screen({ children, scroll, pad = true, column, edges = ['top'], style, footer, bg }) {
   const { c, mode } = useTheme();
   const wide = useWide();
-  const page = wide && pad ? [PAGE, { paddingHorizontal: 40, paddingTop: 28 }] : null;
+  const page = wide && pad ? WIDE_PAGE : wide && column ? PAGE : null;
   const inner = scroll
     ? <ScrollView contentContainerStyle={[pad && { padding: 20, paddingBottom: 40 }, { gap: 14 }, page, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
     : <View style={[{ flex: 1 }, pad && { paddingHorizontal: 20 }, page, style]}>{children}</View>;
   return (
+    <InPage.Provider value={!!page}>
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg || c.bg }}>
       <StatusBar barStyle={mode === 'dark' || bg ? 'light-content' : 'dark-content'} backgroundColor={bg || c.bg} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -61,14 +71,17 @@ export function Screen({ children, scroll, pad = true, edges = ['top'], style, f
         {footer ? <View style={{ padding: 16, paddingBottom: 20, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.nav }}><View style={[{ gap: 10 }, wide && { ...PAGE, maxWidth: 520 }]}>{footer}</View></View> : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+    </InPage.Provider>
   );
 }
 
-export function AppBar({ title, subtitle, right, close, onBack }) {
+export function AppBar({ title, subtitle, right, close, onBack, bare }) {
   const nav = useNavigation();
   const { c } = useTheme();
+  // Website: on a screen that scrolls its own content, line the bar up with the centred page instead of the window edge.
+  const align = useWide() && !useContext(InPage) && !bare;   // bare: the caller places the bar itself
   return (
-    <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 }}>
+    <View style={[{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 }, align && { ...PAGE, paddingHorizontal: 32, marginTop: 12 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack || (() => nav.goBack())} style={s.iconBtn} hitSlop={8}>
         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={close ? 'close' : 'arrow-left'} size={22} /></View>
       </Pressable>
@@ -424,6 +437,33 @@ export function Stat({ label, value, sub, subColor }) {
   const { c } = useTheme();
   return <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 20, padding: 14, gap: 2, borderWidth: 1, borderColor: c.line }}>
     <Txt v="label">{label}</Txt><Txt v="mono" style={{ fontSize: 22, letterSpacing: -0.4 }}>{value}</Txt>{sub ? <Txt v="small" color={subColor}>{sub}</Txt> : null}</View>;
+}
+
+// The main "add" action of a list screen. Phone: floats bottom-right. Website: sits at the bottom-right of the
+// centred page column rather than the far corner of the window.
+export function Fab({ icon = 'plus', label, onPress, accessibilityLabel }) {
+  const { c } = useTheme();
+  const wide = useWide();
+  const btn = (
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel || label} onPress={onPress}
+      style={({ pressed, hovered }) => [{ height: 56, minWidth: 56, paddingHorizontal: label ? 20 : 0, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+        wide && { shadowColor: '#000', shadowOpacity: hovered ? 0.18 : 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }, pressed && { opacity: 0.85 }]}>
+      <Icon name={icon} size={label ? 24 : 26} color={c.onyolk} />{label ? <Txt v="bold" color={c.onyolk}>{label}</Txt> : null}
+    </Pressable>
+  );
+  if (!wide) return <View style={{ position: 'absolute', right: 20, bottom: 20 }}>{btn}</View>;
+  return <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 28 }}><View pointerEvents="box-none" style={[PAGE, { paddingHorizontal: 40, alignItems: 'flex-end' }]}>{btn}</View></View>;
+}
+
+// Add-a-photo buttons. Phone: camera or gallery. Website: one upload button (a computer has no camera to point at a document).
+export function PhotoButtons({ onCamera, onGallery }) {
+  if (Platform.OS === 'web') return <Button small variant="outline" icon="upload" title="Upload photo" onPress={onGallery} />;
+  return (
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      <Button small variant="outline" icon="camera-outline" title="Take photo" onPress={onCamera} style={{ flex: 1 }} />
+      <Button small variant="outline" icon="image-outline" title="Gallery" onPress={onGallery} style={{ flex: 1 }} />
+    </View>
+  );
 }
 
 export function PhotoBox({ uri, size = 72, radius = 14 }) {

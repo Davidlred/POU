@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, RefreshControl, Alert, Linking, BackHandler } from 'react-native';
+import { View, Pressable, ScrollView, RefreshControl, Alert, Linking, BackHandler, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Steps, PhotoBox, Toggle,
-  naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase } from '@p360/shared';
+import { usePage, useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Steps, PhotoBox, Toggle,
+  naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
 const SPECIALTIES = ['Layer health', 'Broiler health', 'Biosecurity', 'Nutrition', 'Turkey & waterfowl', 'General poultry'];
@@ -91,7 +91,7 @@ export function VetApplyScreen({ navigation }) {
         </View>
         {errs.licence ? <Txt v="small" color={c.err}>{errs.licence}</Txt> : null}
         {up.state === 'failed' && photo ? <Button small variant="dark" icon="refresh" title="Retry upload" onPress={() => send(photo)} /> : null}
-        <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" icon="camera-outline" title="Take photo" onPress={() => pick(true)} style={{ flex: 1 }} /><Button small variant="outline" icon="image-outline" title="Gallery" onPress={() => pick(false)} style={{ flex: 1 }} /></View>
+        <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
       </Card>
     </Screen>
   );
@@ -99,13 +99,14 @@ export function VetApplyScreen({ navigation }) {
 
 // The vet's home: bookings, time slots and profile. Shown in place of the buyer tabs when the active role is vet.
 export function VetDeskScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
   const { profile, setActiveRole, homeRole } = useAuth();
   const home = homeRole();   // null for a vet-only account
   const leave = useCallback(() => { if (home) setActiveRole(home); }, [home]);
   // Back (button or swipe) returns to the role they came from. Without this it would close the app, because the desk is the root screen.
   useFocusEffect(useCallback(() => {
-    if (!home) return undefined;
+    if (!home || Platform.OS === 'web') return undefined;   // browsers have no hardware Back; BackHandler only logs an error there
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; });
     return () => sub.remove();
   }, [home, leave]));
@@ -124,7 +125,7 @@ export function VetDeskScreen({ navigation }) {
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <View style={{ flex: 1 }}><Txt v="display" style={{ fontSize: 28 }}>Vet desk</Txt>{d?.vet ? <Txt v="small">{d.vet.name}</Txt> : null}</View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : 'My farm'} onPress={leave} style={{ height: 44 }} /> : null}
+        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : home === 'supplier' ? 'My store' : 'My farm'} onPress={leave} style={{ height: 44 }} /> : null}
         <Pressable onPress={() => navigation.navigate('Profile')} accessibilityLabel="Profile" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-circle-outline" /></Pressable>
       </View>
     </View>
@@ -142,7 +143,7 @@ export function VetDeskScreen({ navigation }) {
         <Hearth><Icon name="shield-check-outline" size={32} color={c.hacc} /><Txt v="h2" color={c.hink}>We're checking your licence</Txt><Txt v="small" color={c.hmute}>This usually takes a working day. Farmers will be able to book you as soon as you're approved. This screen updates by itself.</Txt></Hearth>
         <Card><Steps steps={[{ label: 'Details submitted', state: 'done' }, { label: 'Licence under review', state: 'current' }, { label: 'Open for bookings', state: 'todo' }]} /></Card>
       </>}
-      {home ? <Button variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Back to shopping' : 'Back to my farm'} onPress={leave} /> : null}
+      {home ? <Button variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Back to shopping' : home === 'supplier' ? 'Back to my store' : 'Back to my farm'} onPress={leave} /> : null}
     </Screen>
   );
   const open = d.consultations.filter((k) => ['requested', 'proposed', 'confirmed'].includes(k.status));
@@ -150,7 +151,7 @@ export function VetDeskScreen({ navigation }) {
   const free = d.slots.filter((s) => !s.booked);
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 14, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 8, gap: 14, paddingBottom: 40 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         {header}
         <Hearth>
           <Txt v="label" color={c.hmute}>Wallet balance</Txt>
@@ -161,7 +162,7 @@ export function VetDeskScreen({ navigation }) {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <StatBox label="Upcoming" value={open.length} /><StatBox label="Open slots" value={free.length} /><StatBox label="Completed" value={past.filter((k) => k.status === 'completed').length} />
         </View>
-        {!free.length ? <Banner tone="warn" icon="calendar-plus" title="You have no open slots" body="Farmers can only book times you've opened." action="Add slots" onAction={() => setTab('slots')} /> : null}
+        {!d.availability?.windows?.length ? <Banner tone="warn" icon="calendar-clock" title="Set your working hours" body="Farmers can book you once you do." action="Set hours" onAction={() => setTab('slots')} /> : null}
         <Segmented options={[{ value: 'bookings', label: 'Bookings' }, { value: 'slots', label: 'My hours' }, { value: 'profile', label: 'Profile' }]} value={tab} onChange={setTab} />
         {tab === 'bookings' ? <>
           {!open.length ? <Empty icon="calendar-blank-outline" title="No upcoming bookings" body="New video consults and farm-visit requests appear here." /> : <Group>{open.map((k, i) => (

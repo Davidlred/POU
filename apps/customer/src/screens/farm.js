@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Pressable, ScrollView, Linking, Alert } from 'react-native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, naira, isoDate, shortDate, timeAgo, supabase, rpc } from '@p360/shared';
+import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, naira, isoDate, shortDate, timeAgo, supabase, rpc, Fab } from '@p360/shared';
 import { useFarm, save, retryFailed, discardFailed, flockStats } from '../lib/offlineQueue';
 import { itemAlert, perKg, stockKg, afterUsing } from './inventory';
 import { isClosed, flockSummary, series, farmTotals } from '../lib/flockHistory';
@@ -43,6 +43,7 @@ function PastFlockCard({ f, s, onPress }) {
 }
 
 export function FarmHomeScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
   const { data } = useFarm();
   const flocks = data.flocks.filter((f) => !isClosed(f));
@@ -57,7 +58,7 @@ export function FarmHomeScreen({ navigation }) {
   useEffect(() => navigation.addListener('focus', () => { rpc('farm_book').then(setBook).catch(() => {}); }), [navigation]);
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}>
+      <ScrollView contentContainerStyle={[{ padding: 20, gap: 14, paddingBottom: 100 }, page]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Txt v="display" style={{ fontSize: 28 }}>Farm Hub</Txt>
           {data.flocks.length ? <Button small variant="outline" icon="chart-bar" title="Dashboard" onPress={() => navigation.navigate('FarmDashboard')} style={{ height: 40 }} /> : null}
@@ -104,7 +105,7 @@ export function FarmHomeScreen({ navigation }) {
           {past.slice(0, 3).map(({ f, s }) => <PastFlockCard key={f.id} f={f} s={s} onPress={() => navigation.navigate('FlockDetail', { id: f.id })} />)}
         </> : null}
       </ScrollView>
-      {data.flocks.length ? <Pressable accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} style={{ position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 18, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={26} color={c.onyolk} /></Pressable> : null}
+      {data.flocks.length ? <Fab accessibilityLabel="Add flock" onPress={() => navigation.navigate('FlockForm')} /> : null}
     </Screen>
   );
 }

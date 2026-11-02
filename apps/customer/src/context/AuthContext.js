@@ -48,6 +48,12 @@ export function AuthProvider({ children }) {
     isVendorMode: profile?.active_role === 'vendor' || profile?.active_role === 'supplier',
     // A store that only sells farm supplies: no Farm Hub, no birds or eggs to list.
     supplierOnly: (profile?.roles || []).includes('supplier') && !(profile?.roles || []).includes('vendor'),
+    // A supplier store not approved yet (in review, rejected, or details not sent): only the home and its products
+    // (drafts) until approval; Agents, Credit sales, Orders and Wallet appear once approved.
+    storeLocked: (profile?.roles || []).includes('supplier') && !(profile?.roles || []).includes('vendor') && vendor?.verification_status !== 'approved',
+    // What the seller calls their business in the app's wording: a supplier-only store never sees "farm".
+    seller: (profile?.roles || []).includes('supplier') && !(profile?.roles || []).includes('vendor') ? 'store' : 'farm',
+    bookName: (profile?.roles || []).includes('supplier') && !(profile?.roles || []).includes('vendor') ? 'Store Book' : 'Farm Book',
     multiRole: (profile?.roles || []).length > 1,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

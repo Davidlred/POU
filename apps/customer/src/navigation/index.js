@@ -1,13 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, Image, Platform } from 'react-native';
-import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, StackActions } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 // Local notifications are phone-only; the browser build has no reminders to open.
 const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLastNotificationResponse;
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, pendingInviteNow, getPendingInvite } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -41,7 +41,8 @@ const navRef = createNavigationContainerRef();
 function InviteOpener() {
   useEffect(() => {
     let alive = true;
-    getPendingInvite().then((code) => {
+    // Website: only an invite link opened on this visit (an old one must not keep taking over the site).
+    (Platform.OS === 'web' ? Promise.resolve(inviteOpenedNow()) : getPendingInvite()).then((code) => {
       if (!alive || !code) return;
       const go = () => (navRef.isReady() ? navRef.navigate('JoinStore', { code }) : setTimeout(go, 200));
       setTimeout(go, 300);
@@ -69,34 +70,75 @@ function VaccinationReminders() {
 }
 const Tab = createBottomTabNavigator();
 
-function TabBar({ state, descriptors, navigation }) {
+// The sections of the signed-in app for the current mode. The phone shows them as the bottom tab bar,
+// the website as the left sidebar.
+function useTabItems() {
+  const { profile, isVendorMode, supplierOnly, storeLocked } = useAuth();
+  if (isVendorMode) return [
+    { name: 'VendorHome', component: VendorHomeScreen, title: 'Home', icon: 'home', iconOff: 'home-outline' },
+    { name: 'MyListings', component: MyListingsScreen, title: supplierOnly ? 'Products' : 'Listings', icon: 'package-variant-closed' },
+    // a store in review only prepares its products; the rest opens on approval
+    ...(storeLocked ? [] : [
+      { name: 'VendorOrders', component: VendorOrdersScreen, title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' },
+      supplierOnly ? { name: 'Agents', component: StoreAgentsScreen, title: 'Agents', icon: 'account-group', iconOff: 'account-group-outline' }
+        : { name: 'FarmHome', component: FarmHomeScreen, title: 'Farm Hub', icon: 'barn' },
+      { name: 'Wallet', component: WalletScreen, title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' }]),
+  ];
+  const investor = INVEST_ENABLED && (profile?.roles || []).includes('investor');
+  return [
+    { name: 'Home', component: HomeScreen, title: 'Home', icon: 'home', iconOff: 'home-outline' },
+    { name: 'Market', component: MarketScreen, title: 'Market', icon: 'storefront', iconOff: 'storefront-outline' },
+    { name: 'Orders', component: OrdersScreen, title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' },
+    ...(investor ? [{ name: 'Invest', component: InvestHomeScreen, title: 'Invest', icon: 'chart-line', iconOff: 'chart-line' }] : []),
+    { name: 'Wallet', component: WalletScreen, title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' },
+  ];
+}
+
+// The tab the app is on (also while a page is open on top of the tabs), or 'Profile' on the profile page.
+function currentSection(state) {
+  if (!state) return null;
+  const top = state.routes[state.index];
+  if (top?.name === 'Profile') return 'Profile';
+  const t = state.routes.find((r) => r.name === 'Tabs')?.state;
+  return t ? t.routes[t.index ?? 0]?.name : null;
+}
+// Go to a section from anywhere: close the pages open on top of the tabs, then switch tab.
+function openSection(name) {
+  if (!navRef.isReady()) return;
+  const root = navRef.getRootState();
+  if (root.routes[root.index]?.name !== 'Tabs') navRef.dispatch(StackActions.popTo('Tabs'));
+  setTimeout(() => navRef.navigate(name), 0);
+}
+
+// Website: the left sidebar. It sits outside the navigator so it stays on every page, not just the tabs.
+function Sidebar({ current }) {
   const { c, f, mode, toggle } = useTheme();
-  const wide = useWide();
-  if (wide) return (
-    // Website: a left sidebar with the same sections
+  const items = useTabItems();
+  const sel = current || items[0].name;
+  const item = (key, icon, label, on, onPress, role) => (
+    <Pressable key={key} accessibilityRole={role} accessibilityState={role === 'tab' ? { selected: on } : undefined} onPress={onPress}
+      style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: on ? c.navact : hovered ? c.sf2 : 'transparent' })}>
+      <Icon name={icon} size={22} color={on ? c.navactink : c.mute} />
+      <Text style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 15, color: on ? c.ink : c.mute }}>{label}</Text>
+    </Pressable>
+  );
+  return (
     <View style={{ width: 248, backgroundColor: c.nav, borderRightWidth: 1, borderColor: c.line, paddingVertical: 20, paddingHorizontal: 14, gap: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, marginBottom: 20 }}>
+      <Pressable onPress={() => openSection(items[0].name)} accessibilityRole="link" accessibilityLabel="Poultry360 home" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, marginBottom: 20 }}>
         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}><Image source={LOGO_MARK} style={{ width: 34, height: 34 }} /></View>
         <Txt v="h2" style={{ fontSize: 20 }}>Poultry360</Txt>
-      </View>
-      {state.routes.map((r, i) => {
-        const on = state.index === i; const o = descriptors[r.key].options;
-        return (
-          <Pressable key={r.key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => navigation.navigate(r.name)}
-            style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: on ? c.navact : hovered ? c.sf2 : 'transparent' })}>
-            <Icon name={on ? o.icon : o.iconOff || o.icon} size={22} color={on ? c.navactink : c.mute} />
-            <Text style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 15, color: on ? c.ink : c.mute }}>{o.title}</Text>
-          </Pressable>
-        );
-      })}
+      </Pressable>
+      {items.map((t) => { const on = sel === t.name && current !== 'Profile'; return item(t.name, on ? t.icon : t.iconOff || t.icon, t.title, on, () => openSection(t.name), 'tab'); })}
       <View style={{ flex: 1 }} />
-      {[[mode === 'dark' ? 'white-balance-sunny' : 'weather-night', mode === 'dark' ? 'Light mode' : 'Dark mode', toggle], ['account-circle-outline', 'Profile', () => navigation.navigate('Profile')]].map(([i, l, fn]) => (
-        <Pressable key={l} onPress={fn} style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: hovered ? c.sf2 : 'transparent' })}>
-          <Icon name={i} size={22} color={c.mute} /><Text style={{ fontFamily: f.semibold, fontSize: 15, color: c.mute }}>{l}</Text>
-        </Pressable>
-      ))}
+      {item('theme', mode === 'dark' ? 'white-balance-sunny' : 'weather-night', mode === 'dark' ? 'Light mode' : 'Dark mode', false, toggle, 'button')}
+      {item('Profile', 'account-circle-outline', 'Profile', current === 'Profile', () => { if (current !== 'Profile' && navRef.isReady()) navRef.navigate('Profile'); }, 'link')}
     </View>
   );
+}
+
+function TabBar({ state, descriptors, navigation }) {
+  const { c, f } = useTheme();
+  if (useWide()) return null;   // the website uses Sidebar instead
   return (
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: c.nav, borderTopWidth: 1, borderColor: c.line }}>
       <View style={{ height: 72, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
@@ -119,32 +161,11 @@ function TabBar({ state, descriptors, navigation }) {
   );
 }
 
-function BuyerTabs() {
-  const { profile } = useAuth();
-  const investor = INVEST_ENABLED && (profile?.roles || []).includes('investor');
-  const wide = useWide();
+function MainTabs({ vendor }) {
+  const items = useTabItems();
   return (
-    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom' }}>
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home', icon: 'home', iconOff: 'home-outline' }} />
-      <Tab.Screen name="Market" component={MarketScreen} options={{ title: 'Market', icon: 'storefront', iconOff: 'storefront-outline' }} />
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' }} />
-      {investor ? <Tab.Screen name="Invest" component={InvestHomeScreen} options={{ title: 'Invest', icon: 'chart-line', iconOff: 'chart-line' }} /> : null}
-      <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' }} />
-    </Tab.Navigator>
-  );
-}
-function VendorTabs() {
-  const wide = useWide();
-  const { supplierOnly } = useAuth();
-  return (
-    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false, tabBarPosition: wide ? 'left' : 'bottom' }}>
-      <Tab.Screen name="VendorHome" component={VendorHomeScreen} options={{ title: 'Home', icon: 'home', iconOff: 'home-outline' }} />
-      <Tab.Screen name="MyListings" component={MyListingsScreen} options={{ title: 'Listings', icon: 'package-variant-closed' }} />
-      <Tab.Screen name="VendorOrders" component={VendorOrdersScreen} options={{ title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' }} />
-      {supplierOnly
-        ? <Tab.Screen name="Agents" component={StoreAgentsScreen} options={{ title: 'Agents', icon: 'account-group', iconOff: 'account-group-outline' }} />
-        : <Tab.Screen name="FarmHome" component={FarmHomeScreen} options={{ title: 'Farm Hub', icon: 'barn' }} />}
-      <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' }} />
+    <Tab.Navigator key={vendor ? 'vendor' : 'buyer'} tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+      {items.map((t) => <Tab.Screen key={t.name} name={t.name} component={t.component} options={{ title: t.title, icon: t.icon, iconOff: t.iconOff }} />)}
     </Tab.Navigator>
   );
 }
@@ -152,19 +173,22 @@ function Tabs(props) {
   const { isVendorMode, profile } = useAuth();
   if (profile?.active_role === 'vet') return <VetDeskScreen {...props} />;
   if (profile?.active_role === 'agent') return <AgentDeskScreen {...props} />;
-  return isVendorMode ? <VendorTabs /> : <BuyerTabs />;
+  return <MainTabs vendor={isVendorMode} />;
 }
 
-// On the website the sign-in pages carry the site's nav bar.
-function WebAuth({ navigation, children }) {
+// On the website the sign-in pages carry the site's nav bar. shop: the public shop pages, which keep Sign in / Get started in it.
+function WebAuth({ navigation, children, shop }) {
   if (Platform.OS !== 'web') return children;
-  return <View style={{ flex: 1 }}><WebNav navigation={navigation} compact /><View style={{ flex: 1 }}>{children}</View></View>;
+  return <View style={{ flex: 1 }}><WebNav navigation={navigation} compact={!shop} /><View style={{ flex: 1 }}>{children}</View></View>;
 }
+// Website visitors can browse the market before they have an account; checking out asks them to sign in.
+const PUBLIC_SHOP = [['Market', MarketScreen], ['Listings', ListingsScreen], ['Product', ProductScreen], ['Store', StoreScreen], ['Cart', CartScreen]];
 
 function AuthFlow() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={Platform.OS !== 'web' ? 'SignIn' : pendingInviteNow() ? 'JoinStore' : 'Landing'}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={Platform.OS !== 'web' ? 'SignIn' : inviteOpenedNow() ? 'JoinStore' : 'Landing'}>
       {Platform.OS === 'web' ? <Stack.Screen name="Landing" component={LandingScreen} /> : null}
+      {Platform.OS === 'web' ? PUBLIC_SHOP.map(([name, C]) => <Stack.Screen key={name} name={name}>{(p) => <WebAuth navigation={p.navigation} shop><C {...p} /></WebAuth>}</Stack.Screen>) : null}
       {Platform.OS === 'web' ? <Stack.Screen name="JoinStore">{(p) => <WebAuth navigation={p.navigation}><JoinStoreScreen {...p} /></WebAuth>}</Stack.Screen> : null}
       <Stack.Screen name="SignIn">{({ navigation }) => <WebAuth navigation={navigation}><SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} /></WebAuth>}</Stack.Screen>
       <Stack.Screen name="Email">{({ navigation, route }) => <WebAuth navigation={navigation}><EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} /></WebAuth>}</Stack.Screen>
@@ -176,9 +200,24 @@ function AuthFlow() {
 export default function Navigation() {
   const { c, mode } = useTheme();
   const { session, profile, loading } = useAuth();
+  const wide = useWide();
+  const [navState, setNavState] = useState(null);
   // Signed out: this phone stops reminding about that account's flocks. (Kept above the early return: hooks must run every render.)
   useEffect(() => { if (session === null) cancelVaccinationReminders(); }, [session]);
   const gate = usePasswordGate(session);   // 'create' for accounts with no password yet, 'change' after a reset or from Profile
+  // Finishing sign-up (business form, vet application, joining a store) swaps the sign-up screens for the app.
+  // Business and VetApply exist in both groups, so React Navigation could carry the open form across: it reopened
+  // empty and needed a second Submit. Start the app at its home instead.
+  const signingUp = !!session && !!profile && !(profile.roles || []).length;
+  const wasSigningUp = useRef(false);
+  useEffect(() => {
+    if (signingUp) { wasSigningUp.current = true; return undefined; }
+    if (!wasSigningUp.current || !session) return undefined;
+    wasSigningUp.current = false;
+    let t; const go = () => { if (navRef.isReady()) navRef.resetRoot({ index: 0, routes: [{ name: 'Tabs' }] }); else t = setTimeout(go, 50); };
+    t = setTimeout(go, 0);
+    return () => clearTimeout(t);
+  }, [signingUp, session]);
   const base = mode === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: c.bg, card: c.bg, text: c.ink, border: c.line, primary: c.ember } };
   // Signed in but no password yet (or choosing a new one): that comes before anything else in the app.
@@ -186,12 +225,17 @@ export default function Navigation() {
   if (loading) return <Splash />;
   const needsRole = session && !(profile?.roles || []).length;
   const farms = (profile?.roles || []).some((r) => r === 'vendor' || r === 'supplier');
+  // Website, signed in: the sidebar stays beside every page (the vet and agent desks are single pages of their own).
+  const sidebar = wide && session && !needsRole && !['vet', 'agent'].includes(profile?.active_role);
   // The key on Stack.Navigator matters: Role, Business and VetApply exist in both groups (they double as "add a role" later).
   // Without it, finishing registration keeps you on the same-named screen instead of opening the app. A new key starts the main group at Tabs.
   return (
-    <NavigationContainer theme={theme} ref={navRef}>
+    <NavigationContainer theme={theme} ref={navRef} onReady={() => setNavState(navRef.getRootState())} onStateChange={setNavState}>
       {session && farms ? <VaccinationReminders /> : null}
       {session && !needsRole ? <InviteOpener /> : null}
+      <View style={{ flex: 1, flexDirection: 'row' }}>
+      {sidebar ? <Sidebar current={currentSection(navState)} /> : null}
+      <View style={{ flex: 1 }}>
       {!session ? <AuthFlow /> : (
         <Stack.Navigator key={needsRole ? 'onboarding' : 'app'} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
           {needsRole ? (<>
@@ -269,6 +313,8 @@ export default function Navigation() {
           </>)}
         </Stack.Navigator>
       )}
+      </View>
+      </View>
     </NavigationContainer>
   );
 }

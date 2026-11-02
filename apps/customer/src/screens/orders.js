@@ -3,7 +3,7 @@ import { View, Pressable, Image, ScrollView, RefreshControl, Linking } from 'rea
 import MapView, { Marker, PROVIDER_GOOGLE } from '../lib/map';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
+import { usePage, useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
   naira, rpc, publicUrl, uploadImage, friendlyError, timeAgo, clock, STATUS_LABEL, ORDER_STEPS, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,6 +11,7 @@ const ACTIVE = ['placed', 'confirmed', 'ready', 'picked_up', 'out_for_delivery']
 const tone = (s) => (s === 'delivered' ? 'ok' : ['refunded', 'cancelled', 'flagged'].includes(s) ? 'err' : s === 'out_for_delivery' || s === 'picked_up' ? 'live' : 'warn');
 
 export function OrdersScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
   const [tab, setTab] = useState('active');
   const [orders, setOrders] = useState(null);
@@ -20,7 +21,7 @@ export function OrdersScreen({ navigation }) {
   const list = (orders || []).filter((o) => (tab === 'active') === (o.subs || []).some((s) => ACTIVE.includes(s.status)));
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+      <ScrollView contentContainerStyle={[{ padding: 20, gap: 14 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         <Txt v="display" style={{ fontSize: 28 }}>Orders</Txt>
         <Segmented options={[{ value: 'active', label: 'Active' }, { value: 'past', label: 'Past' }]} value={tab} onChange={setTab} />
         {orders === null ? <Skeleton h={110} r={20} /> : !list.length ? <Empty icon="receipt-text-outline" title={tab === 'active' ? 'No active orders' : 'No past orders yet'} body="Orders you place appear here, tracked per farm." action={tab === 'active' ? 'Browse the market' : undefined} onAction={() => navigation.navigate('Market')} />

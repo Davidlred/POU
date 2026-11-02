@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export function ProfileScreen({ navigation }) {
   const { c, pref, setPref } = useTheme();
-  const { profile, vendor, signOut, setActiveRole, refresh } = useAuth();
+  const { profile, vendor, signOut, setActiveRole, refresh, seller } = useAuth();
   const [typeSheet, setTypeSheet] = useState(false);
   const [bType, setBType] = useState(profile?.buyer_type || 'individual');
   const [bName, setBName] = useState(profile?.buyer_business_name || '');
@@ -27,11 +27,11 @@ export function ProfileScreen({ navigation }) {
       <Txt v="label">Your roles</Txt>
       <Group>
         {roles.includes('buyer') ? <Row icon="basket-outline" title="Buyer" onPress={() => setActiveRole('buyer')} right={profile.active_role === 'buyer' ? <Pill tone="ok" label="Active" /> : <Txt v="small">Switch</Txt>} /> : null}
-        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon="barn" title={vendor?.business_name || 'Farm'} subtitle={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Needs attention' : 'In review'} onPress={() => (vs === 'approved' ? setActiveRole('vendor') : navigation.navigate('Pending'))}
+        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon={seller === 'store' ? 'storefront-outline' : 'barn'} title={vendor?.business_name || (seller === 'store' ? 'Store' : 'Farm')} subtitle={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Needs attention' : 'In review'} onPress={() => (vs === 'approved' ? setActiveRole(seller === 'store' ? 'supplier' : 'vendor') : navigation.navigate('Pending'))}
           right={profile.active_role === 'vendor' ? <Pill tone="ok" label="Active" /> : <Pill tone={vs === 'approved' ? 'ok' : vs === 'rejected' ? 'err' : 'warn'} label={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Rejected' : 'Pending'} />} /> : null}
         {roles.includes('vet') ? <Row icon="stethoscope" title="Vet desk" subtitle="Licence status, bookings and time slots" onPress={() => setActiveRole('vet').then(() => navigation.popTo('Tabs'))} right={profile.active_role === 'vet' ? <Pill tone="ok" label="Active" /> : <Txt v="small">Switch</Txt>} /> : null}
         {roles.includes('agent') ? <Row icon="account-tie-outline" title="Agent desk" subtitle="Log sales and see your commission" onPress={() => setActiveRole('agent').then(() => navigation.popTo('Tabs'))} /> : null}
-        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon="account-group-outline" title="Agents" subtitle="Your invite code and top agents" onPress={() => navigation.navigate('StoreAgents')} /> : null}
+        {(roles.includes('vendor') || roles.includes('supplier')) && vs === 'approved' ? <Row icon="account-group-outline" title="Agents" subtitle="Your invite code and top agents" onPress={() => navigation.navigate('StoreAgents')} /> : null}
         {roles.includes('investor') ? <Row icon="chart-line" title="Investor" subtitle="Portfolio and identity verification" onPress={() => navigation.navigate('InvestHome')} /> : null}
         <Row icon="compass-outline" title="Explore" subtitle="Shop, add a farm, work as a vet or agent" onPress={() => navigation.navigate('Explore')} />
         {roles.length < 6 ? <Row icon="plus-circle-outline" iconColor={c.acc} title="Add a role" onPress={() => navigation.navigate('Role', { adding: true })} last /> : null}

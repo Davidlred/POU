@@ -15,6 +15,9 @@ export function WebNav({ navigation, sections, onSection, compact }) {
           <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}><Image source={LOGO_MARK} style={{ width: 34, height: 34 }} /></View>
           <Txt v="h2" style={{ fontSize: 20 }}>Poultry360</Txt>
         </Pressable>
+        {/* anyone can browse the market without an account */}
+        {wide ? <Pressable onPress={() => navigation.navigate('Market')} accessibilityRole="link" style={{ paddingHorizontal: 8, height: 44, justifyContent: 'center' }}><Txt v="strong" color={c.ink}>Shop</Txt></Pressable>
+          : <Pressable onPress={() => navigation.navigate('Market')} accessibilityLabel="Shop" style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront-outline" size={20} /></Pressable>}
         {wide && sections ? sections.map(([key, label]) => (
           <Pressable key={key} onPress={() => onSection(key)} accessibilityRole="link" style={{ paddingHorizontal: 8, height: 44, justifyContent: 'center' }}><Txt v="strong" color={c.mute}>{label}</Txt></Pressable>
         )) : null}
@@ -67,7 +70,7 @@ export function LandingScreen({ navigation }) {
             <Txt v="body" color={c.mute} style={{ fontSize: wide ? 20 : 17, lineHeight: wide ? 30 : 26, maxWidth: 560 }}>Order eggs, birds and feed from farms we have checked. Our riders pick up and deliver to your door.</Txt>
             <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
               <Button title="Get started" onPress={get} style={{ paddingHorizontal: 28 }} />
-              <Button variant="outline" title="Sign in" onPress={() => navigation.navigate('SignIn')} style={{ paddingHorizontal: 28 }} />
+              <Button variant="outline" icon="storefront-outline" title="Browse products" onPress={() => navigation.navigate('Market')} style={{ paddingHorizontal: 28 }} />
             </View>
           </View>
           <View style={{ flex: wide ? 1 : undefined, width: wide ? undefined : '100%', alignItems: 'center', justifyContent: 'center', minHeight: wide ? 460 : 360 }}>

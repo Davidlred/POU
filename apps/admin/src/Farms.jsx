@@ -8,7 +8,12 @@ const TABS = [
   { id: 'all', label: 'All' },
 ];
 const STATUS_LABEL = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' };
-const QUICK_REASONS = ["ID photo is unclear or cut off", "Name on ID doesn't match the account", 'Farm location is outside our delivery area', 'Business details are incomplete'];
+const QUICK_REASONS = ["ID photo is unclear or cut off", "Name on ID doesn't match the account", 'Location is outside our delivery area', 'Business details are incomplete'];
+
+// 'kind' comes from admin_vendors() (migration 018); older backends don't send it.
+const KIND_LABEL = { farm: 'Farm', store: 'Store', both: 'Farm + store' };
+const SUPPLY_LABEL = { feed: 'Feed', equipment: 'Equipment', medicine: 'Drugs & vaccines' };
+const noun = (f) => (f.kind === 'store' ? 'store' : f.kind ? 'farm' : '');
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—');
 function ago(iso) {
@@ -68,12 +73,12 @@ export default function Farms() {
       <main className={'main' + (selected ? ' has-detail' : '')}>
         <section className="list-pane">
           <div className="pane-head">
-            <h1>Farm verification</h1>
-            <p className="muted">Approve farms before their listings go live to buyers.</p>
+            <h1>Farm and store verification</h1>
+            <p className="muted">Approve farms and stores before their listings go live to buyers.</p>
           </div>
           <div className="stats">
             <Stat label="Waiting for review" value={counts.pending} tone={counts.pending ? 'warn' : ''} />
-            <Stat label="Approved farms" value={counts.approved} />
+            <Stat label="Approved" value={counts.approved} />
             <Stat label="Rejected" value={counts.rejected} />
           </div>
           <div className="toolbar">
@@ -84,15 +89,15 @@ export default function Farms() {
                 </button>
               ))}
             </div>
-            <input className="input search" placeholder="Search farm, owner, email, area" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search farms" />
+            <input className="input search" placeholder="Search name, owner, email, area" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search farms and stores" />
           </div>
 
           {loadErr ? <div className="banner err">{loadErr} <button className="link" onClick={load}>Try again</button></div> : null}
           {farms === null && !loadErr ? <div className="empty"><div className="spinner" /></div> : null}
           {farms && !shown.length ? (
             <div className="empty">
-              <p className="strong">{q ? 'No farms match your search' : tab === 'pending' ? 'All caught up' : 'Nothing here yet'}</p>
-              <p className="muted small">{q ? 'Try a different name or area.' : tab === 'pending' ? 'New farm applications will appear here automatically.' : ''}</p>
+              <p className="strong">{q ? 'Nothing matches your search' : tab === 'pending' ? 'All caught up' : 'Nothing here yet'}</p>
+              <p className="muted small">{q ? 'Try a different name or area.' : tab === 'pending' ? 'New applications will appear here automatically.' : ''}</p>
             </div>
           ) : null}
 
@@ -102,7 +107,7 @@ export default function Farms() {
                 <button className={'farm-row' + (f.user_id === selId ? ' on' : '')} onClick={() => setSelId(f.user_id)}>
                   <div className="avatar">{(f.business_name || '?').slice(0, 1).toUpperCase()}</div>
                   <div className="grow">
-                    <div className="row gap-sm"><span className="strong">{f.business_name}</span>{tab === 'all' ? <Pill status={f.verification_status} /> : null}</div>
+                    <div className="row gap-sm"><span className="strong">{f.business_name}</span>{KIND_LABEL[f.kind] ? <span className="chip sm">{KIND_LABEL[f.kind]}</span> : null}{tab === 'all' ? <Pill status={f.verification_status} /> : null}</div>
                     <div className="muted small">{f.owner_name || 'No name'} · {f.location || 'No location'}</div>
                   </div>
                   <span className="muted small mono nowrap">{ago(f.created_at)}</span>
@@ -113,7 +118,7 @@ export default function Farms() {
         </section>
 
         {selected ? <Detail key={selected.user_id} farm={selected} onClose={() => setSelId(null)} onDecide={decide} /> : (
-          <aside className="detail-pane placeholder hide-sm"><p className="muted">Select a farm to review its details and ID.</p></aside>
+          <aside className="detail-pane placeholder hide-sm"><p className="muted">Select one to review its details and ID.</p></aside>
         )}
       </main>
 
@@ -160,6 +165,7 @@ function Detail({ farm, onClose, onDecide }) {
       {st === 'rejected' && farm.rejection_reason ? <div className="banner err"><b>Rejection reason:</b> {farm.rejection_reason}</div> : null}
 
       <dl className="facts">
+        {KIND_LABEL[farm.kind] ? <Fact k="Type" v={KIND_LABEL[farm.kind] + (farm.supplier_type && SUPPLY_LABEL[farm.supplier_type] ? ' · ' + SUPPLY_LABEL[farm.supplier_type] : '')} /> : null}
         <Fact k="Owner" v={farm.owner_name || '—'} />
         <Fact k="Email" v={farm.email ? <a href={'mailto:' + farm.email}>{farm.email}</a> : '—'} />
         {farm.phone ? <Fact k="Phone" v={<a href={'tel:+' + farm.phone}>+{farm.phone}</a>} /> : null}
@@ -181,17 +187,17 @@ function Detail({ farm, onClose, onDecide }) {
 
       {rejecting ? (
         <div className="reject">
-          <p className="label">Reason for the farm</p>
+          <p className="label">Reason for the {noun(farm) || 'seller'}</p>
           <div className="chips">{QUICK_REASONS.map((r) => <button key={r} type="button" className={'chip btn-chip' + (reason === r ? ' on' : '')} onClick={() => setReason(r)}>{r}</button>)}</div>
-          <textarea className="input" rows={3} autoFocus placeholder="Tell the farm what to fix. They'll see this in the app." value={reason} onChange={(e) => setReason(e.target.value)} />
+          <textarea className="input" rows={3} autoFocus placeholder="Tell them what to fix. They'll see this in the app." value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="actions">
             <button className="btn ghost" onClick={() => { setRejecting(false); setReason(''); }}>Cancel</button>
-            <button className="btn danger" disabled={!reason.trim() || !!busy} onClick={() => act('rejected', reason.trim())}>{busy === 'rejected' ? 'Rejecting…' : st === 'approved' ? 'Revoke approval' : 'Reject farm'}</button>
+            <button className="btn danger" disabled={!reason.trim() || !!busy} onClick={() => act('rejected', reason.trim())}>{busy === 'rejected' ? 'Rejecting…' : st === 'approved' ? 'Revoke approval' : ('Reject ' + noun(farm)).trim()}</button>
           </div>
         </div>
       ) : (
         <div className="actions">
-          {st !== 'approved' ? <button className="btn primary" disabled={!!busy} onClick={() => act('approved')}>{busy === 'approved' ? 'Approving…' : 'Approve farm'}</button> : null}
+          {st !== 'approved' ? <button className="btn primary" disabled={!!busy} onClick={() => act('approved')}>{busy === 'approved' ? 'Approving…' : ('Approve ' + noun(farm)).trim()}</button> : null}
           {st !== 'rejected' ? <button className="btn outline" disabled={!!busy} onClick={() => setRejecting(true)}>{st === 'approved' ? 'Revoke approval' : 'Reject'}</button> : null}
           {st === 'rejected' ? <button className="btn ghost" disabled={!!busy} onClick={() => act('pending')}>{busy === 'pending' ? 'Moving…' : 'Move back to pending'}</button> : null}
         </div>

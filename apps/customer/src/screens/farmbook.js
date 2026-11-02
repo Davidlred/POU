@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Toggle,
-  naira, isoDate, shortDate, rpc, uploadImage, friendlyError, supabase } from '@p360/shared';
+import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Toggle,
+  naira, isoDate, shortDate, rpc, uploadImage, friendlyError, supabase, Fab, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
 const THRESHOLD = { individual: 50000, business: 300000 };
@@ -12,7 +12,9 @@ const typeLabel = (t) => (t === 'business' ? 'Business' : 'Individual');
 
 // ---------- Farm side ----------
 export function FarmBookScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
+  const { seller, bookName } = useAuth();
   const [book, setBook] = useState(null);
   const [err, setErr] = useState(null);
   const [tab, setTab] = useState('pending');
@@ -28,8 +30,8 @@ export function FarmBookScreen({ navigation }) {
   const rows = tab === 'pending' ? pending : paid;
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
-        <View style={{ marginHorizontal: -20 }}><AppBar title="Farm Book" subtitle="Sales on credit" /></View>
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+        <View style={{ marginHorizontal: -20 }}><AppBar title={bookName} subtitle="Sales on credit" /></View>
         {err ? <Banner tone="err" title="Couldn't load your book" body={err} action="Retry" onAction={load} /> : null}
         {book === null && !err ? <Skeleton h={140} r={24} /> : null}
         {book ? <>
@@ -58,7 +60,7 @@ export function FarmBookScreen({ navigation }) {
                 right={<Txt v="mono" color={Number(k.outstanding) ? c.ink : c.mute} style={{ fontSize: 14 }}>{naira(k.outstanding)}</Txt>} />))}</Group>
               : <Card><Txt v="small">Customers appear here when you log a credit sale or allow an app buyer to pay later.</Txt></Card>}
             <Txt v="label">App buyers · credit eligibility</Txt>
-            <Txt v="small">A buyer qualifies after buying {naira(THRESHOLD.individual)} from your farm, or {naira(THRESHOLD.business)} if they are a business.</Txt>
+            <Txt v="small">A buyer qualifies after buying {naira(THRESHOLD.individual)} from your {seller}, or {naira(THRESHOLD.business)} if they are a business.</Txt>
             {book.eligible.length ? <Group>{book.eligible.map((x, i) => (
               <Row key={x.buyer_id} last={i === book.eligible.length - 1} icon={x.qualifies ? 'account-star-outline' : 'account-clock-outline'} iconColor={x.qualifies ? c.sage : c.mute} title={x.name}
                 subtitle={typeLabel(x.buyer_type) + ' · bought ' + naira(x.bought) + ' of ' + naira(x.threshold)}
@@ -68,8 +70,7 @@ export function FarmBookScreen({ navigation }) {
           </>}
         </> : null}
       </ScrollView>
-      <Pressable accessibilityLabel="Log a credit sale" onPress={() => navigation.navigate('CreditLog')} style={{ position: 'absolute', right: 20, bottom: 20, height: 56, paddingHorizontal: 20, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', elevation: 4 }}>
-        <Icon name="plus" size={24} color={c.onyolk} /><Txt v="bold" color={c.onyolk}>Log credit sale</Txt></Pressable>
+      <Fab label="Log credit sale" accessibilityLabel="Log a credit sale" onPress={() => navigation.navigate('CreditLog')} />
     </Screen>
   );
 }
@@ -81,7 +82,7 @@ let lineKey = 0;
 
 export function CreditLogScreen({ navigation, route }) {
   const { c } = useTheme();
-  const { uid } = useAuth();
+  const { uid, seller } = useAuth();
   const [customers, setCustomers] = useState(null);
   const [products, setProducts] = useState(null);     // the farm's own listings: name, price, unit
   const [sel, setSel] = useState(route.params?.customerId || 'new');
@@ -157,10 +158,10 @@ export function CreditLogScreen({ navigation, route }) {
             <Pressable onPress={() => drop(l.key)} accessibilityLabel={'Remove ' + (l.name || 'item')} hitSlop={8} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={20} color={c.mute} /></Pressable>
           </View>
           {!l.listing_id ? <>
-            <Input label="Item" value={l.name} onChangeText={(t) => upd(l.key, { name: t })} placeholder="Spent hens" autoCapitalize="sentences" />
+            <Input label="Item" value={l.name} onChangeText={(t) => upd(l.key, { name: t })} placeholder={seller === 'store' ? 'Plastic feeder' : 'Spent hens'} autoCapitalize="sentences" />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <View style={{ flex: 1 }}><Input label="Price each" prefix="₦" keyboardType="number-pad" value={String(l.unit_price)} onChangeText={(t) => upd(l.key, { unit_price: t.replace(/\D/g, '') })} mono /></View>
-              <View style={{ flex: 1 }}><Input label="Sold per" value={l.unit} onChangeText={(t) => upd(l.key, { unit: t })} placeholder="bird" autoCapitalize="none" /></View>
+              <View style={{ flex: 1 }}><Input label="Sold per" value={l.unit} onChangeText={(t) => upd(l.key, { unit: t })} placeholder={seller === 'store' ? 'piece' : 'bird'} autoCapitalize="none" /></View>
             </View>
           </> : null}
           <Input label={'How many ' + plural(l.unit || 'unit', 2) + '?'} keyboardType="decimal-pad" value={String(l.qty)} onChangeText={(t) => upd(l.key, { qty: num(t) })} mono autoFocus={!!l.listing_id} />
@@ -250,7 +251,7 @@ export function CreditEntryScreen({ navigation, route }) {
           </Pressable>
           <Txt v="small">{up === 'uploading' ? 'Uploading…' : up === 'failed' ? "Upload didn't finish. Try again." : up?.path ? 'Receipt uploaded. Tap the button below to finish.' : 'When they pay, add the receipt here and this entry becomes Payment completed.'}</Txt>
           {up === 'failed' && photo ? <Button small variant="dark" icon="refresh" title="Retry upload" onPress={() => send(photo)} /> : null}
-          <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" icon="camera-outline" title="Take photo" onPress={() => pick(true)} style={{ flex: 1 }} /><Button small variant="outline" icon="image-outline" title="Gallery" onPress={() => pick(false)} style={{ flex: 1 }} /></View>
+          <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
         </Card>
         {commission > 0 ? (short > 0
           ? <Banner tone="warn" icon="wallet-plus-outline" title={'Add ' + naira(short) + ' to your wallet first'} body={'This was an app order, so Poultry360\'s 10% commission (' + naira(commission) + ') is due now that the customer has paid you. Your wallet holds ' + naira(farmWallet) + '.'} action="Add funds" onAction={() => navigation.navigate('TopUp', { amount: Math.ceil(short), returnTo: 'CreditEntry' })} />
@@ -318,6 +319,7 @@ export function CreditCustomerScreen({ navigation, route }) {
 // Give a qualifying app buyer permission to pay later, with a limit.
 export function CreditAllowScreen({ navigation, route }) {
   const { c } = useTheme();
+  const { seller, bookName } = useAuth();
   const { buyer } = route.params;
   const [limit, setLimit] = useState('');
   const [busy, setBusy] = useState(false);
@@ -331,12 +333,12 @@ export function CreditAllowScreen({ navigation, route }) {
     <Screen scroll footer={<Button title={n > 0 ? 'Allow up to ' + naira(n) + ' on credit' : 'Allow credit'} disabled={!(n > 0)} loading={busy} onPress={go} />}>
       <AppBar title="Allow pay later" close />
       <Txt v="display" style={{ fontSize: 26, lineHeight: 30 }}>{buyer.name}</Txt>
-      <Banner tone="ok" icon="account-star-outline" title={typeLabel(buyer.buyer_type) + ' buyer · qualifies'} body={'They have bought ' + naira(buyer.bought) + ' from your farm. The requirement is ' + naira(buyer.threshold) + '.'} />
+      <Banner tone="ok" icon="account-star-outline" title={typeLabel(buyer.buyer_type) + ' buyer · qualifies'} body={'They have bought ' + naira(buyer.bought) + ' from your ' + seller + '. The requirement is ' + naira(buyer.threshold) + '.'} />
       <Input label="Credit limit" prefix="₦" keyboardType="number-pad" value={limit} onChangeText={(t) => setLimit(t.replace(/\D/g, ''))} mono autoFocus hint="The most they can owe you at once. You can change or block this any time." />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[20000, 50000, 100000, 250000].map((v) => <Chip key={v} label={naira(v)} selected={n === v} onPress={() => setLimit(String(v))} />)}</View>
       <Card>
         <Txt v="label">How pay later works</Txt>
-        {['They choose "Pay later" at checkout, up to this limit.', 'They still pay the delivery fee up front, so the rider is paid.', 'The order shows in your Farm Book as payment pending.', 'It completes when they pay in the app, or when you upload their receipt.', "Poultry360's 10% commission is only taken when they pay you back."].map((t) => (
+        {['They choose "Pay later" at checkout, up to this limit.', 'They still pay the delivery fee up front, so the rider is paid.', 'The order shows in your ' + bookName + ' as payment pending.', 'It completes when they pay in the app, or when you upload their receipt.', "Poultry360's 10% commission is only taken when they pay you back."].map((t) => (
           <View key={t} style={{ flexDirection: 'row', gap: 10 }}><Icon name="check" size={18} color={c.sage} /><Txt v="body" style={{ flex: 1 }}>{t}</Txt></View>))}
       </Card>
       <Txt v="small">You carry the risk if a customer doesn't pay. Poultry360 doesn't guarantee credit sales.</Txt>

@@ -160,7 +160,8 @@ export function EmailScreen({ onSent, onBack, mode = 'signup', initialEmail = ''
   if (!onBack) return <Screen scroll style={CENTERED}>{body}</Screen>;
   return (
     <Screen pad={false}>
-      <AppBar onBack={onBack} />
+      {/* the back button sits above the centred form, not at the window edge */}
+      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onBack} /></View>
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">{body}</ScrollView>
     </Screen>
   );
@@ -245,7 +246,7 @@ export function OtpScreen({ email, onVerified, onEdit }) {
 
   return (
     <Screen pad={false}>
-      <AppBar onBack={onEdit} />
+      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onEdit} /></View>
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">
         <AuthMark />
         <View style={{ gap: 10, alignItems: 'center', marginBottom: 8 }}>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Pressable, ScrollView, Linking, Image, Alert } from 'react-native';
+import { View, Pressable, ScrollView, Linking, Image, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Pill, Stat, Group, Row, Skeleton,
@@ -187,7 +187,8 @@ export function SymptomScreen({ navigation }) {
     try { keep(await ImagePicker.launchCameraAsync({ quality: 0.5, mediaTypes: ['images'] })); }
     catch (e) { Alert.alert("Couldn't open the camera", friendlyError(e), [{ text: 'Choose a photo instead', onPress: fromGallery }, { text: 'Cancel', style: 'cancel' }]); }
   };
-  const add = () => Alert.alert('Add a photo', 'Clear, close-up photos of the affected birds work best.', [
+  // Website: straight to the file picker (no camera to choose).
+  const add = () => Platform.OS === 'web' ? fromGallery() : Alert.alert('Add a photo', 'Clear, close-up photos of the affected birds work best.', [
     { text: 'Take photo', onPress: fromCamera }, { text: 'Choose from gallery', onPress: fromGallery }, { text: 'Cancel', style: 'cancel' }]);
   const run = async () => {
     setBusy(true); setUpErr(false);

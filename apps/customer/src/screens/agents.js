@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, BackHandler, Alert, Image, Linking } from 'react-native';
+import { View, Pressable, BackHandler, Alert, Image, Linking, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Empty, Input, Chip, Segmented, Pill, Group, Row, Skeleton, Sheet, Stat,
@@ -74,7 +74,7 @@ export function AgentDeskScreen({ navigation }) {
   const leaveMode = useCallback(() => { if (home) setActiveRole(home); }, [home]);
   // The desk is the root screen in agent mode, so Back returns to the role they came from instead of closing the app.
   useFocusEffect(useCallback(() => {
-    if (!home) return undefined;
+    if (!home || Platform.OS === 'web') return undefined;   // browsers have no hardware Back; BackHandler only logs an error there
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { leaveMode(); return true; });
     return () => sub.remove();
   }, [home, leaveMode]));
@@ -89,7 +89,7 @@ export function AgentDeskScreen({ navigation }) {
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <View style={{ flex: 1 }}><Txt v="display" style={{ fontSize: 28 }}>Agent</Txt>{d?.store ? <Txt v="small">{d.store.name}</Txt> : null}</View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : 'My farm'} onPress={leaveMode} style={{ height: 44 }} /> : null}
+        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : home === 'supplier' ? 'My store' : 'My farm'} onPress={leaveMode} style={{ height: 44 }} /> : null}
         <Pressable onPress={() => navigation.navigate('Profile')} accessibilityLabel="Profile" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-outline" /></Pressable>
       </View>
     </View>

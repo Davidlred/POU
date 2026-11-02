@@ -9,8 +9,8 @@ export const supabase = createClient(url || 'http://localhost', key || 'missing'
 // Turns Postgres "raise exception 'CODE'" messages into readable copy.
 const MESSAGES = {
   NOT_ADMIN: "This account isn't an ops admin.",
-  REASON_REQUIRED: 'Give the farm a reason so they know what to fix.',
-  NOT_FOUND: 'That farm no longer exists.',
+  REASON_REQUIRED: 'Give a reason so they know what to fix.',
+  NOT_FOUND: 'That account no longer exists.',
   INVALID_STATUS: 'Unknown verification status.',
   INVALID_EMAIL: 'Enter a valid email address.',
   NAME_REQUIRED: "Enter the rider's name.",

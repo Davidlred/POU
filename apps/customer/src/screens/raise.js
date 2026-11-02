@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, Image, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Pill, Skeleton,
-  naira, pct, isoDate, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase } from '@p360/shared';
+import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Pill, Skeleton,
+  naira, pct, isoDate, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase, Fab } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { OfferingCard } from './invest';
 import { ESTIMATE_COPY } from '../lib/roi';
@@ -42,6 +42,7 @@ function PhotoStrip({ photos, setPhotos, bucket, max = 4, error }) {
 }
 
 export function RaiseHomeScreen({ navigation }) {
+  const page = usePage();
   const { c } = useTheme();
   const { uid, vendor, refresh } = useAuth();
   const [list, setList] = useState(null);
@@ -57,7 +58,7 @@ export function RaiseHomeScreen({ navigation }) {
   );
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 0, gap: 14 }}>
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 0, gap: 14 }, page]}>
         <View style={{ marginHorizontal: -20 }}><AppBar title="Raise funds" /></View>
         {badge === 'none' ? (
           <Hearth onPress={() => navigation.navigate('Badge')}>
@@ -80,7 +81,7 @@ export function RaiseHomeScreen({ navigation }) {
           ))}
         <View style={{ height: 64 }} />
       </ScrollView>
-      {badge === 'approved' ? <Pressable accessibilityLabel="New offering" onPress={() => navigation.navigate('OfferingForm')} style={{ position: 'absolute', right: 20, bottom: 20, height: 56, paddingHorizontal: 20, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', elevation: 4 }}><Icon name="plus" size={24} color={c.onyolk} /><Txt v="bold" color={c.onyolk}>New offering</Txt></Pressable> : null}
+      {badge === 'approved' ? <Fab label="New offering" onPress={() => navigation.navigate('OfferingForm')} /> : null}
     </Screen>
   );
 }

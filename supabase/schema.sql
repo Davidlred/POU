@@ -916,7 +916,10 @@ begin
       'verification_status', v.verification_status, 'rejection_reason', v.rejection_reason,
       'rating', v.rating, 'rating_count', v.rating_count, 'created_at', v.created_at,
       'owner_name', p.full_name, 'email', coalesce(p.email, u.email), 'phone', p.phone,
-      'listings', (select count(*) from listings l where l.vendor_id = v.user_id)
+      'listings', (select count(*) from listings l where l.vendor_id = v.user_id),
+      'supplier_type', v.supplier_type,   -- column added further down; plpgsql resolves it at run time
+      'kind', case when 'supplier' = any(p.roles) and 'vendor' = any(p.roles) then 'both'
+                   when 'supplier' = any(p.roles) then 'store' else 'farm' end
     ) order by v.created_at desc)
     from vendor_profiles v
     join profiles p on p.id = v.user_id

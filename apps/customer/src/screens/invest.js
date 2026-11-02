@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Skeleton, Steps, PhotoBox,
-  naira, pct, isoDate, shortDate, timeAgo, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase } from '@p360/shared';
+import { usePage, useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Skeleton, Steps, PhotoBox,
+  naira, pct, isoDate, shortDate, timeAgo, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { projectReturn, daysLeft, progress, ESTIMATE_COPY } from '../lib/roi';
 import { track } from '../lib/analytics';
@@ -80,6 +80,7 @@ function KycBanner({ kyc, navigation }) {
 }
 
 export function InvestHomeScreen({ navigation, route }) {
+  const page = usePage();
   const { c } = useTheme();
   const [kyc] = useKyc();
   const [port, setPort] = useState(null);
@@ -95,7 +96,7 @@ export function InvestHomeScreen({ navigation, route }) {
   const has = port && port.items.length > 0;
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+      <ScrollView contentContainerStyle={[{ padding: 20, gap: 16 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
         {route.name === 'Invest' ? <Txt v="display" style={{ fontSize: 28 }}>Invest</Txt> : <View style={{ marginHorizontal: -20, marginTop: -20 }}><AppBar title="Invest" /></View>}
         <KycBanner kyc={kyc} navigation={navigation} />
         <Hearth onPress={() => navigation.navigate('Portfolio')}>
@@ -371,7 +372,7 @@ function DocUpload({ title, hint, value, onChange, error }) {
       </View>
       {error ? <Txt v="small" color={c.err}>{error}</Txt> : null}
       {st === 'failed' && photo ? <Button small variant="dark" icon="refresh" title="Retry upload" onPress={() => send(photo)} /> : null}
-      <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" icon="camera-outline" title="Take photo" onPress={() => pick(true)} style={{ flex: 1 }} /><Button small variant="outline" icon="image-outline" title="Gallery" onPress={() => pick(false)} style={{ flex: 1 }} /></View>
+      <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
     </Card>
   );
 }

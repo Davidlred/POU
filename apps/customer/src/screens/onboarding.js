@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Pressable, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { ExploreOptions } from './explore';
@@ -173,7 +173,7 @@ export function BusinessScreen({ navigation, route }) {
               <Txt v="small">{upload.state === 'done' ? 'Tap to replace' : 'All four corners in frame, good light'}</Txt></View>
           </View>
           {errs.id ? <Txt v="small" color={c.err}>{errs.id}</Txt> : null}
-          <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" icon="camera-outline" title="Take photo" onPress={() => pick(true)} style={{ flex: 1 }} /><Button small variant="outline" icon="image-outline" title="Gallery" onPress={() => pick(false)} style={{ flex: 1 }} /></View>
+          <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
         </Card>
       )}
     </Screen>

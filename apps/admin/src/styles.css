@@ -105,6 +105,7 @@ textarea.input { resize: vertical; }
 .facts { display: grid; grid-template-columns: 96px 1fr; gap: 10px 14px; margin: 0; font-size: 14px; }
 .facts dt { color: var(--mute); } .facts dd { margin: 0; overflow-wrap: anywhere; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.sm { padding: 1px 8px; font-size: 12px; }
 .chip { padding: 4px 10px; border-radius: 999px; background: var(--sf2); border: 1px solid var(--line); font-size: 13px; }
 .btn-chip { cursor: pointer; text-align: left; }
 .btn-chip.on { border-color: var(--ember); background: var(--warnbg); }

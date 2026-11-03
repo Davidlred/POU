@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, Image, ScrollView, RefreshControl, Alert, Linking } from 'react-native';
+import { View, Pressable, Image, ScrollView, RefreshControl, Alert, Linking, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Skeleton, Sheet, useTick,
@@ -114,7 +114,7 @@ export function MyListingsScreen({ navigation }) {
   // A tab page, but it is also opened from the home ("Prepare your products"), so it carries a way back home.
   const header = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-      {wide ? null : <Pressable accessibilityRole="button" accessibilityLabel="Back to home" onPress={() => navigation.navigate('VendorHome')} hitSlop={8}
+      {wide || Platform.OS === 'web' ? null : <Pressable accessibilityRole="button" accessibilityLabel="Back to home" onPress={() => navigation.navigate('VendorHome')} hitSlop={8}
         style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name="arrow-left" size={22} />
       </Pressable>}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ScrollView, TextInput, Pressable } from 'react-native';
+import { View, ScrollView, TextInput, Pressable, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { normalizeEmail, pad } from './format';
@@ -161,7 +161,7 @@ export function EmailScreen({ onSent, onBack, mode = 'signup', initialEmail = ''
   return (
     <Screen pad={false}>
       {/* the back button sits above the centred form, not at the window edge */}
-      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onBack} /></View>
+      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={Platform.OS === 'web' ? undefined : onBack} /></View>
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">{body}</ScrollView>
     </Screen>
   );
@@ -246,7 +246,7 @@ export function OtpScreen({ email, onVerified, onEdit }) {
 
   return (
     <Screen pad={false}>
-      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onEdit} /></View>
+      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={Platform.OS === 'web' ? undefined : onEdit} /></View>
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">
         <AuthMark />
         <View style={{ gap: 10, alignItems: 'center', marginBottom: 8 }}>

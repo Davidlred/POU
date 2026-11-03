@@ -80,12 +80,16 @@ export function AppBar({ title, subtitle, right, close, onBack, bare }) {
   const { c } = useTheme();
   // Website: on a screen that scrolls its own content, line the bar up with the centred page instead of the window edge.
   const align = useWide() && !useContext(InPage) && !bare;   // bare: the caller places the bar itself
+  // Website: the browser's back (and a phone's swipe back) already returns to the previous page, so there is no back
+  // arrow. A screen's own step back (onBack, e.g. checkout's address step) keeps its button: the browser can't do that.
+  const button = Platform.OS !== 'web' || !!onBack;
+  if (!button && !title && !subtitle && !right) return <View style={{ height: 16 }} />;
   return (
     <View style={[{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 }, align && { ...PAGE, paddingHorizontal: 32, marginTop: 12 }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack || (() => nav.goBack())} style={s.iconBtn} hitSlop={8}>
+      {button ? <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack || (() => nav.goBack())} style={s.iconBtn} hitSlop={8}>
         <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={close ? 'close' : 'arrow-left'} size={22} /></View>
-      </Pressable>
-      <View style={{ flex: 1, marginLeft: 4 }}>
+      </Pressable> : null}
+      <View style={{ flex: 1, marginLeft: button ? 4 : 8 }}>
         {title ? <Txt v="h2" numberOfLines={1}>{title}</Txt> : null}
         {subtitle ? <Txt v="label">{subtitle}</Txt> : null}
       </View>

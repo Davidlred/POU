@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, FlatList, ScrollView, Image, Dimensions, RefreshControl, TextInput } from 'react-native';
+import { View, Pressable, FlatList, ScrollView, Image, Dimensions, RefreshControl, TextInput, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Chip, Sheet, Input, Skeleton, Pill, naira, rpc, publicUrl, STATUS_LABEL, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
@@ -210,7 +210,7 @@ export function ListingsScreen({ navigation, route }) {
     <Screen pad={false} column>
       {search ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 }}>
-          <Pressable onPress={() => navigation.goBack()} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-left" size={24} /></Pressable>
+          {Platform.OS === 'web' ? null : <Pressable onPress={() => navigation.goBack()} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-left" size={24} /></Pressable>}
           <View style={{ flex: 1, height: 48, borderRadius: 14, backgroundColor: c.sf, borderWidth: 2, borderColor: c.ember, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }}>
             <TextInput value={q} onChangeText={setQ} autoFocus placeholder="Search the market" placeholderTextColor={c.mute} style={{ flex: 1, color: c.ink, fontSize: 15 }} returnKeyType="search" />
             {q ? <Icon name="close" color={c.mute} /> : null}
@@ -313,7 +313,7 @@ export function ProductScreen({ navigation, route }) {
           {photos.length ? <FlatList horizontal pagingEnabled data={photos} keyExtractor={(u) => u} onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / W))}
             renderItem={({ item }) => <Image source={{ uri: item }} style={{ width: W, height: 300, backgroundColor: c.sf2, opacity: out ? 0.5 : 1 }} />} />
             : <View style={{ height: 300, backgroundColor: c.sf2, alignItems: 'center', justifyContent: 'center' }}><Icon name="image-outline" size={40} color={c.mute} /></View>}
-          <Pressable onPress={() => navigation.goBack()} style={{ position: 'absolute', top: 44, left: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-left" /></Pressable>
+          {Platform.OS === 'web' ? null : <Pressable onPress={() => navigation.goBack()} style={{ position: 'absolute', top: 44, left: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-left" /></Pressable>}
           {photos.length > 1 ? <View style={{ position: 'absolute', bottom: 34, alignSelf: 'center', flexDirection: 'row', gap: 6 }}>{photos.map((_, i) => <View key={i} style={{ width: i === page ? 18 : 6, height: 6, borderRadius: 3, backgroundColor: c.ink, opacity: i === page ? 1 : 0.3 }} />)}</View> : null}
         </View>
         <View style={{ marginTop: -24, backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, gap: 12 }}>
@@ -349,7 +349,7 @@ export function StoreScreen({ navigation, route }) {
             <Card style={{ flex: 1, gap: 2 }}><Txt v="mono" style={{ fontSize: 20 }}>{items ? items.length : '–'}</Txt><Txt v="small">Active listings</Txt></Card>
           </View>
         </View> : <Skeleton h={160} r={20} />}
-        ListEmptyComponent={items ? <Empty icon="store-off-outline" title="No active listings" body="This farm has nothing for sale right now. Check back soon." /> : null}
+        ListEmptyComponent={items ? <Empty icon="store-off-outline" title="No active listings" body="Nothing for sale right now. Check back soon." /> : null}
         renderItem={({ item }) => <ListingCard l={item} onPress={() => navigation.navigate('Product', { id: item.id })} />} />
     </Screen>
   );

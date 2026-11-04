@@ -50,7 +50,8 @@ const WIDE_PAGE = [PAGE, { paddingHorizontal: 40, paddingTop: 28 }];
 // Screens that scroll their own content (<Screen pad={false}>) add this to their scroll's contentContainerStyle,
 // so on the wide website the content is centred at page width like every other screen (null on phones).
 export function usePage() { return useWide() ? WIDE_PAGE : null; }
-// True inside a Screen whose content is already in the centred page column (so AppBar doesn't centre itself twice).
+// Inside a Screen whose content is already in the centred page column (so AppBar doesn't centre itself twice):
+// 'pad' when that column is already padded, 'column' when the screen pads its own content (usually 20).
 const InPage = createContext(false);
 
 // column: with pad={false}, keep the whole screen in a centred page-wide column on the wide website
@@ -63,7 +64,7 @@ export function Screen({ children, scroll, pad = true, column, edges = ['top'], 
     ? <ScrollView contentContainerStyle={[pad && { padding: 20, paddingBottom: 40 }, { gap: 14 }, page, style]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
     : <View style={[{ flex: 1 }, pad && { paddingHorizontal: 20 }, page, style]}>{children}</View>;
   return (
-    <InPage.Provider value={!!page}>
+    <InPage.Provider value={wide && pad ? 'pad' : page ? 'column' : false}>
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: bg || c.bg }}>
       <StatusBar barStyle={mode === 'dark' || bg ? 'light-content' : 'dark-content'} backgroundColor={bg || c.bg} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -75,21 +76,45 @@ export function Screen({ children, scroll, pad = true, column, edges = ['top'], 
   );
 }
 
+// Back button. Phone app: the 40 px round button. Website: smaller, since the browser has its own back too:
+// a slim "Back" pill on a laptop, a 32 px round arrow on a phone browser.
+export function BackButton({ onPress, close, style }) {
+  const { c, f } = useTheme();
+  const wide = useWide();
+  const web = Platform.OS === 'web';
+  const icon = close ? 'close' : 'arrow-left';
+  if (web && wide) return (
+    <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={6}
+      style={({ hovered }) => [{ height: 36, borderRadius: 18, paddingLeft: 10, paddingRight: 14, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: hovered ? c.sf2 : c.sf, borderWidth: 1, borderColor: hovered ? c.line2 : c.line }, style]}>
+      <Icon name={icon} size={18} />
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: f.semibold, fontSize: 14, color: c.ink }}>{close ? 'Close' : 'Back'}</Text>
+    </Pressable>
+  );
+  const d = web ? 32 : 40;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={web ? 10 : 8}
+      style={[{ width: web ? 40 : 48, height: web ? 40 : 48, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <View style={{ width: d, height: d, borderRadius: d / 2, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={web ? 18 : 22} /></View>
+    </Pressable>
+  );
+}
+
 export function AppBar({ title, subtitle, right, close, onBack, bare }) {
   const nav = useNavigation();
-  const { c } = useTheme();
+  const wide = useWide();
   // Website: on a screen that scrolls its own content, line the bar up with the centred page instead of the window edge.
-  const align = useWide() && !useContext(InPage) && !bare;   // bare: the caller places the bar itself
-  // Website: the browser's back (and a phone's swipe back) already returns to the previous page, so there is no back
-  // arrow. A screen's own step back (onBack, e.g. checkout's address step) keeps its button: the browser can't do that.
-  const button = Platform.OS !== 'web' || !!onBack;
+  const inPage = useContext(InPage);
+  const align = wide && !inPage && !bare;   // bare: the caller places the bar itself
+  // Wide website: the back button lines up with the content's left edge.
+  const inset = !wide || bare ? 8 : inPage === 'pad' ? 0 : inPage === 'column' ? 20 : 40;
+  // Website: a page opened straight from a link has nothing to go back to, so it gets no button.
+  const button = !!onBack || Platform.OS !== 'web' || nav.canGoBack();
   if (!button && !title && !subtitle && !right) return <View style={{ height: 16 }} />;
   return (
-    <View style={[{ height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 4 }, align && { ...PAGE, paddingHorizontal: 32, marginTop: 12 }]}>
-      {button ? <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack || (() => nav.goBack())} style={s.iconBtn} hitSlop={8}>
-        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={close ? 'close' : 'arrow-left'} size={22} /></View>
-      </Pressable> : null}
-      <View style={{ flex: 1, marginLeft: button ? 4 : 8 }}>
+    <View style={[{ height: Platform.OS === 'web' ? 52 : 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: inset, gap: wide ? 12 : 4 }, align && { ...PAGE, marginTop: 12 }]}>
+      {button ? <BackButton close={close} onPress={onBack || (() => nav.goBack())} /> : null}
+      <View style={{ flex: 1, marginLeft: wide ? 0 : button ? 4 : 8 }}>
         {title ? <Txt v="h2" numberOfLines={1}>{title}</Txt> : null}
         {subtitle ? <Txt v="label">{subtitle}</Txt> : null}
       </View>

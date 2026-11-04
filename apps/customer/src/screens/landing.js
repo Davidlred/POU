@@ -1,6 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, ScrollView, Pressable, Image, useWindowDimensions } from 'react-native';
 import { useTheme, Txt, Button, Icon, Pill, LOGO_MARK, MAX_FONT_SCALE } from '@p360/shared';
+import { PHOTOS } from './landingPhotos';
+import { ListingCard } from './buyer';
+import { fetchListings, catLabel } from '../lib/catalog';
 
 // Public home page of the web version (signed out). Phones never see it: the app opens on sign-in there.
 
@@ -34,6 +37,11 @@ export function WebNav({ navigation, sections, onSection, compact }) {
   );
 }
 
+// Categories shown as photo tiles; each opens that part of the shop (no account needed).
+const SHOP = ['eggs', 'chicken', 'turkey', 'live_birds', 'feed', 'drugs'];
+// "Fresh today" only appears once the market has enough products with photos to fill a row.
+const FRESH_MIN = 4;
+
 const SECTIONS = [['how', 'How it works'], ['who', "Who it's for"], ['agents', 'Stores & agents'], ['faq', 'FAQ']];
 const FAQ = [
   ['Where do you deliver?', 'Port Harcourt, Rivers State. More cities later.'],
@@ -53,17 +61,24 @@ export function LandingScreen({ navigation }) {
   const go = (k) => scroll.current?.scrollTo({ y: Math.max(0, (at.current[k] || 0) - 8), animated: true });
   const mark = (k) => (e) => { at.current[k] = e.nativeEvent.layout.y; };
   const wrap = { width: '100%', maxWidth: 1200, alignSelf: 'center', paddingHorizontal: wide ? 40 : 20 };
+  // a sideways row runs to the window edges but starts in line with the page column
+  const side = wide ? Math.max(40, (width - 1200) / 2 + 40) : 20;
   const h1 = { fontSize: wide ? 68 : 42, lineHeight: wide ? 72 : 46, letterSpacing: wide ? -2.4 : -1.4 };
   const h2 = { fontSize: wide ? 44 : 32, lineHeight: wide ? 50 : 37, letterSpacing: -1.2 };
   const card = { backgroundColor: c.sf, borderRadius: 24, borderWidth: 1, borderColor: c.line, padding: 22, gap: 10 };
   const get = () => navigation.navigate('Email', { mode: 'signup' });
+  const lift = { shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 6 } };
+  const [fresh, setFresh] = useState([]);
+  useEffect(() => {
+    fetchListings({ limit: 16 }).then((rows) => setFresh((rows || []).filter((l) => l.photos?.length).slice(0, 8))).catch(() => {});
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <WebNav navigation={navigation} sections={SECTIONS} onSection={go} />
       <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: 0 }}>
         {/* Hero */}
-        <View style={[wrap, { paddingVertical: wide ? 88 : 48, flexDirection: wide ? 'row' : 'column', alignItems: 'center', gap: 48 }]}>
+        <View style={[wrap, { paddingVertical: wide ? 72 : 40, flexDirection: wide ? 'row' : 'column', alignItems: 'center', gap: 48 }]}>
           <View style={{ flex: wide ? 1.1 : undefined, gap: 22 }}>
             <View style={{ alignSelf: 'flex-start' }}><Pill tone="ok" label="Now delivering in Port Harcourt" /></View>
             <Txt v="display" style={h1}>Fresh poultry from{' '}<Txt v="display" style={[h1, { backgroundColor: c.navact, color: c.navactink, borderRadius: 12 }]}>verified</Txt>{' '}farms.</Txt>
@@ -73,16 +88,12 @@ export function LandingScreen({ navigation }) {
               <Button variant="outline" icon="storefront-outline" title="Browse products" onPress={() => navigation.navigate('Market')} style={{ paddingHorizontal: 28 }} />
             </View>
           </View>
-          <View style={{ flex: wide ? 1 : undefined, width: wide ? undefined : '100%', alignItems: 'center', justifyContent: 'center', minHeight: wide ? 460 : 360 }}>
-            <View style={{ width: wide ? 420 : 300, height: wide ? 420 : 300, borderRadius: 999, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{ width: wide ? 230 : 170, height: wide ? 230 : 170, borderRadius: 999, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}>
-                <Image source={LOGO_MARK} style={{ width: wide ? 160 : 120, height: wide ? 160 : 120, borderRadius: 999 }} />
-              </View>
-            </View>
-            <View style={[card, { position: 'absolute', top: wide ? 20 : 0, right: wide ? 0 : 4, padding: 14, gap: 4, flexDirection: 'row', alignItems: 'center' }]}>
+          <View style={{ flex: wide ? 1 : undefined, width: wide ? undefined : '100%' }}>
+            <Image source={PHOTOS.hero} accessibilityLabel="Chickens in a poultry house" resizeMode="cover" style={{ width: '100%', height: wide ? 520 : 300, borderRadius: 28, backgroundColor: c.sf2 }} />
+            <View style={[card, lift, { position: 'absolute', top: wide ? 28 : 14, right: wide ? -20 : 12, padding: 14, gap: 6, flexDirection: 'row', alignItems: 'center' }]}>
               <Icon name="check-decagram" size={20} color={c.sage} /><Txt v="strong">Verified farm</Txt>
             </View>
-            <View style={[card, { position: 'absolute', bottom: wide ? 30 : 0, left: wide ? 0 : 4, padding: 16, gap: 6, minWidth: 240 }]}>
+            <View style={[card, lift, { position: 'absolute', bottom: wide ? 32 : 14, left: wide ? -28 : 12, padding: 16, gap: 6, minWidth: wide ? 250 : 230 }]}>
               <Txt v="label">Order P360-2148</Txt>
               <Txt v="bold">Fresh eggs · 5 crates</Txt>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}><Pill tone="live" label="Rider on the way" /><Txt v="mono">₦22,500</Txt></View>
@@ -90,21 +101,59 @@ export function LandingScreen({ navigation }) {
           </View>
         </View>
 
+        {/* Shop by category */}
+        <View style={[wrap, { paddingBottom: wide ? 88 : 48, gap: 24 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+            <View style={{ flex: 1, gap: 10 }}><Txt v="label" color={c.acc}>Shop</Txt><Txt v="display" style={h2}>What do you need today?</Txt></View>
+            {wide ? <Button small variant="outline" title="See all" onPress={() => navigation.navigate('Market')} style={{ height: 44, paddingHorizontal: 20 }} /> : null}
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: wide ? 16 : 12 }}>
+            {SHOP.map((id) => (
+              <Pressable key={id} onPress={() => navigation.navigate('Listings', { category: id })} accessibilityRole="link"
+                style={({ hovered }) => ({ flexBasis: wide ? '14%' : '45%', flexGrow: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: c.sf, borderWidth: 1, borderColor: hovered ? c.line2 : c.line })}>
+                <Image source={PHOTOS[id]} resizeMode="cover" style={{ width: '100%', height: wide ? 150 : 118, backgroundColor: c.sf2 }} />
+                <View style={{ paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Txt v="bold" numberOfLines={2} style={{ flex: 1 }}>{catLabel(id)}</Txt>
+                  <Icon name="arrow-right" size={18} color={c.mute} />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+          {wide ? null : <Button variant="outline" title="See all products" onPress={() => navigation.navigate('Market')} />}
+        </View>
+
+        {/* Fresh today: real products, once there are enough to fill a row */}
+        {fresh.length >= FRESH_MIN ? (
+          <View style={{ paddingBottom: wide ? 88 : 48, gap: 20 }}>
+            <View style={[wrap, { gap: 10 }]}><Txt v="label" color={c.acc}>Fresh today</Txt><Txt v="display" style={h2}>On the market now.</Txt></View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: wide ? 16 : 12, paddingHorizontal: side }}>
+              {fresh.map((l) => (
+                <View key={l.id} style={{ width: wide ? 232 : 170 }}>
+                  <ListingCard l={l} wide hideFarm onPress={() => navigation.navigate('Product', { id: l.id, viaSearch: true })} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
         {/* How it works */}
         <View onLayout={mark('how')} style={{ backgroundColor: c.sf2, paddingVertical: wide ? 96 : 56 }}>
           <View style={[wrap, { gap: 36 }]}>
             <View style={{ gap: 10 }}><Txt v="label" color={c.acc}>How it works</Txt><Txt v="display" style={h2}>From farm to your door in a day.</Txt></View>
             <View style={{ flexDirection: wide ? 'row' : 'column', gap: 20 }}>
-              {[['01', 'Pick from verified farms', 'Eggs, broilers, turkey, live birds, feed and drugs, with real stock and prices.', 'storefront-outline'],
-                ['02', 'Pay safely', 'Pay by card or wallet. The farm is paid after your order is delivered.', 'shield-check-outline'],
-                ['03', 'We deliver', 'Our rider checks the goods at the farm and brings them to you. Track it live.', 'moped-outline']].map(([n, t, b, i]) => (
-                <View key={n} style={[card, { flex: 1, padding: 28, gap: 14 }]}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={i} size={26} color={c.navactink} /></View>
-                    <Txt v="mono" color={c.mute} style={{ fontSize: 22 }}>{n}</Txt>
+              {[['01', 'Pick from verified farms', 'Eggs, broilers, turkey, live birds, feed and drugs, with real stock and prices.', 'storefront-outline', PHOTOS.stepFarm],
+                ['02', 'Pay safely', 'Pay by card or wallet. The farm is paid after your order is delivered.', 'shield-check-outline', PHOTOS.stepShopper],
+                ['03', 'We deliver', 'Our rider checks the goods at the farm and brings them to you. Track it live.', 'moped-outline', PHOTOS.stepRider]].map(([n, t, b, i, photo]) => (
+                <View key={n} style={[card, { flex: 1, padding: 0, gap: 0, overflow: 'hidden' }]}>
+                  <Image source={photo} resizeMode="cover" style={{ width: '100%', height: wide ? 200 : 180, backgroundColor: c.sf2 }} />
+                  <View style={{ padding: 24, gap: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={i} size={22} color={c.navactink} /></View>
+                      <Txt v="mono" color={c.mute} style={{ fontSize: 20 }}>{n}</Txt>
+                    </View>
+                    <Txt v="h1" style={{ fontSize: 22 }}>{t}</Txt>
+                    <Txt v="body" color={c.mute} style={{ fontSize: 16, lineHeight: 24 }}>{b}</Txt>
                   </View>
-                  <Txt v="h1" style={{ fontSize: 24 }}>{t}</Txt>
-                  <Txt v="body" color={c.mute} style={{ fontSize: 16, lineHeight: 24 }}>{b}</Txt>
                 </View>
               ))}
             </View>
@@ -115,14 +164,19 @@ export function LandingScreen({ navigation }) {
         <View onLayout={mark('who')} style={[wrap, { paddingVertical: wide ? 96 : 56, gap: 36 }]}>
           <View style={{ gap: 10 }}><Txt v="label" color={c.acc}>Who it's for</Txt><Txt v="display" style={h2}>One place for the whole poultry trade.</Txt></View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 20 }}>
-            {[['Buyers', 'Homes, restaurants and caterers ordering fresh produce.', 'basket-outline', 't1'],
-              ['Farms', 'Sell online, keep flock records in Farm Hub and sell on credit with Farm Book.', 'barn', 't4'],
-              ['Stores & suppliers', 'Feed, drugs and equipment: inventory, orders and a team of agents.', 'package-variant', 't2'],
-              ['Vets', 'Video consults and farm visits, booked and paid in the app.', 'stethoscope', 't3']].map(([t, b, i, tone]) => (
-              <View key={t} style={[card, { flexBasis: wide ? '22%' : '100%', flexGrow: 1, padding: 26, gap: 12 }]}>
-                <View style={{ width: 52, height: 52, borderRadius: 16, backgroundColor: c[tone], alignItems: 'center', justifyContent: 'center' }}><Icon name={i} size={26} color={c[tone + 'i']} /></View>
-                <Txt v="h2">{t}</Txt>
-                <Txt v="body" color={c.mute} style={{ fontSize: 15, lineHeight: 23 }}>{b}</Txt>
+            {[['Buyers', 'Homes, restaurants and caterers ordering fresh produce.', 'basket-outline', 't1', PHOTOS.buyers],
+              ['Farms', 'Sell online, keep flock records in Farm Hub and sell on credit with Farm Book.', 'barn', 't4', PHOTOS.farms],
+              ['Stores & suppliers', 'Feed, drugs and equipment: inventory, orders and a team of agents.', 'package-variant', 't2', PHOTOS.stores],
+              ['Vets', 'Video consults and farm visits, booked and paid in the app.', 'stethoscope', 't3', PHOTOS.vets]].map(([t, b, i, tone, photo]) => (
+              <View key={t} style={[card, { flexBasis: wide ? '22%' : '100%', flexGrow: 1, padding: 0, gap: 0, overflow: 'hidden' }]}>
+                <Image source={photo} resizeMode="cover" style={{ width: '100%', height: wide ? 180 : 200, backgroundColor: c.sf2 }} />
+                <View style={{ padding: 22, gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: c[tone], alignItems: 'center', justifyContent: 'center' }}><Icon name={i} size={20} color={c[tone + 'i']} /></View>
+                    <Txt v="h2">{t}</Txt>
+                  </View>
+                  <Txt v="body" color={c.mute} style={{ fontSize: 15, lineHeight: 23 }}>{b}</Txt>
+                </View>
               </View>
             ))}
           </View>

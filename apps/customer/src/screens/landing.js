@@ -94,7 +94,7 @@ export function LandingScreen({ navigation }) {
               <Icon name="check-decagram" size={20} color={c.sage} /><Txt v="strong">Verified farm</Txt>
             </View>
             <View style={[card, lift, { position: 'absolute', bottom: wide ? 32 : 14, left: wide ? -28 : 12, padding: 16, gap: 6, minWidth: wide ? 250 : 230 }]}>
-              <Txt v="label">Order P360-2148</Txt>
+              <Txt v="label">Order P360-7KQ4XM</Txt>
               <Txt v="bold">Fresh eggs · 5 crates</Txt>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}><Pill tone="live" label="Rider on the way" /><Txt v="mono">₦22,500</Txt></View>
             </View>

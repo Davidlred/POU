@@ -38,7 +38,7 @@ drop table if exists
   public.coverage_areas, public.withdrawal_codes, public.transactions, public.wallets,
   public.credit_entries, public.credit_customers,
   public.roi_calculations, public.investments, public.pool_farms, public.investment_pools, public.investment_offerings, public.kyc_records,
-  public.vendor_profiles, public.profiles, public.admins
+  public.vendor_profiles, public.profiles, public.admins, public.admin_emails
 cascade;
 
 drop sequence if exists public.order_seq;
@@ -58,7 +58,7 @@ begin
       'place_order','refund_sub_order','vendor_respond','assign_rider','vendor_mark_ready',
       'rider_claim','rider_set_status','rider_ping','rider_respond','rider_advance',
       'expire_overdue','order_detail','buyer_orders','vendor_orders','rider_current','rider_history',
-      'book_consultation','request_onsite','rollup_vendor_rating',
+      'book_consultation','request_onsite','rollup_vendor_rating','new_order_code',
       'is_admin','admin_vendors','admin_set_verification',
       'admin_riders','admin_save_rider','admin_set_rider_active',
       'rider_trip_size','dispatch_waiting','rider_after_job','vendor_pickup_riders','rider_profile',

@@ -5,7 +5,8 @@ import { supabase, friendlyError } from './supabase';
 //   Sign in:      email + password.
 //   First time,
 //   or forgot it: email → 6-digit code → choose a password (SetPassword below).
-// The dashboard never creates accounts (shouldCreateUser: false); admin access is checked after sign-in.
+// The code step also creates the account if there is none, so an admin added by email (public.admin_emails)
+// can sign up here. Anyone else just gets a plain account and the "Not an ops account" screen: access is is_admin().
 
 const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
@@ -19,8 +20,8 @@ export function passwordProblem(pw, again) {
 
 const authError = (e) => {
   const m = (e && e.message) || '';
-  if (/invalid login credentials/i.test(m)) return "That email and password don't match. If you haven't set a password yet, use “Forgot password, or never set one?” below.";
-  if (/signups not allowed|user not found/i.test(m)) return 'No Poultry360 account uses this email. Sign up in the app first.';
+  if (/invalid login credentials/i.test(m)) return "That email and password don't match. New here, or haven't set a password? Use “New here, or forgot your password?” below.";
+  if (/signups not allowed|user not found/i.test(m)) return 'No account uses this email yet. Use “New here, or forgot your password?” below.';
   if (/different from the old|same as the old|should be different/i.test(m)) return 'Choose a password you have not used on this account before.';
   if (/reauth|nonce|recently/i.test(m)) return 'For your security, sign out, then use “Forgot password” to set a new one with a code.';
   if (/weak|pwned|characters/i.test(m)) return 'That password is too easy to guess. Try a longer one.';
@@ -66,7 +67,7 @@ export default function SignIn({ onResetStarted }) {
     const clean = email.trim().toLowerCase();
     if (!validEmail(clean)) return setErr('Enter a valid email address.');
     setBusy(true); setErr(null);
-    const { error } = await supabase.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: false } });
+    const { error } = await supabase.auth.signInWithOtp({ email: clean, options: { shouldCreateUser: true } });
     setBusy(false);
     if (error) return setErr(authError(error));
     setEmail(clean); setCode(''); setStep('code');
@@ -95,10 +96,10 @@ export default function SignIn({ onResetStarted }) {
           <PasswordInput value={pw} onChange={(v) => { setPw(v); setErr(null); }} placeholder="Password" label="Password" />
           {err ? <p className="error">{err}</p> : null}
           <button className="btn primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-          <button type="button" className="link" onClick={() => go('email')}>Forgot password, or never set one?</button>
+          <button type="button" className="link" onClick={() => go('email')}>New here, or forgot your password?</button>
         </> : step === 'email' ? <>
-          <h1>Set your password</h1>
-          <p className="muted">We'll email you a 6-digit code, then you can choose a password.</p>
+          <h1>Get a code</h1>
+          <p className="muted">We'll email you a 6-digit code, then you choose a password.</p>
           <input className="input" type="email" autoFocus autoComplete="email" placeholder="you@example.com" value={email}
             onChange={(e) => { setEmail(e.target.value); setErr(null); }} aria-label="Email address" />
           {err ? <p className="error">{err}</p> : null}

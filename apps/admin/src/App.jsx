@@ -69,7 +69,7 @@ function NotAdmin({ email }) {
         <h1>Not an ops account</h1>
         <p className="muted"><strong>{email}</strong> is signed in, but it isn't on the admin list.</p>
         <p className="muted small">Ask the project owner to run this in the Supabase SQL editor:</p>
-        <pre className="code">{`insert into public.admins (user_id)\nselect id from auth.users where email = '${email}';`}</pre>
+        <pre className="code">{`insert into public.admin_emails (email)\nvalues ('${email}') on conflict do nothing;`}</pre>
         <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
       </div>
     </div>

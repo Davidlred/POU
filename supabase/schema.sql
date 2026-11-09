@@ -87,10 +87,23 @@ create table public.listings (
 );
 create index on public.listings (category) where status = 'live';
 
-create sequence public.order_seq start 2100;
+-- Order number people see: "P360-" + 6 random characters (e.g. P360-7KQ4XM), not a running count,
+-- so nobody can tell how many orders there are. No 0/O or 1/I/L, so it is easy to read out.
+create or replace function public.new_order_code() returns text language plpgsql volatile as $$
+declare
+  abc constant text := '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  c text;
+begin
+  loop
+    c := 'P360-';
+    for i in 1..6 loop c := c || substr(abc, 1 + floor(random() * length(abc))::int, 1); end loop;
+    exit when not exists (select 1 from public.orders where code = c);
+  end loop;
+  return c;
+end $$;
 create table public.orders (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null default ('P360-' || nextval('public.order_seq')),
+  code text unique not null default public.new_order_code(),
   buyer_id uuid not null references public.profiles,
   address_id uuid references public.addresses,
   items_total numeric(14,2),
@@ -899,9 +912,18 @@ create table public.admins (
 );
 alter table public.admins enable row level security;
 
+-- Admins by email: works before the account exists, so a new admin can sign up straight from the
+-- ops dashboard. Kept by wipe_data.sql. SQL editor only (RLS on, no policies), like admins.
+create table public.admin_emails (
+  email text primary key,
+  created_at timestamptz default now()
+);
+alter table public.admin_emails enable row level security;
+
 create or replace function public.is_admin() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from admins where user_id = auth.uid());
+  select exists (select 1 from admins where user_id = auth.uid())
+      or exists (select 1 from admin_emails e join auth.users u on lower(u.email) = lower(e.email) where u.id = auth.uid());
 $$;
 
 -- All farm applications with owner details, newest first

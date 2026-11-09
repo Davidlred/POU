@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Pressable, Image, ScrollView, RefreshControl, Linking } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../lib/map';
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
-  naira, rpc, publicUrl, uploadImage, friendlyError, timeAgo, clock, STATUS_LABEL, ORDER_STEPS, supabase } from '@p360/shared';
+  naira, rpc, publicUrl, uploadImage, friendlyError, timeAgo, clock, STATUS_LABEL, ORDER_STEPS, supabase, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
+import { getPhotos } from '../lib/photos';
 
 const ACTIVE = ['placed', 'confirmed', 'ready', 'picked_up', 'out_for_delivery'];
 const tone = (s) => (s === 'delivered' ? 'ok' : ['refunded', 'cancelled', 'flagged'].includes(s) ? 'err' : s === 'out_for_delivery' || s === 'picked_up' ? 'live' : 'warn');
@@ -148,7 +148,7 @@ export function IssueScreen({ navigation, route }) {
   const { c } = useTheme();
   const { uid } = useAuth();
   const [reason, setReason] = useState(null); const [details, setDetails] = useState(''); const [photo, setPhoto] = useState(null); const [busy, setBusy] = useState(false); const [done, setDone] = useState(false);
-  const pick = async () => { const r = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ['images'] }); if (!r.canceled) setPhoto(r.assets[0].uri); };
+  const pick = async (camera) => { const assets = await getPhotos(camera); if (assets) setPhoto(assets[0].uri); };
   const submit = async () => {
     setBusy(true);
     try {
@@ -168,7 +168,8 @@ export function IssueScreen({ navigation, route }) {
         </Pressable>
       ))}
       <Input value={details} onChangeText={setDetails} placeholder="Tell us what happened" multiline />
-      <Button variant="outline" icon="camera-plus-outline" title={photo ? 'Photo added' : 'Add a photo (optional)'} onPress={pick} />
+      {photo ? <Txt v="small">Photo added. Add another to replace it.</Txt> : <Txt v="strong" style={{ fontSize: 13 }}>Add a photo (optional)</Txt>}
+      <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
     </Screen>
   );
 }

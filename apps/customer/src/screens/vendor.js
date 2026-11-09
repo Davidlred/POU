@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, Image, ScrollView, RefreshControl, Alert, Linking } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, liveChannel, Screen, AppBar, BackButton, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Skeleton, Sheet, useTick,
   naira, countdown, rpc, publicUrl, uploadImage, friendlyError, timeAgo, STATUS_LABEL, supabase, Fab } from '@p360/shared';
@@ -8,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE } from '../lib/catalog';
 import { ExploreOptions } from './explore';
+import { getPhotos, asksSource, PhotoSourceSheet } from '../lib/photos';
 
 function RoleSwitch() {
   const { c, f } = useTheme();
@@ -178,10 +178,12 @@ export function ListingFormScreen({ navigation, route }) {
       setPhotos((l.photos || []).map((p) => ({ uri: publicUrl('listing-photos', p), path: p, state: 'done' })));
     });
   }, [id]);
-  const addPhoto = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 - photos.length });
-    if (r.canceled) return;
-    r.assets.forEach(async (a) => {
+  // Phone: the + tile asks camera or gallery. Website: the browser's own picker.
+  const [photoMenu, setPhotoMenu] = useState(false);
+  const addPhoto = async (camera) => {
+    const assets = await getPhotos(camera, 4 - photos.length);
+    if (!assets) return;
+    assets.forEach(async (a) => {
       setPhotos((p) => [...p, { uri: a.uri, state: 'uploading' }]);
       try { const path = await uploadImage('listing-photos', uid, a.uri); setPhotos((p) => p.map((x) => (x.uri === a.uri ? { ...x, path, state: 'done' } : x))); }
       catch { setPhotos((p) => p.map((x) => (x.uri === a.uri ? { ...x, state: 'failed' } : x))); }
@@ -231,7 +233,7 @@ export function ListingFormScreen({ navigation, route }) {
             {p.state !== 'done' ? <View style={{ position: 'absolute', inset: 0, top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><Icon name={p.state === 'failed' ? 'alert-circle' : 'cloud-upload-outline'} color={p.state === 'failed' ? c.err : c.ink} /></View> : null}
           </Pressable>
         ))}
-        {photos.length < 4 ? <Pressable onPress={addPhoto} style={{ width: 84, height: 84, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: errs.photos ? c.err : c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera-plus-outline" color={errs.photos ? c.err : c.acc} /></Pressable> : null}
+        {photos.length < 4 ? <Pressable accessibilityRole="button" accessibilityLabel="Add photo" onPress={() => (asksSource ? setPhotoMenu(true) : addPhoto(false))} style={{ width: 84, height: 84, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: errs.photos ? c.err : c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera-plus-outline" color={errs.photos ? c.err : c.acc} /></Pressable> : null}
       </ScrollView>
       {errs.photos ? <Txt v="small" color={c.err}>{errs.photos}</Txt> : null}
       <Txt v="strong" style={{ fontSize: 13 }}>{waste ? 'Type' : 'Category'}</Txt>
@@ -247,6 +249,7 @@ export function ListingFormScreen({ navigation, route }) {
       {waste ? <Input label="Moisture % (optional)" keyboardType="number-pad" value={f.moisture} onChangeText={(t) => set('moisture')(t.replace(/\D/g, '').slice(0, 2))} mono /> : null}
       <Input label="Description (optional)" value={f.description} onChangeText={set('description')} multiline placeholder={SUPPLY_CATEGORIES.includes(f.category) ? 'Pack size, storage or how to use' : "How it's raised, graded or packed"} />
       <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="truck-delivery-outline" size={16} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>{waste ? 'Orders over 1 tonne may need a scheduled truck pickup. We confirm the time with you.' : 'No delivery setup needed. Poultry360 riders collect from ' + (supplierOnly ? 'your store.' : 'your farm.')}</Txt></View>
+      <PhotoSourceSheet visible={photoMenu} onClose={() => setPhotoMenu(false)} onPick={addPhoto} />
     </Screen>
   );
 }

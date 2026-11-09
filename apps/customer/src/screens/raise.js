@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, Image, Alert } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Pill, Skeleton,
   naira, pct, isoDate, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase, Fab } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { OfferingCard } from './invest';
 import { ESTIMATE_COPY } from '../lib/roi';
+import { getPhotos, asksSource, PhotoSourceSheet } from '../lib/photos';
 
 const TONE = { draft: 'neutral', pending_review: 'warn', open: 'live', funded: 'ok', active: 'ok', matured: 'neutral', refunded: 'neutral', suspended: 'warn', rejected: 'err' };
 
@@ -14,12 +14,11 @@ const TONE = { draft: 'neutral', pending_review: 'warn', open: 'live', funded: '
 function PhotoStrip({ photos, setPhotos, bucket, max = 4, error }) {
   const { c } = useTheme();
   const { uid } = useAuth();
-  const add = async () => {
-    let r;
-    try { r = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: max - photos.length }); }
-    catch (e) { return Alert.alert("Couldn't open your photos", friendlyError(e)); }
-    if (r.canceled) return;
-    r.assets.forEach(async (a) => {
+  const [menu, setMenu] = useState(false);
+  const add = async (camera) => {
+    const assets = await getPhotos(camera, max - photos.length);
+    if (!assets) return;
+    assets.forEach(async (a) => {
       setPhotos((p) => [...p, { uri: a.uri, state: 'uploading' }]);
       try { const path = await uploadImage(bucket, uid, a.uri); setPhotos((p) => p.map((x) => (x.uri === a.uri ? { ...x, path, state: 'done' } : x))); }
       catch { setPhotos((p) => p.map((x) => (x.uri === a.uri ? { ...x, state: 'failed' } : x))); }
@@ -34,9 +33,10 @@ function PhotoStrip({ photos, setPhotos, bucket, max = 4, error }) {
             {p.state !== 'done' ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><Icon name={p.state === 'failed' ? 'alert-circle' : 'cloud-upload-outline'} color={p.state === 'failed' ? c.err : c.ink} /></View> : null}
           </Pressable>
         ))}
-        {photos.length < max ? <Pressable onPress={add} accessibilityLabel="Add photos" style={{ width: 84, height: 84, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: error ? c.err : c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera-plus-outline" color={error ? c.err : c.acc} /></Pressable> : null}
+        {photos.length < max ? <Pressable onPress={() => (asksSource ? setMenu(true) : add(false))} accessibilityLabel="Add photos" style={{ width: 84, height: 84, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: error ? c.err : c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera-plus-outline" color={error ? c.err : c.acc} /></Pressable> : null}
       </ScrollView>
       {error ? <Txt v="small" color={c.err}>{error}</Txt> : null}
+      <PhotoSourceSheet visible={menu} onClose={() => setMenu(false)} onPick={add} />
     </>
   );
 }

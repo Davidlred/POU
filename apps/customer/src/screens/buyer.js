@@ -5,7 +5,9 @@ import { usePage, useWide, useTheme, Screen, AppBar, BackButton, Txt, Button, Ca
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { useCart } from '../context/CartContext';
-import { CATEGORIES, catLabel, fetchListings, deliveryContext, deliveryEta, DELIVERY_FEE } from '../lib/catalog';
+import { CATEGORIES, catLabel, fetchListings, deliveryContext, deliveryEta } from '../lib/catalog';
+import { distanceKm, deliveryFee, kmLabel, byDistance } from '../lib/nearby';
+import { useSpot } from '../lib/spot';
 
 const img = (l) => publicUrl('listing-photos', l?.photos?.[0]);
 
@@ -14,10 +16,14 @@ export function useGridCols(desk = 4) { return useWide() ? desk : 2; }
 // Pads the last row with blanks so a lone card keeps its width instead of stretching across the row.
 export const padRows = (items, cols) => { const n = (cols - (items.length % cols)) % cols; return n ? [...items, ...Array.from({ length: n }, (_, i) => ({ id: '_pad' + i, _pad: true }))] : items; };
 
-export function ListingCard({ l, onPress, hideFarm, wide }) {
+// "2.9 km · ₦1,100 delivery" from where the buyer is to the seller (nothing if either isn't pinned).
+const nearText = (vendor, spot) => { const km = distanceKm(vendor, spot); return km == null ? null : kmLabel(km) + ' · ' + naira(deliveryFee(vendor, spot)) + ' delivery'; };
+
+export function ListingCard({ l, onPress, hideFarm, wide, spot }) {
   const { c } = useTheme();
   const site = useWide();
   if (l._pad) return <View style={{ flex: 1 }} />;
+  const near = nearText(l.vendor, spot);
   const uri = img(l);
   const ph = site ? 170 : 120;
   return (
@@ -27,20 +33,23 @@ export function ListingCard({ l, onPress, hideFarm, wide }) {
         <Txt v="bold" numberOfLines={2} style={{ fontSize: 14 }}>{l.title}</Txt>
         <Txt v="small" numberOfLines={1} style={{ fontSize: 12 }}>{hideFarm ? 'Verified farm near you' : l.vendor?.business_name}</Txt>
         <Txt v="mono">{naira(l.price)}<Txt v="small" style={{ fontSize: 12 }}> / {l.unit}</Txt></Txt>
+        {near ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon name="map-marker-outline" size={14} color={c.acc} /><Txt v="small" numberOfLines={1} style={{ fontSize: 12, flexShrink: 1 }}>{near}</Txt></View> : null}
       </View>
     </Pressable>
   );
 }
 
-export function ListRow({ l, onPress, hideFarm }) {
+export function ListRow({ l, onPress, hideFarm, spot }) {
   const { c } = useTheme();
   const uri = img(l);
+  const near = nearText(l.vendor, spot);
   return (
     <Card onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 }}>
       {uri ? <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: 14 }} /> : <View style={{ width: 64, height: 64, borderRadius: 14, backgroundColor: c.sf2 }} />}
       <View style={{ flex: 1, gap: 3 }}>
         <Txt v="bold" numberOfLines={1}>{l.title}</Txt>
         <Txt v="small" numberOfLines={1}>{hideFarm ? 'Verified farm · ' + catLabel(l.category) : l.vendor?.business_name}</Txt>
+        {near ? <Txt v="small" numberOfLines={1} style={{ fontSize: 12 }}>{near}</Txt> : null}
       </View>
       <Txt v="mono" style={{ fontSize: 14 }}>{naira(l.price)}</Txt>
     </Card>
@@ -78,6 +87,7 @@ export function HomeScreen({ navigation }) {
   const [live, setLive] = useState(null);
   const [fresh, setFresh] = useState(null);
   const [busy, setBusy] = useState(false);
+  const { spot } = useSpot();
   const load = useCallback(async () => {
     setBusy(true);
     try {
@@ -141,8 +151,8 @@ export function HomeScreen({ navigation }) {
         ) : null}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="h2">Fresh today</Txt><Txt v="bold" color={c.acc} onPress={() => navigation.navigate('Market')} style={{ fontSize: 13 }}>See all</Txt></View>
         {fresh === null ? <><Skeleton h={88} r={20} /><Skeleton h={88} r={20} /></>
-          : fresh.length && wide ? <ProductGrid items={fresh} cols={3} hideFarm onOpen={(l) => navigation.navigate('Product', { id: l.id, viaSearch: true })} />
-          : fresh.length ? fresh.map((l) => <ListRow key={l.id} l={l} hideFarm onPress={() => navigation.navigate('Product', { id: l.id, viaSearch: true })} />)
+          : fresh.length && wide ? <ProductGrid items={byDistance(fresh, spot)} cols={3} hideFarm spot={spot} onOpen={(l) => navigation.navigate('Product', { id: l.id, viaSearch: true })} />
+          : fresh.length ? byDistance(fresh, spot).map((l) => <ListRow key={l.id} l={l} hideFarm spot={spot} onPress={() => navigation.navigate('Product', { id: l.id, viaSearch: true })} />)
           : <Empty icon="egg-outline" title="Nothing listed yet" body="Products from verified farms will appear here as soon as they are published." />}
       </ScrollView>
     </Screen>
@@ -150,10 +160,10 @@ export function HomeScreen({ navigation }) {
 }
 
 // A grid of product cards inside a scrolling page (rows of equal-width cards).
-function ProductGrid({ items, cols, hideFarm, onOpen }) {
+function ProductGrid({ items, cols, hideFarm, spot, onOpen }) {
   const rows = []; const all = padRows(items, cols);
   for (let i = 0; i < all.length; i += cols) rows.push(all.slice(i, i + cols));
-  return <View style={{ gap: 12 }}>{rows.map((r, i) => <View key={i} style={{ flexDirection: 'row', gap: 12 }}>{r.map((l) => <ListingCard key={l.id} l={l} hideFarm={hideFarm} onPress={() => onOpen(l)} />)}</View>)}</View>;
+  return <View style={{ gap: 12 }}>{rows.map((r, i) => <View key={i} style={{ flexDirection: 'row', gap: 12 }}>{r.map((l) => <ListingCard key={l.id} l={l} hideFarm={hideFarm} spot={spot} onPress={() => onOpen(l)} />)}</View>)}</View>;
 }
 
 export function MarketScreen({ navigation }) {
@@ -161,7 +171,7 @@ export function MarketScreen({ navigation }) {
   const wide = useWide();
   const { session } = useAuth();
   const [farms, setFarms] = useState(null);
-  useEffect(() => { supabase.from('vendor_profiles').select('user_id,business_name,rating,rating_count,categories,created_at').eq('verification_status', 'approved').limit(12).then(({ data }) => setFarms(data || [])); }, []);
+  useEffect(() => { supabase.from('vendor_profiles').select('user_id,business_name,rating,rating_count,categories,created_at').eq('verification_status', 'approved').is('parent_id', null).limit(12).then(({ data }) => setFarms(data || [])); }, []);
   return (
     <Screen scroll>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Txt v="display" style={{ fontSize: 28 }}>Market</Txt><CartButton navigation={navigation} /></View>
@@ -196,15 +206,18 @@ export function ListingsScreen({ navigation, route }) {
   const { category, search, waste } = route.params || {};
   const [q, setQ] = useState('');
   const [items, setItems] = useState(null);
-  const [filters, setFilters] = useState({ min: '', max: '', sort: 'newest' });
+  const [filters, setFilters] = useState({ min: '', max: '', sort: 'nearest' });
   const [open, setOpen] = useState(false);
-  const active = (filters.min ? 1 : 0) + (filters.max ? 1 : 0) + (filters.sort !== 'newest' ? 1 : 0);
+  const { spot, locate } = useSpot();
+  const sort = filters.sort === 'nearest' && !spot ? 'newest' : filters.sort;   // nearest needs to know where they are
+  const active = (filters.min ? 1 : 0) + (filters.max ? 1 : 0) + (filters.sort !== 'nearest' ? 1 : 0);
   const load = useCallback(async () => {
     if (search && !q.trim()) return setItems([]);
     setItems(null);
-    try { setItems(await fetchListings({ category, q: q || undefined, waste: !!waste, minPrice: Number(filters.min) || undefined, maxPrice: Number(filters.max) || undefined, sort: filters.sort })); }
+    try { setItems(await fetchListings({ category, q: q || undefined, waste: !!waste, minPrice: Number(filters.min) || undefined, maxPrice: Number(filters.max) || undefined, sort: filters.sort === 'cheapest' ? 'cheapest' : 'newest', limit: 60 })); }
     catch (e) { setItems([]); }
   }, [category, q, filters, waste, search]);
+  const shown = items && sort === 'nearest' ? byDistance(items, spot) : items;
   useEffect(() => { const t = setTimeout(load, search ? 350 : 0); return () => clearTimeout(t); }, [load]);
   return (
     <Screen pad={false} column>
@@ -228,17 +241,21 @@ export function ListingsScreen({ navigation, route }) {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{CATEGORIES.slice(0, 4).map((k) => <Chip key={k.id} label={k.label} onPress={() => navigation.replace('Listings', { category: k.id })} />)}</View></View>
           : <View style={{ padding: 20 }}><Empty icon="basket-off-outline" title={'No ' + (catLabel(category) || 'products').toLowerCase() + ' listed yet'} body={active ? 'Nothing matches your filters. Clear them, or try another category.' : 'Farms add new products often. Check back soon, or try another category.'} />
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{CATEGORIES.filter((k) => k.id !== category).slice(0, 3).map((k) => <Chip key={k.id} label={k.label} onPress={() => navigation.replace('Listings', { category: k.id })} />)}</View></View>)
-        : <FlatList key={cols} data={padRows(items, cols)} keyExtractor={(x) => x.id} numColumns={cols} columnWrapperStyle={{ gap: 12 }} contentContainerStyle={{ padding: 20, gap: 12 }}
-            ListHeaderComponent={search ? <Txt v="small" style={{ marginBottom: 4 }}>{items.length} results</Txt> : null}
-            renderItem={({ item }) => <ListingCard l={item} hideFarm onPress={() => navigation.navigate('Product', { id: item.id, viaSearch: true })} />} />}
+        : <FlatList key={cols} data={padRows(shown, cols)} keyExtractor={(x) => x.id} numColumns={cols} columnWrapperStyle={{ gap: 12 }} contentContainerStyle={{ padding: 20, gap: 12 }}
+            ListHeaderComponent={search || spot === null ? <View style={{ gap: 8, marginBottom: 4 }}>
+              {search ? <Txt v="small">{items.length} results</Txt> : null}
+              {spot === null ? <Pressable onPress={locate} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 14, borderRadius: 14, backgroundColor: c.navact }}>
+                <Icon name="crosshairs-gps" size={18} color={c.navactink} /><Txt v="strong" color={c.navactink} style={{ fontSize: 13, flex: 1 }}>Use my location to see the nearest sellers</Txt></Pressable> : null}
+            </View> : null}
+            renderItem={({ item }) => <ListingCard l={item} hideFarm spot={spot} onPress={() => navigation.navigate('Product', { id: item.id, viaSearch: true })} />} />}
       <Sheet visible={open} onClose={() => setOpen(false)}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="h1">Filters</Txt><Txt v="bold" color={c.acc} onPress={() => setFilters({ min: '', max: '', sort: 'newest' })}>Clear all</Txt></View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="h1">Filters</Txt><Txt v="bold" color={c.acc} onPress={() => setFilters({ min: '', max: '', sort: 'nearest' })}>Clear all</Txt></View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}><Input label="Min price" prefix="₦" keyboardType="number-pad" value={filters.min} onChangeText={(t) => setFilters({ ...filters, min: t.replace(/\D/g, '') })} mono /></View>
           <View style={{ flex: 1 }}><Input label="Max price" prefix="₦" keyboardType="number-pad" value={filters.max} onChangeText={(t) => setFilters({ ...filters, max: t.replace(/\D/g, '') })} mono /></View>
         </View>
         <Txt v="strong" style={{ fontSize: 13 }}>Sort</Txt>
-        <View style={{ flexDirection: 'row', gap: 8 }}>{[['newest', 'Newest'], ['cheapest', 'Lowest price']].map(([v, l]) => <Chip key={v} label={l} selected={filters.sort === v} onPress={() => setFilters({ ...filters, sort: v })} />)}</View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>{[...(spot ? [['nearest', 'Nearest']] : []), ['newest', 'Newest'], ['cheapest', 'Lowest price']].map(([v, l]) => <Chip key={v} label={l} selected={sort === v} onPress={() => setFilters({ ...filters, sort: v })} />)}</View>
         <Button title="Show results" onPress={() => setOpen(false)} />
       </Sheet>
     </Screen>
@@ -254,15 +271,17 @@ export function ProductScreen({ navigation, route }) {
   const [ctx, setCtx] = useState(null);
   const [qty, setQty] = useState(1);
   const [page, setPage] = useState(0);
+  const { spot } = useSpot();
   const W = Math.min(Dimensions.get('window').width, 1080);   // the website centres the page at 1080 px
   useEffect(() => {
-    supabase.from('listings').select('*, vendor:vendor_profiles(user_id,business_name,rating,rating_count,location)').eq('id', id).maybeSingle().then(({ data }) => setL(data));
+    supabase.from('listings').select('*, vendor:vendor_profiles(user_id,business_name,rating,rating_count,location,lat,lng,parent_id)').eq('id', id).maybeSingle().then(({ data }) => setL(data));
     deliveryContext().then(setCtx);
   }, [id]);
   if (!l) return <Screen><AppBar /><Skeleton h={260} r={20} /></Screen>;
   const out = l.quantity <= 0 || l.status !== 'live';
   const outside = ctx?.primary && !ctx.covered;
   const photos = (l.photos || []).map((p) => publicUrl('listing-photos', p));
+  const km = distanceKm(l.vendor, spot);
   const buy = out
       ? <Button variant="dark" icon="bell-outline" title="Notify me when available" onPress={() => alert("We'll let you know when it's back.")} />
       : <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -282,7 +301,7 @@ export function ProductScreen({ navigation, route }) {
           <Txt v="h1" style={{ fontSize: wide ? 32 : 26, lineHeight: wide ? 38 : 30 }}>{l.title}</Txt>
           <Txt v="monoLg" style={{ fontSize: 26 }}>{naira(l.price)}<Txt v="small"> / {l.unit}</Txt></Txt>
           {outside ? <Banner tone="warn" icon="map-marker-off-outline" title={"We can't deliver to " + ctx.primary.area + ' yet'} body="Switch to an address in our coverage area to add this to your cart." />
-            : <Card style={{ flexDirection: 'row', gap: 10 }}><Icon name="truck-delivery-outline" color={c.acc} /><View style={{ flex: 1 }}><Txt v="strong" style={{ fontSize: 14 }}>Delivered by Poultry360 {deliveryEta()}</Txt><Txt v="small">Delivery {naira(DELIVERY_FEE)} per farm{ctx?.primary ? ' to ' + ctx.primary.area : ''}</Txt></View></Card>}
+            : <Card style={{ flexDirection: 'row', gap: 10 }}><Icon name="truck-delivery-outline" color={c.acc} /><View style={{ flex: 1 }}><Txt v="strong" style={{ fontSize: 14 }}>Delivered by Poultry360 {deliveryEta()}</Txt><Txt v="small">{km != null ? 'Delivery ' + naira(deliveryFee(l.vendor, spot)) + ' · ' + kmLabel(km) + ' away' : 'Delivery ' + naira(deliveryFee(null, null)) + (ctx?.primary ? ' to ' + ctx.primary.area : '')}</Txt></View></Card>}
           {!out ? <Pill tone="ok" label={'In stock · ' + l.quantity + ' ' + l.unit + (l.quantity === 1 ? '' : 's')} /> : null}
           {l.attributes?.moisture ? <Txt v="small">Moisture content: {l.attributes.moisture}%</Txt> : null}
           {l.description ? <Txt v="body" color={c.mute}>{l.description}</Txt> : null}
@@ -333,8 +352,12 @@ export function StoreScreen({ navigation, route }) {
   const cols = useGridCols(4);
   const [v, setV] = useState(null);
   const [items, setItems] = useState(null);
+  const [parent, setParent] = useState(null);
   useEffect(() => {
-    supabase.from('vendor_profiles').select('*').eq('user_id', vendorId).maybeSingle().then(({ data }) => setV(data));
+    supabase.from('vendor_profiles').select('*').eq('user_id', vendorId).maybeSingle().then(({ data }) => {
+      setV(data);
+      if (data?.parent_id) supabase.from('vendor_profiles').select('business_name').eq('user_id', data.parent_id).maybeSingle().then((r) => setParent(r.data?.business_name || null));
+    });
     fetchListings({ vendorId, limit: 60 }).then(setItems).catch(() => setItems([]));
   }, [vendorId]);
   return (
@@ -344,7 +367,7 @@ export function StoreScreen({ navigation, route }) {
         ListHeaderComponent={v ? <View style={{ gap: 12, marginBottom: 8 }}>
           <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: c.hc, alignItems: 'center', justifyContent: 'center' }}><Txt v="h1" color={c.yolk}>{v.business_name.slice(0, 2).toUpperCase()}</Txt></View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Txt v="h1" style={{ flexShrink: 1 }}>{v.business_name}</Txt>{v.verification_status === 'approved' ? <Icon name="check-decagram" color={c.acc} /> : null}</View>
-          <Txt v="small">{v.location}</Txt>
+          <Txt v="small">{v.parent_id ? (parent ? 'Agent for ' + parent : 'Agent') : v.location}</Txt>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {v.rating_count ? <Card style={{ flex: 1, gap: 2 }}><Txt v="mono" style={{ fontSize: 20 }}>{Number(v.rating).toFixed(1)}</Txt><Txt v="small">Product quality · {v.rating_count}</Txt></Card>
               : <Card style={{ flex: 1 }}><Pill tone="warn" label="New seller" /><Txt v="small">No ratings yet</Txt></Card>}

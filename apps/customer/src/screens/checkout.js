@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, Image, ActivityIndicator, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, naira, rpc, publicUrl, friendlyError, supabase, getPendingAgentCode, clearPendingAgentCode } from '@p360/shared';
+import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, naira, rpc, publicUrl, friendlyError, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { DELIVERY_FEE } from '../lib/catalog';
+import { deliveryFee } from '../lib/nearby';
 import { TEST_CARDS, chargeCard } from '../lib/payments';
 
 function groupByVendor(items) {
@@ -137,13 +137,19 @@ export function CheckoutScreen({ navigation, route }) {
   const address = (addrs || []).find((a) => a.id === sel);
   const covered = address && areas.includes(address.area);
   const itemsTotal = live.reduce((s, x) => s + x.price * x.qty, 0);
-  const fee = groups.length * DELIVERY_FEE;
+  // Delivery is priced per seller by distance (the server works out the same amounts in place_order).
+  const [spots, setSpots] = useState({});
+  const sellerIds = groups.map((g) => g.id).join(',');
+  useEffect(() => {
+    if (!sellerIds) return;
+    supabase.from('vendor_profiles').select('user_id,lat,lng').in('user_id', sellerIds.split(',')).then(({ data }) => setSpots(Object.fromEntries((data || []).map((v) => [v.user_id, v]))));
+  }, [sellerIds]);
+  const feeOf = (g) => deliveryFee(spots[g.id], address);
+  const fee = groups.reduce((t, g) => t + feeOf(g), 0);
   const total = itemsTotal + fee;
   const balance = Number(wallet?.balance || 0);
   // Pay later: the goods go on credit with the farm; the delivery fee is paid now so the rider is paid.
   const onCredit = method === 'credit' && !!credit;
-  const [agentCode, setAgentCode] = useState('');
-  useEffect(() => { getPendingAgentCode().then((v) => v && setAgentCode((x) => x || v)); }, []);   // opened an agent's link
   const creditOk = !!credit && itemsTotal <= Number(credit.available) && balance >= fee;
   const payNow = onCredit ? fee : total;
 
@@ -158,8 +164,6 @@ export function CheckoutScreen({ navigation, route }) {
     try {
       const res = await rpc('place_order', { p_address_id: sel, p_items: live.map((x) => ({ listing_id: x.listing_id, qty: x.qty, via_search: !!x.via_search })), p_method: onCredit ? 'credit' : method === 'wallet' ? 'wallet' : 'card', p_ref: ref });
       clear(); refreshWallet();
-      if (agentCode.trim()) clearPendingAgentCode();
-      if (agentCode.trim()) rpc('set_order_agent', { p_order: res.order_id, p_code: agentCode.trim() }).catch((e) => alert('Your order is placed, but the agent code was not added: ' + friendlyError(e)));
       navigation.reset({ index: 1, routes: [{ name: 'Tabs' }, { name: 'OrderSuccess', params: { orderId: res.order_id } }] });
     } catch (e) {
       if (String(e.message).startsWith('ITEM_UNAVAILABLE')) { await validate(); setState({ phase: 'idle' }); alert('Some items sold out while you were checking out. You have not been charged.'); return navigation.navigate('Cart'); }
@@ -219,6 +223,7 @@ export function CheckoutScreen({ navigation, route }) {
           <View key={g.id} style={{ gap: 8, paddingTop: i ? 10 : 0, borderTopWidth: i ? 1 : 0, borderColor: c.line }}>
             <Txt v="label">Order {i + 1} · {g.via ? 'Verified farm near you' : g.vendor}</Txt>
             {g.items.map((x) => <View key={x.listing_id} style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body" style={{ flex: 1 }}>{x.title} × {x.qty}</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(x.price * x.qty)}</Txt></View>)}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="small" style={{ flex: 1 }}>Delivery</Txt><Txt v="mono" color={c.mute} style={{ fontSize: 13 }}>{naira(feeOf(g))}</Txt></View>
           </View>
         ))}
       </Card>
@@ -230,7 +235,6 @@ export function CheckoutScreen({ navigation, route }) {
       </Card>
       {onCredit ? <Banner tone="info" icon="credit-card-clock-outline" title={naira(itemsTotal) + ' goes on credit'}
         body={'You pay the ' + naira(fee) + ' delivery fee from your wallet now. The ' + naira(itemsTotal) + ' for the goods is due within 14 days: pay it in the app under Pay later, or pay the farm directly.'} /> : null}
-      <Input label="Agent code (optional)" value={agentCode} onChangeText={(t) => setAgentCode(t.toUpperCase())} placeholder="AG7KQ2M" autoCapitalize="characters" autoCorrect={false} mono />
       <Txt v="label">Pay with</Txt>
       {credit ? (
         <Group>

@@ -24,9 +24,8 @@ export const SUPPLY_UNITS = { feed: ['bag', 'kg', 'tonne'], drugs: ['bottle', 'd
 export const unitsFor = (category) => SUPPLY_UNITS[category] || UNITS.filter((u) => u !== 'tonne');
 export const TITLE_EXAMPLE = { eggs: 'Jumbo eggs, crate of 30', chicken: 'Dressed broiler, about 2 kg', turkey: 'Live turkey, about 8 kg', live_birds: 'Point-of-lay pullets, 16 weeks',
   feed: 'Layer mash, 25 kg bag', drugs: 'Newcastle vaccine (Lasota), 1,000 doses', equipment: 'Plastic drinker, 5 litres' };
-export const DELIVERY_FEE = 1250;
-
-export const LISTING_SELECT = '*, vendor:vendor_profiles(user_id, business_name, rating, rating_count, location, created_at)';
+// Seller location comes with every listing so the market can show distance and delivery fee (lib/nearby.js).
+export const LISTING_SELECT = '*, vendor:vendor_profiles(user_id, business_name, rating, rating_count, location, lat, lng, parent_id, created_at)';
 
 export async function fetchListings({ category, q, vendorId, waste = false, maxPrice, minPrice, sort = 'newest', limit = 40 } = {}) {
   let r = supabase.from('listings').select(LISTING_SELECT).eq('status', 'live').gt('quantity', 0).eq('is_waste', waste);

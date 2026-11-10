@@ -3,6 +3,7 @@ import { View, Pressable, Image, ScrollView, RefreshControl, Alert, Linking } fr
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, liveChannel, Screen, AppBar, BackButton, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Skeleton, Sheet, useTick,
   naira, countdown, rpc, publicUrl, uploadImage, friendlyError, timeAgo, STATUS_LABEL, supabase, Fab } from '@p360/shared';
+import { getHere } from '../lib/spot';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE } from '../lib/catalog';
@@ -32,8 +33,15 @@ function VerifyBanner({ navigation }) {
 export function VendorHomeScreen({ navigation }) {
   const page = usePage();
   const { c } = useTheme();
-  const { profile, vendor, wallet, refreshWallet, supplierOnly, storeLocked } = useAuth();
+  const { profile, vendor, wallet, refreshWallet, supplierOnly, storeLocked, refresh } = useAuth();
   const approved = vendor?.verification_status === 'approved';
+  // Sellers without a pinned location show after the ones with one, at a flat delivery fee.
+  const [pinning, setPinning] = useState(false);
+  const pin = async () => {
+    setPinning(true);
+    try { const h = await getHere(); if (h) { await rpc('set_shop_location', { p_lat: h.lat, p_lng: h.lng }); await refresh(); } }
+    catch (e) { Alert.alert("Couldn't save it", friendlyError(e)); } finally { setPinning(false); }
+  };
   const [orders, setOrders] = useState(null);
   const [busy, setBusy] = useState(false);
   useTick(1000);
@@ -51,6 +59,15 @@ export function VendorHomeScreen({ navigation }) {
           <RoleSwitch />
         </View>
         <VerifyBanner navigation={navigation} />
+        {vendor && vendor.lat == null ? (
+          <Card style={{ gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="map-marker-radius-outline" color={c.navactink} /></View>
+              <View style={{ flex: 1 }}><Txt v="bold">{'Pin your ' + (supplierOnly ? 'store' : 'farm') + "'s location"}</Txt><Txt v="small">Nearby buyers see you first and pay less for delivery. Do it while you're there.</Txt></View>
+            </View>
+            <Button small icon="crosshairs-gps" title="Pin it now" loading={pinning} onPress={pin} />
+          </Card>
+        ) : null}
         {!vendor ? <Card><Txt v="bold">{supplierOnly ? 'Finish setting up your store' : 'Finish setting up your farm'}</Txt><Button small title="Add business details" onPress={() => navigation.navigate('Business')} /></Card> : null}
         {/* a store in review only sees its status, its products (drafts) and what else it can do; the rest opens on approval */}
         {storeLocked ? <>
@@ -245,7 +262,7 @@ export function ListingFormScreen({ navigation, route }) {
       </View>
       <Txt v="strong" style={{ fontSize: 13 }}>Sold per</Txt>
       <ChipRow options={waste ? ['bag', 'tonne'] : [...new Set([...unitsFor(f.category), f.unit])]} value={f.unit} onChange={set('unit')} />
-      <Input label="Agent commission (optional)" suffix="%" keyboardType="decimal-pad" value={f.agent_pct} onChangeText={(t) => set('agent_pct')(t.replace(/[^\d.]/g, ''))} mono error={errs.agent_pct} hint="What your agents earn when they sell this." />
+      <Input label="Agent rebate (optional)" suffix="%" keyboardType="decimal-pad" value={f.agent_pct} onChangeText={(t) => set('agent_pct')(t.replace(/[^\d.]/g, ''))} mono error={errs.agent_pct} hint="Agents earn this on what they buy from you, every 3 months." />
       {waste ? <Input label="Moisture % (optional)" keyboardType="number-pad" value={f.moisture} onChangeText={(t) => set('moisture')(t.replace(/\D/g, '').slice(0, 2))} mono /> : null}
       <Input label="Description (optional)" value={f.description} onChangeText={set('description')} multiline placeholder={SUPPLY_CATEGORIES.includes(f.category) ? 'Pack size, storage or how to use' : "How it's raised, graded or packed"} />
       <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="truck-delivery-outline" size={16} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>{waste ? 'Orders over 1 tonne may need a scheduled truck pickup. We confirm the time with you.' : 'No delivery setup needed. Poultry360 riders collect from ' + (supplierOnly ? 'your store.' : 'your farm.')}</Txt></View>
@@ -254,8 +271,9 @@ export function ListingFormScreen({ navigation, route }) {
   );
 }
 
-export function VendorOrdersScreen({ navigation }) {
+export function VendorOrdersScreen({ navigation, route }) {
   const { c } = useTheme();
+  const page = route?.name === 'ShopOrders';   // an agent's orders open as a page from their desk, not a tab
   const [tab, setTab] = useState('new');
   const [rows, setRows] = useState(null);
   useTick(1000);
@@ -265,7 +283,7 @@ export function VendorOrdersScreen({ navigation }) {
   const list = g[tab];
   return (
     <Screen scroll>
-      <Txt v="display" style={{ fontSize: 28 }}>Orders</Txt>
+      {page ? <AppBar title="Orders" /> : <Txt v="display" style={{ fontSize: 28 }}>Orders</Txt>}
       <Segmented options={[{ value: 'new', label: 'New · ' + g.new.length }, { value: 'active', label: 'Active · ' + g.active.length }, { value: 'past', label: 'Past' }]} value={tab} onChange={setTab} />
       {rows === null ? <Skeleton h={100} r={20} /> : !list.length ? <Empty icon="receipt-text-outline" title={tab === 'new' ? 'No new orders' : 'Nothing here yet'} body="New orders appear here with a 24-hour timer. We'll also notify you." />
         : list.map((o) => {

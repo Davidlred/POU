@@ -37,6 +37,7 @@ drop table if exists
   public.order_items, public.sub_orders, public.orders, public.listings, public.addresses,
   public.coverage_areas, public.withdrawal_codes, public.transactions, public.wallets,
   public.credit_entries, public.credit_customers,
+  public.agent_stock_moves, public.agent_claims, public.agent_payouts, public.agent_sales, public.store_agents,
   public.roi_calculations, public.investments, public.pool_farms, public.investment_pools, public.investment_offerings, public.kyc_records,
   public.vendor_profiles, public.profiles, public.admins, public.admin_emails
 cascade;
@@ -69,7 +70,12 @@ begin
       'set_buyer_type','submit_vet_application','vet_update_profile','vet_self','vet_add_slot','vet_remove_slot','vet_respond_onsite',
       'vet_complete','vet_desk','admin_vets','admin_set_vet','credit_threshold','credit_outstanding','farm_book','farm_book_allow_buyer',
       'farm_book_update_customer','farm_book_log_credit','farm_book_settle','farm_book_cancel','credit_available','my_credit','credit_pay',
-      'my_payout_account','vet_generate_slots','vet_set_availability','vet_refresh_slots','vet_set_weekly')
+      'my_payout_account','vet_generate_slots','vet_set_availability','vet_refresh_slots','vet_set_weekly',
+      'p360_code','store_invite_code','store_new_invite_code','store_remove_agent','store_record_payout','agent_cancel_sale',
+      'store_agents_dashboard','agent_join','agent_leave','agent_log_sale','agent_home','store_by_invite','agent_shop',
+      'guard_agent_listing','sync_agent_copies','set_shop_location','distance_km','delivery_fee_for','quarter_start','agent_rebate',
+      'agent_stock_lines','agent_stock_in','agent_stock_deliver','store_give_stock','agent_request_stock','agent_stock_refund',
+      'store_confirm_stock','agent_cancel_stock')
   loop
     execute 'drop function if exists ' || r.sig || ' cascade';
   end loop;

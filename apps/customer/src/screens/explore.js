@@ -19,9 +19,9 @@ export function ExploreOptions({ navigation }) {
   };
   const items = [
     ['Shop the marketplace', 'Buy eggs, birds and feed from verified farms', 'basket-outline', 't1', shop, true],
-    ['Add a farm', 'Sell birds and eggs, and keep flock records in Farm Hub', 'barn', 't4', () => navigation.navigate('Business', { roles: roles.includes('supplier') ? ['vendor', 'supplier'] : ['vendor'] }), !roles.includes('vendor')],
+    ['Add a farm', 'Sell birds and eggs, and keep flock records in Farm Hub', 'barn', 't4', () => navigation.navigate('Business', { roles: roles.includes('supplier') ? ['vendor', 'supplier'] : ['vendor'] }), !roles.includes('vendor') && !roles.includes('agent')],   // an agent account can't also be a farm
     ['Work as a vet', 'Offer consults and farm visits', 'stethoscope', 't2', () => navigation.navigate('VetApply'), !roles.includes('vet')],
-    ['Sell for a store', "Join a store as its agent and earn commission", 'account-tie-outline', 't3', () => navigation.navigate('AgentJoin'), !roles.includes('agent')],
+    ['Sell for a store', "Open your own shop with a store's products", 'account-tie-outline', 't3', () => navigation.navigate('AgentJoin'), !roles.includes('agent') && !(roles.includes('vendor') || roles.includes('supplier'))],
     ...(INVEST_ENABLED ? [['Invest in farms', 'Fund verified farms and track returns', 'chart-line', 't1', () => navigation.navigate('InvestHome'), true]] : []),
   ].filter((x) => x[5]);
   return (

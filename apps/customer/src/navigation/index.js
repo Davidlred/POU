@@ -7,7 +7,7 @@ const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLa
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite, pendingInviteNow } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -24,7 +24,7 @@ import { RaiseHomeScreen, BadgeScreen, OfferingFormScreen } from '../screens/rai
 import { INVEST_ENABLED } from '../lib/roi';
 import { FarmBookScreen, CreditLogScreen, CreditEntryScreen, CreditCustomerScreen, CreditAllowScreen, MyCreditScreen } from '../screens/farmbook';
 import { VetApplyScreen, VetDeskScreen, VetBookingScreen } from '../screens/vetdesk';
-import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, StoreAgentsScreen, StoreAgentScreen, JoinStoreScreen } from '../screens/agents';
+import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, AgentBuyScreen, StoreAgentsScreen, StoreAgentScreen, StoreGiveStockScreen, JoinStoreScreen, AgentShopScreen } from '../screens/agents';
 import { LandingScreen, WebNav } from '../screens/landing';
 import { ExploreScreen } from '../screens/explore';
 import { InventoryScreen, InventoryFormScreen } from '../screens/inventory';
@@ -105,15 +105,15 @@ const APP_SCREENS = ['Role', 'Business', 'VetApply', 'AgentJoin', 'Listings', 'P
   'TopUp', 'Withdraw', 'Bank', 'ListingForm', 'VendorOrder', 'FlockForm', 'FlockDetail', 'FlockHistory', 'Log', 'Vaccinations', 'FarmDashboard', 'VetHome', 'VetList',
   'VetProfile', 'Consultation', 'Symptom', 'HealthRecords', 'Onsite', 'WasteHome', 'Profile', 'Pending', 'TxDetail', 'FarmBook', 'Inventory', 'CareGuide',
   'InventoryForm', 'CreditLog', 'CreditEntry', 'CreditCustomer', 'CreditAllow', 'MyCredit', 'VetBooking', 'AgentSale', 'StoreAgents', 'Explore', 'JoinStore',
-  'StoreAgent', 'InvestHome', 'Kyc', 'Offering', 'Pools', 'Pool', 'RoiCalc', 'InvestAmount', 'InvestSuccess', 'Portfolio', 'InvestmentDetail', 'RaiseHome',
+  'StoreAgent', 'AgentBuy', 'StoreGiveStock', 'ShopOrders', 'InvestHome', 'Kyc', 'Offering', 'Pools', 'Pool', 'RoiCalc', 'InvestAmount', 'InvestSuccess', 'Portfolio', 'InvestmentDetail', 'RaiseHome',
   'Badge', 'OfferingForm'];
-const RELOADABLE = new Set(['Product', 'Store', 'Listings', 'Tracking', 'VendorOrder', 'FlockDetail']);
+const RELOADABLE = new Set(['Product', 'Store', 'Listings', 'Tracking', 'VendorOrder', 'FlockDetail', 'AgentShop']);
 function webLinking(signedIn) {
   if (Platform.OS !== 'web') return undefined;
   const screens = (names) => Object.fromEntries(names.map((n) => [n, kebab(n)]));
   const config = signedIn
-    ? { initialRouteName: 'Tabs', screens: { Tabs: { path: '', screens: TAB_PATHS }, ...screens(APP_SCREENS) } }
-    : { initialRouteName: 'Landing', screens: { Landing: '', ...screens(['Market', 'Listings', 'Product', 'Store', 'Cart', 'JoinStore', 'SignIn', 'Email', 'Otp']) } };
+    ? { initialRouteName: 'Tabs', screens: { Tabs: { path: '', screens: TAB_PATHS }, ...screens(APP_SCREENS), AgentShop: 'a/:code' } }
+    : { initialRouteName: 'Landing', screens: { Landing: '', ...screens(['Market', 'Listings', 'Product', 'Store', 'Cart', 'JoinStore', 'SignIn', 'Email', 'Otp']), AgentShop: 'a/:code' } };
   return {
     prefixes: [],
     config,
@@ -217,7 +217,7 @@ function WebAuth({ navigation, children, shop }) {
   return <View style={{ flex: 1 }}><WebNav navigation={navigation} compact={!shop} /><View style={{ flex: 1 }}>{children}</View></View>;
 }
 // Website visitors can browse the market before they have an account; checking out asks them to sign in.
-const PUBLIC_SHOP = [['Market', MarketScreen], ['Listings', ListingsScreen], ['Product', ProductScreen], ['Store', StoreScreen], ['Cart', CartScreen]];
+const PUBLIC_SHOP = [['Market', MarketScreen], ['Listings', ListingsScreen], ['Product', ProductScreen], ['Store', StoreScreen], ['Cart', CartScreen], ['AgentShop', AgentShopScreen]];
 
 function AuthFlow() {
   return (
@@ -273,7 +273,8 @@ export default function Navigation() {
       {sidebar ? <Sidebar current={currentSection(navState)} /> : null}
       <View style={{ flex: 1 }}>
       {!session ? <AuthFlow /> : (
-        <Stack.Navigator key={needsRole ? 'onboarding' : 'app'} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+        <Stack.Navigator key={needsRole ? 'onboarding' : 'app'} screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
+          initialRouteName={needsRole ? (pendingInviteNow() ? 'AgentJoin' : 'Role') : 'Tabs'}>
           {needsRole ? (<>
             <Stack.Screen name="Role" component={RoleScreen} />
             <Stack.Screen name="Business" component={BusinessScreen} />
@@ -327,10 +328,14 @@ export default function Navigation() {
             <Stack.Screen name="VetBooking" component={VetBookingScreen} />
             <Stack.Screen name="AgentJoin" component={AgentJoinScreen} />
             <Stack.Screen name="AgentSale" component={AgentSaleScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="AgentBuy" component={AgentBuyScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="StoreGiveStock" component={StoreGiveStockScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="ShopOrders" component={VendorOrdersScreen} />
             <Stack.Screen name="StoreAgents" component={StoreAgentsScreen} />
             <Stack.Screen name="Explore" component={ExploreScreen} />
             <Stack.Screen name="JoinStore" component={JoinStoreScreen} />
             <Stack.Screen name="StoreAgent" component={StoreAgentScreen} />
+            <Stack.Screen name="AgentShop" component={AgentShopScreen} />
             {INVEST_ENABLED ? (<>
               <Stack.Screen name="InvestHome" component={InvestHomeScreen} />
               <Stack.Screen name="Kyc" component={KycScreen} />

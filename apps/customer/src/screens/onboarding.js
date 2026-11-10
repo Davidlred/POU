@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Pressable, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow, PhotoButtons } from '@p360/shared';
+import { getHere } from '../lib/spot';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { ExploreOptions } from './explore';
@@ -20,7 +21,7 @@ const ROLES = [
   { id: 'vendor', title: 'Sell as a farm', body: 'List birds and eggs, and manage your flock', icon: 'barn', tone: 't2' },
   { id: 'supplier', title: 'Supply farms', body: 'Sell feed, medicine or poultry equipment to farmers', icon: 'package-variant', tone: 't4' },
   { id: 'vet', title: 'Work as a vet', body: 'Offer video consults and farm visits to poultry farmers', icon: 'stethoscope', tone: 't2' },
-  { id: 'agent', title: 'Sell for a store', body: "Join a store as its agent with the store's code and earn commission", icon: 'account-tie-outline', tone: 't3' },
+  { id: 'agent', title: 'Sell for a store', body: "Open your own shop with a store's products, using the store's code", icon: 'account-tie-outline', tone: 't3' },
   ...(INVEST_ENABLED ? [{ id: 'investor', title: 'Invest in farms', body: 'Fund verified farms and track your returns', icon: 'chart-line', tone: 't3' }] : []),
 ];
 const PLAIN = ['buyer', 'investor'];   // roles that need no business details
@@ -75,7 +76,8 @@ export function RoleScreen({ navigation, route }) {
       <Txt v="display">How will you use Poultry360?</Txt>
       <Txt v="small" style={{ fontSize: 15 }}>{adding ? 'Choose what to add.' : 'Pick one or more. Just buying is fine: you can add other roles later from your profile.'}</Txt>
       {!adding ? <Input label="Your name" value={name} onChangeText={setName} placeholder="Adaeze Okafor" autoCapitalize="words" error={tried && needsName ? 'Enter your name' : null} /> : null}
-      {ROLES.filter((r) => !owned.includes(r.id)).map((r) => {
+      {/* an agent's account can't also be a farm or store (and the other way round) */}
+      {ROLES.filter((r) => !owned.includes(r.id) && !(owned.includes('agent') && SELLERS.includes(r.id)) && !(r.id === 'agent' && owned.some((x) => SELLERS.includes(x)))).map((r) => {
         const on = sel.includes(r.id);
         return (
           <Pressable key={r.id} onPress={() => toggle(r.id)} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
@@ -111,6 +113,9 @@ export function BusinessScreen({ navigation, route }) {
   const [cats, setCats] = useState((vendor?.categories || []).filter((x) => CATS.includes(x)));
   const [supplies, setSupplies] = useState((vendor?.categories || []).filter((x) => supplyLabels.includes(x)));
   const [loc, setLoc] = useState(vendor?.location || '');
+  const [geo, setGeo] = useState(vendor?.lat != null ? { lat: vendor.lat, lng: vendor.lng } : null);   // nearby buyers see pinned sellers first
+  const [pinning, setPinning] = useState(false);
+  const pin = async () => { setPinning(true); try { const h = await getHere(); if (h) setGeo(h); } finally { setPinning(false); } };
   const [photo, setPhoto] = useState(null);
   const [upload, setUpload] = useState({ state: vendor?.id_doc_path ? 'done' : 'empty', path: vendor?.id_doc_path });
   const [errs, setErrs] = useState({});
@@ -139,7 +144,7 @@ export function BusinessScreen({ navigation, route }) {
     setBusy(true);
     try {
       const supType = isSupplier ? SUPPLIES.find((x) => x.label === supplies[0])?.type || null : null;
-      const app = { p_business_name: biz.trim(), p_categories: [...(isFarm ? cats : []), ...(isSupplier ? supplies : [])], p_location: loc.trim(), p_id_doc_path: upload.path, p_supplier_type: supType };
+      const app = { p_business_name: biz.trim(), p_categories: [...(isFarm ? cats : []), ...(isSupplier ? supplies : [])], p_location: loc.trim(), p_id_doc_path: upload.path, p_supplier_type: supType, p_lat: geo?.lat ?? null, p_lng: geo?.lng ?? null };
       // p_is_farm needs migration 016; a database without it still accepts the older call.
       await rpc('submit_vendor_application', { ...app, p_is_farm: isFarm }).catch((e) => (/p_is_farm|PGRST202|function/i.test(String(e?.message || e?.code)) ? rpc('submit_vendor_application', app) : Promise.reject(e)));
       // The server adds the farm and/or supplier role and makes the right one active.
@@ -159,6 +164,8 @@ export function BusinessScreen({ navigation, route }) {
       ) : null}
       {isFarm ? <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>{isSupplier ? 'What does your farm sell?' : 'What do you sell?'}</Txt><ChipRow options={CATS} value={cats} onChange={setCats} multi />{errs.cats ? <Txt v="small" color={c.err}>{errs.cats}</Txt> : null}</View> : null}
       <Input label={isFarm ? 'Farm location' : 'Business location'} value={loc} onChangeText={setLoc} placeholder={isFarm ? 'Igwuruta, Rivers State' : 'Trans-Amadi, Port Harcourt'} error={errs.loc} />
+      <Button small variant="outline" icon={geo ? 'check' : 'crosshairs-gps'} title={geo ? 'Location pinned' : 'Pin my location'} loading={pinning} onPress={pin} />
+      <Txt v="small">Pin it while you're there: nearby buyers see you first and pay less for delivery.</Txt>
       <Txt v="strong" style={{ fontSize: 13 }}>Government-issued ID</Txt>
       {upload.state === 'failed' ? (
         <Card tone="err">

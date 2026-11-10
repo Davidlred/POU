@@ -48,7 +48,7 @@ const FAQ = [
   ['How are farms verified?', 'Every farm and supplier sends ID and business details. Our team checks them before they can sell.'],
   ['Who delivers my order?', 'Poultry360 riders. They pick up from the farm, check the goods, and bring them to you.'],
   ['Can I sell on the website?', 'Yes. Farms and stores can list products, manage stock, take orders and track their agents from any browser.'],
-  ['How do store agents work?', 'A store shares its code. Agents join in the Poultry360 app, log sales and earn the commission the store sets on each product.'],
+  ['How do store agents work?', 'A store shares its code. Each agent opens their own shop, buys stock from the store and earns the rebate the store sets on each product, every 3 months.'],
 ];
 
 export function LandingScreen({ navigation }) {
@@ -188,7 +188,7 @@ export function LandingScreen({ navigation }) {
             <View style={{ flex: wide ? 1 : undefined, gap: 16 }}>
               <Txt v="label" color={c.acc}>Stores & agents</Txt>
               <Txt v="display" style={h2}>Your agents sell. You see who sells most.</Txt>
-              <Txt v="body" color={c.mute} style={{ fontSize: 17, lineHeight: 26 }}>Share one code with your agents. They log sales in the Poultry360 app, earn the commission you set on each product, and you track every sale and payout from the web.</Txt>
+              <Txt v="body" color={c.mute} style={{ fontSize: 17, lineHeight: 26 }}>Share one code with your agents. Each runs their own shop with your products, buys stock from you and earns the rebate you set, so buyers near them get faster, cheaper delivery.</Txt>
               <View style={{ alignSelf: 'flex-start' }}><Button title="Set up your store" onPress={get} style={{ paddingHorizontal: 28 }} /></View>
             </View>
             <View style={[card, { flex: wide ? 1 : undefined, width: wide ? undefined : '100%', padding: 26, gap: 4 }]}>

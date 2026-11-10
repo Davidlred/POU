@@ -1,6 +1,6 @@
 // Share links and what a link brought with it.
 //   Store invite:  <WEB_URL>/join/<STORE CODE>  -> "Join <store> as an agent" page
-//   Agent's link:  <WEB_URL>/?agent=<AGENT CODE> -> the agent code is filled in at checkout
+//   Agent's shop:  <WEB_URL>/a/<AGENT CODE>     -> the agent's own shop. Older links (/?agent=<CODE>) open it too.
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -9,13 +9,12 @@ export const WEB_URL = 'https://poultry360-web.vercel.app';
 export const PLAY_STORE_URL = null;
 
 export const inviteLink = (code) => WEB_URL + '/join/' + encodeURIComponent(code);
-export const agentLink = (code) => WEB_URL + '/?agent=' + encodeURIComponent(code);
+export const agentLink = (code) => WEB_URL + '/a/' + encodeURIComponent(code);
 
 const INVITE = 'p360-pending-invite';
-const AGENT = 'p360-pending-agent-code';
-// How long a link is remembered in this browser. An invite that is never answered must not keep
-// opening the join page (or ticking "Sell for a store" at sign-up) weeks later.
-const INVITE_DAYS = 3, AGENT_DAYS = 30;
+// How long an invite is remembered in this browser. One that is never answered must not keep
+// opening the join page (or the agent sign-up) weeks later.
+const INVITE_DAYS = 3;
 const stamp = (code) => JSON.stringify({ code, at: Date.now() });
 // The stored code if it is still fresh; stale or old-format values are removed.
 function readStamped(key, days) {
@@ -29,17 +28,16 @@ function readStamped(key, days) {
   return null;
 }
 
-// In the browser, read the link the page was opened with (once, at startup), keep the codes,
-// and tidy the address bar back to the home page.
+// In the browser, read the link the page was opened with (once, at startup), keep an invite code,
+// and tidy the address bar. An agent's shop keeps its address (/a/<code>): the navigator opens it.
 function readLaunchLink() {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return {};
   const out = {};
   try {
     const m = window.location.pathname.match(/^\/join\/([A-Za-z0-9-]{4,})/);
-    if (m) { out.invite = m[1].toUpperCase(); window.localStorage.setItem(INVITE, stamp(out.invite)); }
     const a = new URLSearchParams(window.location.search).get('agent');
-    if (a) { out.agent = a.toUpperCase(); window.localStorage.setItem(AGENT, stamp(out.agent)); }
-    if (m || a) window.history.replaceState(null, '', '/');
+    if (m) { out.invite = m[1].toUpperCase(); window.history.replaceState(null, '', '/'); window.localStorage.setItem(INVITE, stamp(out.invite)); }
+    else if (a) window.history.replaceState(null, '', '/a/' + encodeURIComponent(a.toUpperCase()));   // older ?agent= link
   } catch { /* storage blocked: the link still works for this visit */ }
   return out;
 }
@@ -55,5 +53,3 @@ export function pendingInviteNow() {
 export const inviteOpenedNow = () => LAUNCH.invite || null;
 export const getPendingInvite = async () => pendingInviteNow() || (Platform.OS === 'web' ? null : await AsyncStorage.getItem(INVITE).catch(() => null));
 export const clearPendingInvite = async () => { LAUNCH.invite = null; await AsyncStorage.removeItem(INVITE).catch(() => {}); };
-export const getPendingAgentCode = async () => LAUNCH.agent || (Platform.OS === 'web' ? readStamped(AGENT, AGENT_DAYS) : await AsyncStorage.getItem(AGENT).catch(() => null));
-export const clearPendingAgentCode = async () => { LAUNCH.agent = null; await AsyncStorage.removeItem(AGENT).catch(() => {}); };

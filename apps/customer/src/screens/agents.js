@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, BackHandler, Alert, Image, Linking, Platform, FlatList } from 'react-native';
+import { View, Pressable, BackHandler, Alert, Image, Linking, Platform, FlatList, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Empty, Input, Chip, Segmented, Pill, Group, Row, Skeleton, Sheet, Banner,
   naira, shortDate, timeAgo, rpc, friendlyError, shareText, useWide, usePage, inviteLink, agentLink, pendingInviteNow, clearPendingInvite,
-  PLAY_STORE_URL, LOGO_MARK, supabase, useTick, countdown } from '@p360/shared';
+  PLAY_STORE_URL, LOGO_MARK, supabase, useTick, countdown, publicUrl } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { fetchListings } from '../lib/catalog';
 import { distanceKm, kmLabel } from '../lib/nearby';
@@ -148,10 +148,124 @@ export function AgentJoinScreen({ navigation, route }) {
   );
 }
 
+// A tile in the desk's figures row: icon, label, the figure, a line under it, and optional actions.
+function DeskStat({ icon, tone, label, value, sub, children, full }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexBasis: full ? '100%' : '30%', flexGrow: 1, minWidth: 140, backgroundColor: c.sf, borderRadius: 22, borderWidth: 1, borderColor: c.line, padding: 16, gap: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c[tone], alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={19} color={c[tone + 'i']} /></View>
+        <Txt v="label" style={{ flex: 1 }} numberOfLines={1}>{label}</Txt>
+      </View>
+      <View style={{ gap: 2 }}>
+        <Txt v="mono" style={{ fontSize: 22, letterSpacing: -0.4 }} numberOfLines={1}>{value}</Txt>
+        {sub ? <Txt v="small" numberOfLines={1}>{sub}</Txt> : null}
+      </View>
+      {children ? <View style={{ marginTop: 'auto' }}>{children}</View> : null}
+    </View>
+  );
+}
+
+// One of the four big actions under the money card.
+function QuickAction({ icon, tone, label, sub, onPress, badge, wide }) {
+  const { c } = useTheme();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed, hovered }) => ({ flexBasis: wide ? '22%' : '45%', flexGrow: 1, minHeight: 104, borderRadius: 22, backgroundColor: c[tone], padding: 16, gap: 10,
+        justifyContent: 'space-between', opacity: pressed ? 0.85 : hovered ? 0.92 : 1 })}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={21} color={c[tone + 'i']} /></View>
+        {badge ? <View style={{ minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, backgroundColor: c.ember, alignItems: 'center', justifyContent: 'center' }}><Txt v="mono" color={c.onember} style={{ fontSize: 12 }}>{badge}</Txt></View> : null}
+      </View>
+      <View style={{ gap: 2 }}>
+        <Txt v="bold" style={{ fontSize: 15 }}>{label}</Txt>
+        <Txt v="small" style={{ fontSize: 12 }} numberOfLines={1}>{sub}</Txt>
+      </View>
+    </Pressable>
+  );
+}
+
+// A section heading with an optional link on the right.
+function DeskHead({ title, action, onAction, count }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+      <Txt v="h2">{title}</Txt>
+      {count ? <Pill tone="live" label={String(count)} /> : null}
+      <View style={{ flex: 1 }} />
+      {action ? <Pressable onPress={onAction} accessibilityRole="button" hitSlop={8} style={{ minHeight: 32, justifyContent: 'center' }}><Txt v="bold" color={c.acc} style={{ fontSize: 13 }}>{action}</Txt></Pressable> : null}
+    </View>
+  );
+}
+
+// A friendlier empty state inside a card: icon, one line, and the next step.
+function DeskEmpty({ icon, title, body, action, onAction, bare }) {
+  const { c } = useTheme();
+  const Box = bare ? View : Card;
+  return (
+    <Box style={{ alignItems: 'center', paddingVertical: 26, paddingHorizontal: 16, gap: 8 }}>
+      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={26} color={c.navactink} /></View>
+      <Txt v="strong">{title}</Txt>
+      <Txt v="small" style={{ textAlign: 'center', maxWidth: 320 }}>{body}</Txt>
+      {action ? <Button small title={action} onPress={onAction} style={{ marginTop: 4, paddingHorizontal: 22 }} /> : null}
+    </Box>
+  );
+}
+
+// Website: rows under column headings, inside one card. A row with onPress highlights on hover.
+// columns: [{ label, flex, right }]; rows: [{ key, cells: [node…], onPress }]
+function DeskTable({ columns, rows, empty }) {
+  const { c } = useTheme();
+  // right-aligned columns lay out as a row so a Pill (alignSelf: flex-start) still sits on the right
+  const cell = (j, node) => <View key={j} style={columns[j].right ? { flex: columns[j].flex || 1, minWidth: 0, flexDirection: 'row', justifyContent: 'flex-end' } : { flex: columns[j].flex || 1, minWidth: 0 }}>{node}</View>;
+  return (
+    <Group>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 18, paddingVertical: 11, backgroundColor: c.sf2 }}>
+        {columns.map((col, j) => cell(j, <Txt v="label">{col.label}</Txt>))}
+      </View>
+      {rows.length ? rows.map((r) => (
+        <Pressable key={r.key} onPress={r.onPress} disabled={!r.onPress} accessibilityRole={r.onPress ? 'button' : undefined}
+          style={({ hovered }) => ({ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 18, paddingVertical: 12, minHeight: 60,
+            borderTopWidth: 1, borderColor: c.line, backgroundColor: hovered && r.onPress ? c.sf2 : 'transparent' })}>
+          {r.cells.map((node, j) => cell(j, node))}
+        </Pressable>
+      )) : <View style={{ borderTopWidth: 1, borderColor: c.line }}>{empty}</View>}
+    </Group>
+  );
+}
+
+// A product the agent holds: photo, name, price, how many are left.
+function StockCard({ p }) {
+  const { c } = useTheme();
+  const uri = p.photo ? publicUrl('listing-photos', p.photo) : null;
+  const low = p.quantity > 0 && p.quantity <= 3;
+  return (
+    <View style={{ flexBasis: '45%', flexGrow: 1, minWidth: 150, maxWidth: '100%', backgroundColor: c.sf, borderRadius: 20, borderWidth: 1, borderColor: c.line, overflow: 'hidden' }}>
+      {uri ? <Image source={{ uri }} style={{ height: 110, backgroundColor: c.sf2 }} />
+        : <View style={{ height: 110, backgroundColor: c.t4, alignItems: 'center', justifyContent: 'center' }}><Icon name="package-variant-closed" size={34} color={c.t4i} /></View>}
+      <View style={{ padding: 12, gap: 6 }}>
+        <Txt v="bold" numberOfLines={1} style={{ fontSize: 14 }}>{p.title}</Txt>
+        <Txt v="small" style={{ fontSize: 12 }}>{naira(p.price) + ' / ' + p.unit}</Txt>
+        <Pill tone={p.quantity <= 0 ? 'err' : low ? 'warn' : 'ok'} label={p.quantity <= 0 ? 'Sold out' : Number(p.quantity).toLocaleString() + ' ' + plural(p.unit, p.quantity) + (low ? ' · low' : '')} />
+      </View>
+    </View>
+  );
+}
+
+// Days through the current quarter, for the bar on the money card.
+function quarterProgress(end) {
+  if (!end) return { pct: 0, left: 0 };
+  const e = new Date(end + 'T23:59:59');
+  const s = new Date(e.getFullYear(), e.getMonth() - 2, 1);
+  const pct = Math.min(1, Math.max(0, (Date.now() - s) / (e - s)));
+  return { pct, left: Math.max(0, Math.ceil((e - Date.now()) / 864e5)) };
+}
+
 const MOVE = { pending: ['Waiting', 'warn'], declined: ['Declined', 'err'], cancelled: ['Cancelled', 'neutral'] };
 
 export function AgentDeskScreen({ navigation }) {
   const { c } = useTheme();
+  const wide = useWide();
   const { setActiveRole, homeRole, wallet, refreshWallet } = useAuth();
   const home = homeRole();
   const leaveMode = useCallback(() => { if (home) setActiveRole(home); }, [home]);
@@ -176,31 +290,54 @@ export function AgentDeskScreen({ navigation }) {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const name = d?.shop ? firstName(d.shop.name) : '';
   const header = (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <View style={{ flex: 1 }}>
-        <Txt v="display" style={{ fontSize: 28 }} numberOfLines={1}>{d?.shop ? firstName(d.shop.name) + "'s shop" : 'Agent'}</Txt>
-        {d?.store ? <Txt v="small">{'Selling for ' + d.store.name}</Txt> : null}
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View style={{ width: wide ? 60 : 52, height: wide ? 60 : 52, borderRadius: 30, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}>
+        {name ? <Txt v="h1" color={c.navactink}>{name.slice(0, 1).toUpperCase()}</Txt> : <Icon name="storefront-outline" color={c.navactink} />}
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Txt v="display" style={{ fontSize: wide ? 30 : 24 }} numberOfLines={1}>{name ? name + "'s shop" : 'Agent'}</Txt>
+        {d?.store ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="check-decagram" size={16} color={c.acc} />
+          <Txt v="small" numberOfLines={1} style={{ flexShrink: 1 }}>{'Agent for ' + d.store.name}</Txt>
+          {wide ? <Pill label={'Code ' + d.code} /> : null}
+        </View> : null}
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : home === 'supplier' ? 'My store' : 'My farm'} onPress={leaveMode} style={{ height: 44 }} /> : null}
-        <Pressable onPress={() => navigation.navigate('Profile')} accessibilityLabel="Profile" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-outline" /></Pressable>
+        {home && wide ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : home === 'supplier' ? 'My store' : 'My farm'} onPress={leaveMode} style={{ height: 44 }} /> : null}
+        {home && !wide ? <Pressable onPress={leaveMode} accessibilityLabel={home === 'buyer' ? 'Back to shopping' : home === 'supplier' ? 'Back to my store' : 'Back to my farm'} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={home === 'buyer' ? 'basket-outline' : 'storefront-outline'} /></Pressable> : null}
+        <Pressable onPress={() => navigation.navigate('Profile')} accessibilityLabel="Profile" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-outline" /></Pressable>
       </View>
     </View>
   );
-  if (d === undefined) return <Screen style={{ paddingTop: 8, gap: 14 }}>{header}<Skeleton h={160} r={24} /></Screen>;
+  if (d === undefined) return <Screen style={{ paddingTop: 8, gap: 14 }}>{header}<Skeleton h={170} r={26} /><View style={{ flexDirection: 'row', gap: 12 }}><Skeleton h={110} r={22} w="auto" style={{ flex: 1 }} /><Skeleton h={110} r={22} w="auto" style={{ flex: 1 }} /></View></Screen>;
   if (!d?.store) return (
     <Screen scroll style={{ paddingTop: 8 }}>
       {header}
       <Empty icon="storefront-outline" title="You're not with a store" body="Ask a store for its code to open your shop." action="Join a store" onAction={() => navigation.navigate('AgentJoin')} />
     </Screen>
   );
+
   const rebate = d.rebate || {};
   const owed = Number(rebate.earned || 0) - Number(rebate.paid || 0);
+  const q = quarterProgress(rebate.quarter_end);
+  const stock = d.stock || [];
+  const units = stock.reduce((t, p) => t + Math.max(0, Number(p.quantity)), 0);
   const need = orders.filter((o) => o.status === 'placed' || o.status === 'confirmed');
-  const pending = (d.moves || []).filter((m) => m.status === 'pending');
-  const bought = (d.moves || []).filter((m) => m.status !== 'pending');
+  const moves = d.moves || [];
+  const pending = moves.filter((m) => m.status === 'pending');
   const logged = (d.recent || []).filter((s) => s.source === 'logged');
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const thisMonth = (t) => new Date(t).getTime() >= monthStart;
+  const soldOrders = orders.filter((o) => o.status === 'delivered' && thisMonth(o.created_at));
+  const soldLogged = logged.filter((s) => s.status === 'recorded' && thisMonth(s.created_at));
+  const sold = soldOrders.reduce((t, o) => t + Number(o.items_total), 0) + soldLogged.reduce((t, s) => t + Number(s.total), 0);
+  const sales = soldOrders.length + soldLogged.length;
+  // what happened lately: stock bought and sales logged, newest first
+  const activity = [...moves.filter((m) => m.status !== 'pending').map((m) => ({ kind: 'buy', at: m.created_at, m })), ...logged.map((s) => ({ kind: 'sale', at: s.created_at, s }))]
+    .sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 6);
+  const products = (d.products || []).slice(0, 5);
   const unpinned = !d.shop?.location || d.shop?.lat == null;
 
   const leaveStore = () => Alert.alert('Leave ' + d.store.name + '?', 'Your shop closes and its products come off sale. Your records stay.', [{ text: 'Cancel', style: 'cancel' },
@@ -210,90 +347,266 @@ export function AgentDeskScreen({ navigation }) {
   const cancelBuy = (m) => Alert.alert('Cancel this order?', naira(m.total) + ' goes back to your wallet.', [{ text: 'Keep it', style: 'cancel' },
     { text: 'Cancel order', style: 'destructive', onPress: async () => { try { await rpc('agent_cancel_stock', { p_move: m.id }); load(); } catch (e) { Alert.alert("Couldn't cancel", friendlyError(e)); } } }]);
 
-  return (
-    <Screen scroll style={{ paddingTop: 8 }}>
-      {header}
-      {unpinned ? <Banner tone="warn" icon="map-marker-alert-outline" title={d.shop?.location ? "Pin your shop's location" : 'Add your shop address'} body="Nearby buyers see you first." action="Add" onAction={() => setPlacing(true)} /> : null}
-      <Hearth>
+  const money = (
+    <Hearth style={wide ? { flex: 1.15, justifyContent: 'space-between' } : null}>
+      <View style={{ gap: 4 }}>
         <Txt v="label" color={c.hmute}>Rebate owed to you</Txt>
-        <Txt v="monoLg" color={c.hink}>{naira(owed)}</Txt>
-        <Txt v="small" color={c.hmute}>{'This quarter so far ' + naira(rebate.quarter) + ' · due after ' + dayMonth(rebate.quarter_end)}</Txt>
-      </Hearth>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Button icon="cart-arrow-down" title="Buy stock" onPress={() => navigation.navigate('AgentBuy')} style={{ flex: 1 }} />
-        <Button variant="outline" icon="plus" title="Log a sale" onPress={() => navigation.navigate('AgentSale')} style={{ flex: 1 }} />
+        <Txt v="monoLg" color={c.hink} style={{ fontSize: 36 }}>{naira(owed)}</Txt>
       </View>
+      <View style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+          <Txt v="small" color={c.hmute}>{'This quarter so far ' + naira(rebate.quarter)}</Txt>
+          <Txt v="small" color={c.hmute}>{q.left + (q.left === 1 ? ' day' : ' days') + ' left'}</Txt>
+        </View>
+        <View style={{ height: 6, borderRadius: 3, backgroundColor: c.hline, overflow: 'hidden' }}>
+          <View style={{ width: Math.round(q.pct * 100) + '%', height: 6, borderRadius: 3, backgroundColor: c.hacc }} />
+        </View>
+        <Txt v="small" color={c.hmute} style={{ fontSize: 12 }}>{'Paid to you after ' + dayMonth(rebate.quarter_end)}</Txt>
+      </View>
+    </Hearth>
+  );
+  const stats = (
+    <View style={[{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, wide ? { flex: 2, alignContent: 'stretch' } : null]}>
+      <DeskStat full={!wide} icon="wallet-outline" tone="t1" label="Wallet" value={naira(wallet?.balance)}>
+        <View style={{ flexDirection: 'row', gap: 14 }}>
+          <Txt v="bold" color={c.acc} style={{ fontSize: 13 }} onPress={() => navigation.navigate('TopUp')}>Top up</Txt>
+          <Txt v="bold" color={c.acc} style={{ fontSize: 13 }} onPress={() => navigation.navigate('Withdraw')}>Withdraw</Txt>
+        </View>
+      </DeskStat>
+      <DeskStat icon="package-variant-closed" tone="t4" label="In stock" value={units.toLocaleString()} sub={stock.length === 1 ? '1 product' : stock.length + ' products'} />
+      <DeskStat icon="chart-line" tone="t3" label={wide ? "Sold this month" : "This month"} value={naira(sold)} sub={sales === 1 ? '1 sale' : sales + ' sales'} />
+    </View>
+  );
+  const actions = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      <QuickAction wide={wide} icon="cart-arrow-down" tone="t1" label="Buy stock" sub={'From ' + d.store.name} onPress={() => navigation.navigate('AgentBuy')} />
+      <QuickAction wide={wide} icon="receipt-text-outline" tone="t2" label="Log a sale" sub="Sold outside the app" onPress={() => navigation.navigate('AgentSale')} />
+      <QuickAction wide={wide} icon={copied ? 'check' : 'share-variant-outline'} tone="t3" label={copied ? 'Link copied' : 'Share shop'} sub="WhatsApp, SMS, copy" onPress={() => setSharing(true)} />
+      <QuickAction wide={wide} icon="clipboard-list-outline" tone="t4" label="Orders" sub={need.length ? need.length + ' waiting' : 'All caught up'} badge={need.length || null} onPress={() => navigation.navigate('ShopOrders')} />
+    </View>
+  );
 
+  const action = (
+    <View style={{ gap: 12 }}>
+      <DeskHead title="Needs your action" count={pending.length + need.length} />
+      {!pending.length && !need.length ? (
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.sagebg, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={20} color={c.sage} /></View>
+          <View style={{ flex: 1 }}><Txt v="strong">You're all caught up</Txt><Txt v="small">New orders show here with a 24-hour timer.</Txt></View>
+        </Card>
+      ) : null}
       {pending.map((m) => (
-        <Card key={m.id} style={{ gap: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Txt v="strong" style={{ flex: 1 }}>{'Waiting for ' + d.store.name}</Txt><Pill tone="warn" label="Paid" /></View>
-          <Txt v="small">{itemsText(m.items) + ' · ' + naira(m.total)}</Txt>
-          <Button small variant="ghost" title="Cancel order" onPress={() => cancelBuy(m)} style={{ alignSelf: 'flex-start' }} />
+        <Card key={m.id} style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.warnbg, alignItems: 'center', justifyContent: 'center' }}><Icon name="truck-fast-outline" size={20} color={c.warn} /></View>
+            <View style={{ flex: 1 }}><Txt v="strong">{'Stock from ' + d.store.name}</Txt><Txt v="small" numberOfLines={1}>{itemsText(m.items)}</Txt></View>
+            <Txt v="mono" style={{ fontSize: 15 }}>{naira(m.total)}</Txt>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {[['Paid', true], ['Handover', false], ['In your stock', false]].map(([label, done], i) => (
+              <React.Fragment key={label}>
+                {i ? <View style={{ flex: 1, height: 2, backgroundColor: i === 1 ? c.sage : c.line2 }} /> : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: done ? c.sage : i === 1 ? c.ember : 'transparent', borderWidth: done || i === 1 ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>
+                    {done ? <Icon name="check" size={12} color={c.onyolk} /> : null}
+                  </View>
+                  <Txt v="small" style={{ fontSize: 12 }} color={i === 1 ? c.ink : undefined}>{label}</Txt>
+                </View>
+              </React.Fragment>
+            ))}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Txt v="small" style={{ fontSize: 12 }}>{'Paid ' + timeAgo(m.created_at) + ' · waiting for the store'}</Txt>
+            <Txt v="bold" color={c.err} style={{ fontSize: 13 }} onPress={() => cancelBuy(m)}>Cancel</Txt>
+          </View>
         </Card>
       ))}
+      {need.map((o) => {
+        const cd = countdown(o.sla_deadline);
+        const urgent = o.status === 'placed' && cd.ms < 3 * 3.6e6;
+        return (
+          <Card key={o.id} onPress={() => navigation.navigate('VendorOrder', { id: o.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 2, borderColor: urgent ? c.err : c.ember }}>
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="shopping-outline" size={20} color={c.navactink} /></View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Txt v="strong" numberOfLines={1}>{(o.items || []).map((i) => i.qty + ' × ' + i.title).join(', ')}</Txt>
+              <Txt v="small" numberOfLines={1}>{o.buyer + (o.area ? ', ' + o.area : '') + ' · ' + naira(o.items_total)}</Txt>
+            </View>
+            {o.status === 'placed' ? <Txt v="mono" color={urgent ? c.err : c.acc} style={{ fontSize: 13 }}>{cd.text}</Txt> : <Pill tone="warn" label="Prepare" />}
+          </Card>
+        );
+      })}
+    </View>
+  );
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Txt v="h2">Orders</Txt>
-        <Txt v="bold" color={c.acc} onPress={() => navigation.navigate('ShopOrders')} style={{ fontSize: 13 }}>All orders</Txt>
-      </View>
-      {!need.length ? <Card><Txt v="small">No orders waiting. New ones appear here with a 24-hour timer.</Txt></Card>
-        : need.map((o) => {
-          const cd = countdown(o.sla_deadline);
-          return (
-            <Card key={o.id} onPress={() => navigation.navigate('VendorOrder', { id: o.id })} style={{ borderWidth: 2, borderColor: o.status === 'placed' && cd.ms < 3 * 3.6e6 ? c.err : c.ember }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="bold" numberOfLines={1} style={{ flex: 1 }}>{(o.items || []).map((i) => i.qty + ' × ' + i.title).join(', ')}</Txt>
-                {o.status === 'placed' ? <Txt v="mono" color={c.acc} style={{ fontSize: 13 }}>{cd.text}</Txt> : <Pill tone="warn" label="Prepare" />}</View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="small">{o.buyer}{o.area ? ', ' + o.area : ''}</Txt><Txt v="mono" style={{ fontSize: 14 }}>{naira(o.items_total)}</Txt></View>
-            </Card>
+  const stockList = (
+    <View style={{ gap: 12 }}>
+      <DeskHead title="My stock" action={stock.length ? 'Buy more' : null} onAction={() => navigation.navigate('AgentBuy')} />
+      {!stock.length ? <DeskEmpty icon="package-variant" title="No stock yet" body={'Buy from ' + d.store.name + ', then customers can order it from your shop.'} action="Buy stock" onAction={() => navigation.navigate('AgentBuy')} />
+        : <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{stock.map((p) => <StockCard key={p.id} p={p} />)}{stock.length % 2 ? <View style={{ flexBasis: '45%', flexGrow: 1, minWidth: 150 }} /> : null}</View>}
+    </View>
+  );
+
+  const restock = products.length ? (
+    <View style={{ gap: 12 }}>
+      <DeskHead title={'Restock from ' + d.store.name} action="See all" onAction={() => navigation.navigate('AgentBuy')} />
+      <Group>{products.map((p, i) => {
+        const uri = p.photo ? publicUrl('listing-photos', p.photo) : null;
+        return (
+          <Pressable key={p.id} onPress={() => navigation.navigate('AgentBuy')} accessibilityRole="button"
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderBottomWidth: i === products.length - 1 ? 0 : 1, borderColor: c.line, opacity: pressed ? 0.8 : 1 })}>
+            {uri ? <Image source={{ uri }} style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: c.sf2 }} />
+              : <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: c.t4, alignItems: 'center', justifyContent: 'center' }}><Icon name="package-variant-closed" size={20} color={c.t4i} /></View>}
+            <View style={{ flex: 1, gap: 2 }}>
+              <Txt v="strong" numberOfLines={1}>{p.title}</Txt>
+              <Txt v="small" numberOfLines={1}>{naira(p.price) + ' / ' + p.unit + (Number(p.quantity) > 0 ? '' : ' · out of stock')}</Txt>
+            </View>
+            {Number(p.pct) > 0 ? <Pill tone="ok" label={Number(p.pct) + '% rebate'} /> : null}
+            <Icon name="chevron-right" size={20} color={c.mute} />
+          </Pressable>
+        );
+      })}</Group>
+    </View>
+  ) : null;
+
+  const recent = (
+    <View style={{ gap: 12 }}>
+      <DeskHead title="Recent activity" />
+      {!activity.length ? <DeskEmpty icon="history" title="Nothing yet" body="Stock you buy and sales you log show here." />
+        : <Group>{activity.map((a, i) => {
+          const last = i === activity.length - 1;
+          if (a.kind === 'buy') return (
+            <Row key={'m' + a.m.id} last={last} icon="cart-arrow-down" iconColor={c.acc} title={'Bought ' + itemsText(a.m.items)}
+              subtitle={(a.m.paid_in === 'app' ? 'Paid in the app' : 'Paid the store') + ' · ' + timeAgo(a.at)}
+              right={MOVE[a.m.status] ? <Pill tone={MOVE[a.m.status][1]} label={MOVE[a.m.status][0]} /> : Number(a.m.rebate) > 0 ? <Txt v="mono" color={c.sage} style={{ fontSize: 14 }}>{'+' + naira(a.m.rebate)}</Txt> : null} />
           );
-        })}
-
-      <Txt v="h2">My stock</Txt>
-      {!(d.stock || []).length ? <Card><Txt v="small">{'No stock yet. Buy from ' + d.store.name + ' to start selling.'}</Txt></Card> : (
-        <Group>{d.stock.map((p, i) => (
-          <Row key={p.id} last={i === d.stock.length - 1} icon="package-variant-closed" title={p.title} subtitle={naira(p.price) + ' per ' + p.unit}
-            right={<Pill tone={p.quantity > 0 ? 'ok' : 'err'} label={p.quantity > 0 ? Number(p.quantity).toLocaleString() + ' ' + plural(p.unit, p.quantity) : 'Sold out'} />} />
-        ))}</Group>
-      )}
-
-      <Card style={{ gap: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront-outline" size={22} color={c.navactink} /></View>
-          <View style={{ flex: 1 }}><Txt v="strong">Your shop link</Txt><Txt v="small">Customers order from your stock</Txt></View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button small variant="outline" icon="eye-outline" title="Open" onPress={() => navigation.navigate('AgentShop', { code: d.code })} style={{ flex: 1 }} />
-          <Button small icon={copied ? 'check' : 'share-variant-outline'} title={copied ? 'Link copied' : 'Share'} onPress={() => setSharing(true)} style={{ flex: 1 }} />
-        </View>
-      </Card>
-
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Icon name="wallet-outline" color={c.acc} />
-        <View style={{ flex: 1 }}><Txt v="small">Wallet</Txt><Txt v="mono" style={{ fontSize: 18 }}>{naira(wallet?.balance)}</Txt></View>
-        <Button small variant="outline" title="Top up" onPress={() => navigation.navigate('TopUp')} />
-        <Button small variant="outline" title="Withdraw" onPress={() => navigation.navigate('Withdraw')} />
-      </Card>
-
-      {bought.length ? <>
-        <Txt v="h2">Stock bought</Txt>
-        <Group>{bought.map((m, i) => (
-          <Row key={m.id} last={i === bought.length - 1} icon="cart-arrow-down" title={naira(m.total) + (m.paid_in === 'app' ? ' · paid in the app' : ' · paid the store')}
-            subtitle={itemsText(m.items) + ' · ' + timeAgo(m.created_at)}
-            right={MOVE[m.status] ? <Pill tone={MOVE[m.status][1]} label={MOVE[m.status][0]} /> : Number(m.rebate) > 0 ? <Txt v="mono" color={c.sage} style={{ fontSize: 14 }}>{'+' + naira(m.rebate)}</Txt> : null} />
-        ))}</Group>
-      </> : null}
-      {logged.length ? <>
-        <Txt v="h2">Sales you logged</Txt>
-        <Group>{logged.map((s, i) => {
+          const s = a.s;
           const canCancel = s.status === 'recorded' && Date.now() - new Date(s.created_at).getTime() < 864e5;
           return (
-            <Row key={s.id} last={i === logged.length - 1} icon="receipt-text-outline" title={naira(s.total) + (s.buyer_name ? ' · ' + s.buyer_name : '')}
-              subtitle={itemsText(s.items) + ' · ' + timeAgo(s.created_at)} onPress={canCancel ? () => cancelSale(s) : undefined}
-              right={s.status === 'cancelled' ? <Pill label="Cancelled" /> : null} />
+            <Row key={'s' + s.id} last={last} icon="receipt-text-outline" iconColor={c.t2i} title={'Sold ' + itemsText(s.items)}
+              subtitle={(s.buyer_name ? s.buyer_name + ' · ' : '') + timeAgo(a.at) + (canCancel ? ' · tap to cancel' : '')} onPress={canCancel ? () => cancelSale(s) : undefined}
+              right={s.status === 'cancelled' ? <Pill label="Cancelled" /> : <Txt v="mono" style={{ fontSize: 14 }}>{naira(s.total)}</Txt>} />
           );
-        })}</Group>
-      </> : null}
-      <Button variant="ghost" title="Leave this store" onPress={leaveStore} />
+        })}</Group>}
+    </View>
+  );
+
+  const shopLink = (
+    <Card style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name="link-variant" size={22} color={c.navactink} /></View>
+        <View style={{ flex: 1 }}><Txt v="strong">Your shop link</Txt><Txt v="small">Customers order from your stock</Txt></View>
+      </View>
+      <View style={{ backgroundColor: c.sf2, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 }}><Txt v="mono" selectable numberOfLines={1} style={{ fontSize: 13 }}>{agentLink(d.code).replace(/^https?:\/\//, '')}</Txt></View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Button small variant="outline" icon="eye-outline" title="Open" onPress={() => navigation.navigate('AgentShop', { code: d.code })} style={{ flex: 1 }} />
+        <Button small icon={copied ? 'check' : 'share-variant-outline'} title={copied ? 'Copied' : 'Share'} onPress={() => setSharing(true)} style={{ flex: 1 }} />
+      </View>
+    </Card>
+  );
+  const where = (
+    <Card onPress={() => setPlacing(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: unpinned ? c.warnbg : c.sagebg, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={unpinned ? 'map-marker-alert-outline' : 'map-marker-check-outline'} size={22} color={unpinned ? c.warn : c.sage} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Txt v="strong">{d.shop?.location ? 'Pickup address' : 'Add your shop address'}</Txt>
+        <Txt v="small" numberOfLines={2}>{d.shop?.location ? d.shop.location + (d.shop.lat == null ? ' · not pinned' : ' · pinned') : 'Riders collect your orders here'}</Txt>
+      </View>
+      <Icon name="chevron-right" color={c.mute} />
+    </Card>
+  );
+  const leave = <Button variant="ghost" title="Leave this store" onPress={leaveStore} />;
+
+  // Website (900 px+): a dashboard page beside the sidebar: header bar with the actions, figures, then tables.
+  if (wide) {
+    const thumb = (photo, size = 40) => {
+      const uri = photo ? publicUrl('listing-photos', photo) : null;
+      return uri ? <Image source={{ uri }} style={{ width: size, height: size, borderRadius: 10, backgroundColor: c.sf2 }} />
+        : <View style={{ width: size, height: size, borderRadius: 10, backgroundColor: c.t4, alignItems: 'center', justifyContent: 'center' }}><Icon name="package-variant-closed" size={18} color={c.t4i} /></View>;
+    };
+    const top = (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}>
+          <Txt v="h1" color={c.navactink}>{(name || 'A').slice(0, 1).toUpperCase()}</Txt>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Txt v="display" style={{ fontSize: 28 }} numberOfLines={1}>{name + "'s shop"}</Txt>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Icon name="check-decagram" size={16} color={c.acc} />
+            <Txt v="small" numberOfLines={1}>{'Agent for ' + d.store.name}</Txt>
+            <Pill label={'Code ' + d.code} />
+          </View>
+        </View>
+        {home ? <Button small variant="ghost" icon="swap-horizontal" title={home === 'buyer' ? 'Switch to buying' : home === 'supplier' ? 'Switch to my store' : 'Switch to my farm'} onPress={leaveMode} /> : null}
+        <Button small variant="outline" icon={copied ? 'check' : 'share-variant-outline'} title={copied ? 'Link copied' : 'Share shop'} onPress={() => setSharing(true)} style={{ paddingHorizontal: 18 }} />
+        <Button small variant="outline" icon="receipt-text-outline" title="Log a sale" onPress={() => navigation.navigate('AgentSale')} style={{ paddingHorizontal: 18 }} />
+        <Button small icon="cart-arrow-down" title="Buy stock" onPress={() => navigation.navigate('AgentBuy')} style={{ paddingHorizontal: 20 }} />
+      </View>
+    );
+    const stockTable = (
+      <View style={{ gap: 12 }}>
+        <DeskHead title="My stock" count={stock.length || null} action={stock.length ? 'Buy more' : null} onAction={() => navigation.navigate('AgentBuy')} />
+        <DeskTable columns={[{ label: 'Product', flex: 2.4 }, { label: 'Price', flex: 1.4 }, { label: 'In stock' }, { label: 'Value', flex: 1.1, right: true }, { label: 'Status', flex: 0.9, right: true }]}
+          rows={stock.map((p) => ({ key: p.id, cells: [
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>{thumb(p.photo)}<Txt v="strong" numberOfLines={1} style={{ flexShrink: 1 }}>{p.title}</Txt></View>,
+            <Txt v="body" numberOfLines={1}>{naira(p.price) + ' / ' + p.unit}</Txt>,
+            <Txt v="mono" style={{ fontSize: 14 }}>{Number(p.quantity).toLocaleString() + ' ' + plural(p.unit, p.quantity)}</Txt>,
+            <Txt v="mono" style={{ fontSize: 14 }}>{naira(Number(p.price) * Math.max(0, Number(p.quantity)))}</Txt>,
+            <Pill tone={p.quantity <= 0 ? 'err' : p.quantity <= 3 ? 'warn' : 'ok'} label={p.quantity <= 0 ? 'Sold out' : p.quantity <= 3 ? 'Low' : 'On sale'} />] }))}
+          empty={<DeskEmpty bare icon="package-variant" title="No stock yet" body={'Buy from ' + d.store.name + ', then customers can order it from your shop.'} action="Buy stock" onAction={() => navigation.navigate('AgentBuy')} />} />
+      </View>
+    );
+    const activityTable = (
+      <View style={{ gap: 12 }}>
+        <DeskHead title="Recent activity" />
+        <DeskTable columns={[{ label: 'When', flex: 0.9 }, { label: 'What', flex: 2.6 }, { label: 'How', flex: 1.2 }, { label: 'Amount', right: true }]}
+          rows={activity.map((a) => {
+            if (a.kind === 'buy') return { key: 'm' + a.m.id, cells: [
+              <Txt v="small">{timeAgo(a.at)}</Txt>,
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="cart-arrow-down" size={18} color={c.acc} /><Txt v="body" numberOfLines={1} style={{ flexShrink: 1 }}>{'Bought ' + itemsText(a.m.items)}</Txt></View>,
+              MOVE[a.m.status] ? <Pill tone={MOVE[a.m.status][1]} label={MOVE[a.m.status][0]} /> : <Txt v="small">{a.m.paid_in === 'app' ? 'Wallet' : 'Paid the store'}</Txt>,
+              <View style={{ alignItems: 'flex-end' }}><Txt v="mono" style={{ fontSize: 14 }}>{naira(a.m.total)}</Txt>{Number(a.m.rebate) > 0 ? <Txt v="small" color={c.sage} style={{ fontSize: 12 }}>{'+' + naira(a.m.rebate) + ' rebate'}</Txt> : null}</View>] };
+            const s = a.s;
+            const canCancel = s.status === 'recorded' && Date.now() - new Date(s.created_at).getTime() < 864e5;
+            return { key: 's' + s.id, onPress: canCancel ? () => cancelSale(s) : undefined, cells: [
+              <Txt v="small">{timeAgo(a.at)}</Txt>,
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><Icon name="receipt-text-outline" size={18} color={c.t2i} /><Txt v="body" numberOfLines={1} style={{ flexShrink: 1 }}>{'Sold ' + itemsText(s.items) + (s.buyer_name ? ' to ' + s.buyer_name : '')}</Txt></View>,
+              s.status === 'cancelled' ? <Pill label="Cancelled" /> : <Txt v="small">{canCancel ? 'Logged · click to cancel' : 'Logged sale'}</Txt>,
+              <Txt v="mono" style={{ fontSize: 14 }}>{naira(s.total)}</Txt>] };
+          })}
+          empty={<DeskEmpty bare icon="history" title="Nothing yet" body="Stock you buy and sales you log show here." />} />
+      </View>
+    );
+    return (
+      <Screen pad={false}>
+        <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 1320, alignSelf: 'center', paddingHorizontal: 32, paddingTop: 24, paddingBottom: 48, gap: 24 }}>
+          {top}
+          {unpinned ? <Banner tone="warn" icon="map-marker-alert-outline" title={d.shop?.location ? "Pin your shop's location" : 'Add your shop address'} body="Nearby buyers see you first and pay less for delivery." action="Add" onAction={() => setPlacing(true)} /> : null}
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{money}{stats}</View>
+          <View style={{ flexDirection: 'row', gap: 24, alignItems: 'flex-start' }}>
+            <View style={{ flex: 2, gap: 24 }}>{action}{stockTable}{activityTable}</View>
+            <View style={{ flex: 1, gap: 24, minWidth: 300 }}>{shopLink}{where}{restock}{leave}</View>
+          </View>
+        </ScrollView>
+        <ShareLinkSheet visible={sharing} onClose={() => setSharing(false)} onCopied={flashCopied} title="Your shop link" link={agentLink(d.code)}
+          message={'Order from my shop on Poultry360: ' + agentLink(d.code)} />
+        <ShopPlaceSheet visible={placing} onClose={() => setPlacing(false)} shop={d.shop} onDone={load} />
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen scroll style={{ paddingTop: 8, gap: 16 }}>
+      {header}
+      {unpinned ? <Banner tone="warn" icon="map-marker-alert-outline" title={d.shop?.location ? "Pin your shop's location" : 'Add your shop address'} body="Nearby buyers see you first and pay less for delivery." action="Add" onAction={() => setPlacing(true)} /> : null}
+      {wide ? <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{money}{stats}</View> : <>{money}{stats}</>}
+      {actions}
+      {wide ? (
+        <View style={{ flexDirection: 'row', gap: 20, alignItems: 'flex-start' }}>
+          <View style={{ flex: 1.6, gap: 20 }}>{action}{stockList}{recent}</View>
+          <View style={{ flex: 1, gap: 20 }}>{shopLink}{where}{restock}{leave}</View>
+        </View>
+      ) : <>{action}{stockList}{restock}{recent}{shopLink}{where}{leave}</>}
       <ShareLinkSheet visible={sharing} onClose={() => setSharing(false)} onCopied={flashCopied} title="Your shop link" link={agentLink(d.code)}
         message={'Order from my shop on Poultry360: ' + agentLink(d.code)} />
       <ShopPlaceSheet visible={placing} onClose={() => setPlacing(false)} shop={d.shop} onDone={load} />

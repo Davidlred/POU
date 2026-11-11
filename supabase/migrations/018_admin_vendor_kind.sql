@@ -1,8 +1,4 @@
--- =====================================================================
--- Poultry360 · migration 018: ops can tell farms and stores apart
--- admin_vendors() now returns 'kind' (farm | store | both, from profiles.roles) and
--- 'supplier_type', so the ops dashboard tags each application. Safe to run more than once.
--- =====================================================================
+
 create or replace function public.admin_vendors() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 begin

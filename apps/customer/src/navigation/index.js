@@ -74,6 +74,11 @@ const Tab = createBottomTabNavigator();
 // the website as the left sidebar.
 function useTabItems() {
   const { profile, isVendorMode, supplierOnly, storeLocked } = useAuth();
+  if (profile?.active_role === 'agent') return [
+    { name: 'AgentHome', component: AgentDeskScreen, title: 'Dashboard', icon: 'view-dashboard', iconOff: 'view-dashboard-outline' },
+    { name: 'VendorOrders', component: VendorOrdersScreen, title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' },
+    { name: 'Wallet', component: WalletScreen, title: 'Wallet', icon: 'wallet', iconOff: 'wallet-outline' },
+  ];
   if (isVendorMode) return [
     { name: 'VendorHome', component: VendorHomeScreen, title: 'Home', icon: 'home', iconOff: 'home-outline' },
     { name: 'MyListings', component: MyListingsScreen, title: supplierOnly ? 'Products' : 'Listings', icon: 'package-variant-closed' },
@@ -98,7 +103,7 @@ function useTabItems() {
 // swipe back in Chrome) returns to the previous page instead of leaving the site. Paths are the screen names
 // in kebab case (/product, /farm-book); the tabs sit at the top level (/market, /orders).
 const kebab = (n) => n.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'invest', Wallet: 'wallet', VendorHome: 'dashboard', MyListings: 'products', VendorOrders: 'sales', Agents: 'agents', FarmHome: 'farm-hub' };
+const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'invest', Wallet: 'wallet', VendorHome: 'dashboard', MyListings: 'products', VendorOrders: 'sales', Agents: 'agents', FarmHome: 'farm-hub', AgentHome: 'my-shop' };
 // Pages that can be reopened from their address alone after a reload (their params are plain ids).
 // Any other page with params reopens at home: a reload can't bring back what was passed to it.
 const APP_SCREENS = ['Role', 'Business', 'VetApply', 'AgentJoin', 'Listings', 'Product', 'Store', 'Cart', 'Checkout', 'OrderSuccess', 'Tracking', 'Rate', 'Issue',
@@ -196,19 +201,21 @@ function TabBar({ state, descriptors, navigation }) {
   );
 }
 
-function MainTabs({ vendor }) {
+function MainTabs({ mode }) {
   const items = useTabItems();
   return (
-    <Tab.Navigator key={vendor ? 'vendor' : 'buyer'} tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+    <Tab.Navigator key={mode} tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
       {items.map((t) => <Tab.Screen key={t.name} name={t.name} component={t.component} options={{ title: t.title, icon: t.icon, iconOff: t.iconOff }} />)}
     </Tab.Navigator>
   );
 }
 function Tabs(props) {
   const { isVendorMode, profile } = useAuth();
+  const wide = useWide();
   if (profile?.active_role === 'vet') return <VetDeskScreen {...props} />;
-  if (profile?.active_role === 'agent') return <AgentDeskScreen {...props} />;
-  return <MainTabs vendor={isVendorMode} />;
+  // agent: one desk on phones; on the website, sections in the sidebar like the other dashboards
+  if (profile?.active_role === 'agent') return wide ? <MainTabs mode="agent" /> : <AgentDeskScreen {...props} />;
+  return <MainTabs mode={isVendorMode ? 'vendor' : 'buyer'} />;
 }
 
 // On the website the sign-in pages carry the site's nav bar. shop: the public shop pages, which keep Sign in / Get started in it.
@@ -260,8 +267,8 @@ export default function Navigation() {
   if (loading) return <Splash />;
   const needsRole = session && !(profile?.roles || []).length;
   const farms = (profile?.roles || []).some((r) => r === 'vendor' || r === 'supplier');
-  // Website, signed in: the sidebar stays beside every page (the vet and agent desks are single pages of their own).
-  const sidebar = wide && session && !needsRole && !['vet', 'agent'].includes(profile?.active_role);
+  // Website, signed in: the sidebar stays beside every page (the vet desk is a single page of its own).
+  const sidebar = wide && session && !needsRole && profile?.active_role !== 'vet';
   // The key on Stack.Navigator matters: Role, Business and VetApply exist in both groups (they double as "add a role" later).
   // Without it, finishing registration keeps you on the same-named screen instead of opening the app. A new key starts the main group at Tabs.
   return (

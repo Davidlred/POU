@@ -223,6 +223,12 @@ Screens in `screens/farmbook.js`; entry from Farm Hub. Tables `credit_customers`
 - **Before launch**: drop the three `dev_*` functions and their `__DEV__` buttons; integrate a real KYC provider (BVN/NIN) and keep references, not raw numbers; legal review and licence; a risk disclosure screen at first invest; push notifications for KYC decisions, funding reached, distributions and suspensions.
 - **Tested with**: the PRD test plan run against the full `schema.sql` in an in-process Postgres (PGlite): gates, limits, pro-rata payouts, refunds, suspension, pools, and wallet totals balancing at every step.
 
+## Design brief (`DESIGN.md`)
+`DESIGN.md` (repo root) describes the current UI/UX for designers and design tools: product and roles, the design system with exact tokens,
+the rules a redesign must keep, navigation per role, **every screen** in the customer app, website, rider app and ops dashboard, the main
+flows, known weak spots and what a redesign should deliver. It is the file to hand to a designer. **Keep it current**: when a screen, flow,
+tab or design rule changes, update its section there in the same change.
+
 ## Design system (refreshed Oct 2026; replaces the old cream / yolk "Sunrise / Ember" boards)
 The founder asked for the old look to go because it read as AI-generated. Do not bring back: the cream background, yellow primary, uppercase monospace labels, or a separate display / mono typeface.
 - **Light**: off-white bg `#F5F7F5`, white surfaces with a hairline border, near-black ink `#0E1512`, **green primary `#0F8A5F` with white text**, soft green tint `#E1F4EB` for selected states.

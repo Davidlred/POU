@@ -7,7 +7,8 @@ import { usePage, useWide, useTheme, liveChannel, Screen, AppBar, BackButton, Tx
 import { getHere } from '../lib/spot';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
-import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE } from '../lib/catalog';
+import { WantedRow, OfferSheet } from './wanted';
+import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE, SUBTYPES, FORMS, hasForm, typeLine } from '../lib/catalog';
 import { ExploreOptions } from './explore';
 import { getPhotos, asksSource, PhotoSourceSheet } from '../lib/photos';
 import { useFarm, flockStats } from '../lib/offlineQueue';
@@ -57,12 +58,15 @@ export function VendorHomeScreen({ navigation }) {
   const [period, setPeriod] = useState('30');
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(null);
+  const [wanted, setWanted] = useState([]);
+  const [offerFor, setOfferFor] = useState(null);
   useTick(1000);
   const load = useCallback(async () => {
     setBusy(true);
     try {
       setOrders(await rpc('vendor_orders')); refreshWallet();
       rpc('farm_book').then(setBook).catch(() => setBook(null));
+      rpc('open_buy_requests').then((r) => setWanted(r || [])).catch(() => setWanted([]));
       if (supplierOnly) rpc('store_agents_dashboard', { p_days: period === 'all' ? null : Number(period) }).then(setAgents).catch(() => setAgents(null));
     } finally { setBusy(false); }
   }, [supplierOnly, period]);
@@ -197,9 +201,17 @@ export function VendorHomeScreen({ navigation }) {
     <SectionHead title="While you wait" />
     <ExploreOptions navigation={navigation} />
   </>);
+  // Buyers' Wanted requests that fit this seller, nearest first.
+  const wantedBlock = approved && wanted.length ? (
+    <ActionList title="Buyers want" count={wanted.length} right={<Button small variant="ghost" title="See all" onPress={() => navigation.navigate('WantedBoard')} style={{ paddingHorizontal: 10 }} />}>
+      {wanted.slice(0, 3).map((r) => <WantedRow key={r.id} r={r} onOffer={() => setOfferFor(r)} />)}
+    </ActionList>
+  ) : null;
   return scroll(<>
     {vendor.lat == null ? <PinCard /> : null}
     {needs}
+    {wantedBlock}
+    <OfferSheet r={offerFor} onClose={() => setOfferFor(null)} onDone={() => { setOfferFor(null); load(); }} />
     <FigureStrip items={figures} />
     {supplierOnly ? (wide ? <View style={{ flexDirection: 'row', gap: 24, alignItems: 'flex-start' }}><View style={{ flex: 1.5 }}>{agentTable}</View><View style={{ flex: 1 }}>{bookCard}</View></View> : <>{agentTable}{bookCard}</>)
       : wide ? <View style={{ flexDirection: 'row', gap: 24, alignItems: 'flex-start' }}><View style={{ flex: 1.5 }}>{flockTable}</View><View style={{ flex: 1 }}>{bookCard}</View></View> : <>{flockTable}{bookCard}</>}
@@ -207,7 +219,7 @@ export function VendorHomeScreen({ navigation }) {
       <View style={{ gap: 12 }}>
         <SectionHead title="More" />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {[['Sell waste', 'sprout-outline', 't1', 'WasteHome'], ...(approved ? [['Agents', 'account-group-outline', 't3', 'StoreAgents']] : []), ...(INVEST_ENABLED ? [['Raise funds', 'cash-plus', 't2', 'RaiseHome']] : [])].map(([l, i, t, to]) => (
+          {[['Buyers want', 'clipboard-text-search-outline', 't4', 'WantedBoard'], ['Sell waste', 'sprout-outline', 't1', 'WasteHome'], ...(approved ? [['Agents', 'account-group-outline', 't3', 'StoreAgents']] : []), ...(INVEST_ENABLED ? [['Raise funds', 'cash-plus', 't2', 'RaiseHome']] : [])].map(([l, i, t, to]) => (
             <Pressable key={l} onPress={() => navigation.navigate(to)} accessibilityRole="button" style={({ hovered }) => ({ flexBasis: wide ? '22%' : '45%', flexGrow: 1, minHeight: 64, borderRadius: 18, backgroundColor: c[t], paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: hovered ? 0.9 : 1 })}>
               <Icon name={i} color={c[t + 'i']} /><Txt v="bold" style={{ fontSize: 14 }}>{l}</Txt>
             </Pressable>
@@ -231,7 +243,7 @@ export function MyListingsScreen({ navigation }) {
   // In review they can only save drafts, so open on Drafts
   const [tab, setTab] = useState(approved ? 'live' : 'draft');
   const [rows, setRows] = useState(null);
-  const load = useCallback(async () => { const { data } = await supabase.from('listings').select('*').eq('vendor_id', uid).order('updated_at', { ascending: false }); setRows(data || []); }, [uid]);
+  const load = useCallback(async () => { const { data } = await supabase.from('listings').select('*').eq('vendor_id', uid).neq('status', 'reserved').order('updated_at', { ascending: false }); setRows(data || []); }, [uid]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   if (!vendor) return (
     <Screen><AppBar title={title} />
@@ -285,20 +297,20 @@ export function ListingFormScreen({ navigation, route }) {
   const id = route.params?.id; const waste = !!route.params?.waste;
   const { supplierOnly } = useAuth();
   const cats = waste ? WASTE_CATEGORIES : supplierOnly ? CATEGORIES.filter((k) => SUPPLY_CATEGORIES.includes(k.id)) : CATEGORIES;
-  const [f, setF] = useState({ category: cats[0].id, title: '', price: '', unit: waste ? 'bag' : unitsFor(cats[0].id)[0], quantity: '', description: '', moisture: '', agent_pct: '' });
+  const [f, setF] = useState({ category: cats[0].id, title: '', price: '', unit: waste ? 'bag' : unitsFor(cats[0].id)[0], quantity: '', description: '', moisture: '', agent_pct: '', type: '', form: '' });
   const [photos, setPhotos] = useState([]); // { uri, path, state }
   const [errs, setErrs] = useState({});
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => { setF((x) => ({ ...x, [k]: v })); setErrs((e) => ({ ...e, [k]: undefined })); };
   // A new category keeps the unit only if it fits (feed is sold by the bag, not the crate).
-  const setCategory = (cat) => setF((x) => ({ ...x, category: cat, unit: waste || unitsFor(cat).includes(x.unit) ? x.unit : unitsFor(cat)[0] }));
+  const setCategory = (cat) => setF((x) => ({ ...x, category: cat, type: '', form: '', unit: waste || unitsFor(cat).includes(x.unit) ? x.unit : unitsFor(cat)[0] }));
   const noun = supplierOnly ? 'product' : 'listing';
   useEffect(() => {
     if (!id) return;
     supabase.from('listings').select('*').eq('id', id).single().then(({ data: l }) => {
       if (!l) return;
-      setF({ category: l.category, title: l.title, price: String(l.price), unit: l.unit, quantity: String(l.quantity), description: l.description || '', moisture: l.attributes?.moisture ? String(l.attributes.moisture) : '', agent_pct: Number(l.agent_commission_pct) ? String(Number(l.agent_commission_pct)) : '' });
+      setF({ category: l.category, title: l.title, price: String(l.price), unit: l.unit, quantity: String(l.quantity), description: l.description || '', moisture: l.attributes?.moisture ? String(l.attributes.moisture) : '', agent_pct: Number(l.agent_commission_pct) ? String(Number(l.agent_commission_pct)) : '', type: l.attributes?.type || '', form: l.attributes?.form || '' });
       setPhotos((l.photos || []).map((p) => ({ uri: publicUrl('listing-photos', p), path: p, state: 'done' })));
     });
   }, [id]);
@@ -315,11 +327,15 @@ export function ListingFormScreen({ navigation, route }) {
     });
   };
   // What is still missing, in order; the button says it.
-  const missing = !photos.some((p) => p.state === 'done') ? 'Add at least 1 photo' : !f.title.trim() ? 'Add a title' : !(Number(f.price) > 0) ? 'Enter a price'
+  const types = waste ? null : SUBTYPES[f.category];
+  const needsForm = !waste && hasForm(f.category, f.type);
+  const missing = !photos.some((p) => p.state === 'done') ? 'Add at least 1 photo' : types && !f.type ? 'Pick what kind' : needsForm && !f.form ? 'Pick fresh, chilled or frozen' : !f.title.trim() ? 'Add a title' : !(Number(f.price) > 0) ? 'Enter a price'
     : !(parseInt(f.quantity, 10) > 0) ? 'Enter how many you have' : f.agent_pct !== '' && !(Number(f.agent_pct) >= 0 && Number(f.agent_pct) <= 100) ? 'Agent rebate must be 0 to 100' : null;
   const validate = () => {
     const e = {};
     if (!photos.some((p) => p.state === 'done')) e.photos = 'Add at least 1 photo';
+    if (types && !f.type) e.type = 'Pick what kind';
+    if (needsForm && !f.form) e.form = 'Pick one';
     if (!f.title.trim()) e.title = 'Add a title';
     if (!(Number(f.price) > 0)) e.price = 'Enter a price';
     if (!(parseInt(f.quantity, 10) > 0)) e.quantity = 'Must be at least 1';
@@ -331,7 +347,7 @@ export function ListingFormScreen({ navigation, route }) {
     setBusy(true);
     const row = { vendor_id: uid, category: f.category, is_waste: waste, title: f.title.trim() || 'Untitled draft', description: f.description || null,
       price: Number(f.price) || 1, unit: f.unit, quantity: parseInt(f.quantity, 10) || 0, status, agent_commission_pct: Math.min(100, Number(f.agent_pct) || 0),
-      photos: photos.filter((p) => p.path).map((p) => p.path), attributes: waste && f.moisture ? { moisture: Number(f.moisture) } : {} };
+      photos: photos.filter((p) => p.path).map((p) => p.path), attributes: waste ? (f.moisture ? { moisture: Number(f.moisture) } : {}) : { ...(f.type ? { type: f.type } : {}), ...(needsForm && f.form ? { form: f.form } : {}) } };
     const { error } = id ? await supabase.from('listings').update(row).eq('id', id) : await supabase.from('listings').insert(row);
     setBusy(false);
     if (error) return Alert.alert("Couldn't save", friendlyError(error));
@@ -347,7 +363,7 @@ export function ListingFormScreen({ navigation, route }) {
       <Txt v="small">This is how buyers see your {noun}.</Txt>
       <Card style={{ padding: 0, overflow: 'hidden' }}>
         {photos[0] ? <Image source={{ uri: photos[0].uri }} style={{ height: 220 }} /> : <View style={{ height: 220, backgroundColor: c.sf2 }} />}
-        <View style={{ padding: 16, gap: 6 }}><Txt v="small">{vendor?.business_name}</Txt><Txt v="h1">{f.title}</Txt><Txt v="mono" style={{ fontSize: 24 }}>{naira(f.price)} <Txt v="small">/ {f.unit}</Txt></Txt>
+        <View style={{ padding: 16, gap: 6 }}><Txt v="small">{vendor?.business_name}</Txt><Txt v="h1">{f.title}</Txt>{f.type ? <Txt v="small">{typeLine({ attributes: { type: f.type, form: needsForm ? f.form : null } })}</Txt> : null}<Txt v="mono" style={{ fontSize: 24 }}>{naira(f.price)} <Txt v="small">/ {f.unit}</Txt></Txt>
           <Txt v="small">{f.quantity} available · Delivered by Poultry360</Txt></View>
       </Card>
       {vendor?.verification_status === 'approved' ? <Banner tone="info" icon="lightning-bolt-outline" body={'Goes live in under a minute. It can also show in nearby "' + catLabel(f.category).toLowerCase() + '" searches.'} /> : null}
@@ -371,6 +387,16 @@ export function ListingFormScreen({ navigation, route }) {
       </FormGroup>
       <FormGroup title="What it is">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{cats.map((k) => <Chip key={k.id} label={k.label} selected={f.category === k.id} onPress={() => setCategory(k.id)} />)}</View>
+        {types ? <View style={{ gap: 8 }}>
+          <Txt v="strong" style={{ fontSize: 14 }}>What kind</Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{types.map((t) => <Chip key={t} label={t} selected={f.type === t} onPress={() => { set('type')(t); setErrs((e) => ({ ...e, type: undefined })); }} />)}</View>
+          {errs.type ? <Txt v="small" color={c.err}>{errs.type}</Txt> : null}
+        </View> : null}
+        {needsForm ? <View style={{ gap: 8 }}>
+          <Txt v="strong" style={{ fontSize: 14 }}>How it is kept</Txt>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{FORMS.map((t) => <Chip key={t} label={t} selected={f.form === t} onPress={() => { set('form')(t); setErrs((e) => ({ ...e, form: undefined })); }} />)}</View>
+          {errs.form ? <Txt v="small" color={c.err}>{errs.form}</Txt> : null}
+        </View> : null}
         <Input label="Title" value={f.title} onChangeText={set('title')} placeholder={waste ? 'Dry layer manure, 50 kg bag' : TITLE_EXAMPLE[f.category] || 'Product name and size'} error={errs.title} />
         <Input label="Description (optional)" value={f.description} onChangeText={set('description')} multiline placeholder={SUPPLY_CATEGORIES.includes(f.category) ? 'Pack size, storage or how to use' : "How it's raised, graded or packed"} />
         {waste ? <Input label="Moisture % (optional)" keyboardType="number-pad" value={f.moisture} onChangeText={(t) => set('moisture')(t.replace(/\D/g, '').slice(0, 2))} mono /> : null}

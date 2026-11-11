@@ -12,6 +12,7 @@
 begin;
 
 truncate table
+  public.buy_offers, public.buy_requests,
   public.agent_stock_moves, public.agent_payouts, public.agent_sales, public.store_agents,
   public.roi_calculations, public.investments, public.pool_farms, public.investment_pools,
   public.investment_offerings, public.kyc_records,

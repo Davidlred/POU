@@ -26,7 +26,7 @@ export function CartProvider({ children }) {
     if (!items.length) return items;
     const { data } = await supabase.from('listings').select('id,price,quantity,status').in('id', items.map((x) => x.listing_id));
     const map = Object.fromEntries((data || []).map((l) => [l.id, l]));
-    const next = items.map((x) => { const l = map[x.listing_id]; return { ...x, price: l ? Number(l.price) : x.price, unavailable: !l || l.status !== 'live' || l.quantity < x.qty }; });
+    const next = items.map((x) => { const l = map[x.listing_id]; return { ...x, price: l ? Number(l.price) : x.price, unavailable: !l || !['live', 'reserved'].includes(l.status) || l.quantity < x.qty }; });
     save(next); return next;
   };
 

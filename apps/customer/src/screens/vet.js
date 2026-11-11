@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useWide, SectionHead, PlaceholderArt, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Pill, Stat, Group, Row, Skeleton,
   naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
+import { PhotoSourceSheet } from '../lib/photos';
 import { useFarm, save } from '../lib/offlineQueue';
 import { TEST_CARDS, chargeCard } from '../lib/payments';
 import { SIGNS, triage } from '../lib/triage';
@@ -255,9 +256,9 @@ export function SymptomScreen({ navigation }) {
     try { keep(await ImagePicker.launchCameraAsync({ quality: 0.5, mediaTypes: ['images'] })); }
     catch (e) { Alert.alert("Couldn't open the camera", friendlyError(e), [{ text: 'Choose a photo instead', onPress: fromGallery }, { text: 'Cancel', style: 'cancel' }]); }
   };
-  // Website: straight to the file picker (no camera to choose).
-  const add = () => Platform.OS === 'web' ? fromGallery() : Alert.alert('Add a photo', 'Clear, close-up photos of the affected birds work best.', [
-    { text: 'Take photo', onPress: fromCamera }, { text: 'Choose from gallery', onPress: fromGallery }, { text: 'Cancel', style: 'cancel' }]);
+  // Take a photo or choose one, on phones and the website.
+  const [menu, setMenu] = useState(false);
+  const add = () => setMenu(true);
   const run = async () => {
     setBusy(true); setUpErr(false);
     let paths = [];
@@ -296,7 +297,8 @@ export function SymptomScreen({ navigation }) {
         {photos.map((u) => <Image key={u} source={{ uri: u }} style={{ width: 84, height: 84, borderRadius: 16 }} />)}
         {photos.length < 4 ? <Pressable onPress={add} style={{ width: 84, height: 84, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera-plus-outline" color={c.acc} /></Pressable> : null}
       </View>
-      <Txt v="small" style={{ fontSize: 12 }}>Close-ups in daylight work best. Photos that don't show poultry are ignored.</Txt>
+      <Txt v="small" style={{ fontSize: 13 }}>Close-ups in daylight work best. Photos that don't show poultry are ignored.</Txt>
+      <PhotoSourceSheet visible={menu} onClose={() => setMenu(false)} onPick={(camera) => (camera ? fromCamera() : fromGallery())} />
       {flocks.length ? <><Txt v="strong" style={{ fontSize: 13 }}>Flock</Txt><ChipRow options={flocks.map((f) => f.code)} value={flocks.find((f) => f.id === flock)?.code} onChange={(cd) => setFlock(flocks.find((f) => f.code === cd)?.id)} /></> : null}
       <Txt v="strong" style={{ fontSize: 13 }}>What are you seeing?</Txt>
       <ChipRow options={SIGNS} value={signs} onChange={setSigns} multi />

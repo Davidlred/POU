@@ -8,9 +8,9 @@ import { useTheme } from './ThemeProvider';
 // Four drawings: eggs in a tray, bird, feed bag, vial. Real photos replace it when present.
 // (Drawn here from the brief; swap the paths for the mockup's Art.dc.html drawings if they differ.)
 
-const KIND_OF = { eggs: 'eggs', chicken: 'bird', turkey: 'bird', live_birds: 'bird', feed: 'feed', drugs: 'vial', equipment: 'feed', manure: 'feed', litter: 'feed', feathers: 'bird' };
-const TINT_OF = { eggs: 't4', bird: 't2', feed: 't1', vial: 't3' };
-export const artKind = (category) => KIND_OF[category] || (['eggs', 'bird', 'feed', 'vial'].includes(category) ? category : 'feed');
+const KIND_OF = { eggs: 'eggs', chicken: 'bird', turkey: 'bird', live_birds: 'bird', feed: 'feed', drugs: 'vial', equipment: 'box', packaging: 'box', manure: 'feed', litter: 'feed', feathers: 'bird' };
+const TINT_OF = { eggs: 't4', bird: 't2', feed: 't1', vial: 't3', box: 't4' };
+export const artKind = (category) => KIND_OF[category] || (['eggs', 'bird', 'feed', 'vial', 'box'].includes(category) ? category : 'feed');
 export const artTint = (kind) => TINT_OF[artKind(kind)];
 
 function Drawing({ kind, size }) {
@@ -40,6 +40,12 @@ function Drawing({ kind, size }) {
         <Rect x="31" y="32" width="38" height="56" rx="9" fill={W} {...p} />
         <Line x1="31" y1="60" x2="69" y2="60" {...p} />
         <Path d="M41 70 H59 M41 77 H53" {...p} fill="none" />
+      </> : kind === 'box' ? <>
+        <Path d="M18 36 L50 22 L82 36 L50 50 Z" fill={W} {...p} />
+        <Path d="M18 36 V72 L50 86 V50 Z" fill={W} {...p} />
+        <Path d="M82 36 V72 L50 86 V50 Z" fill={W} {...p} />
+        <Path d="M34 29 L66 43 V56 L58 52.5 V40" fill={O} {...p} />
+        <Path d="M58 72 L72 66" {...p} fill="none" />
       </> : <>
         <Path d="M32 28 L68 28 C70 28 71 29 71.5 31 L78 82 C78.3 85 76.5 87 73.5 87 H26.5 C23.5 87 21.7 85 22 82 L28.5 31 C29 29 30 28 32 28 Z" fill={W} {...p} />
         <Path d="M33 28 C35 21 41 16 50 16 C59 16 65 21 67 28" fill={W} {...p} />

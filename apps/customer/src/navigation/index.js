@@ -25,6 +25,7 @@ import { RaiseHomeScreen, BadgeScreen, OfferingFormScreen } from '../screens/rai
 import { INVEST_ENABLED } from '../lib/roi';
 import { FarmBookScreen, CreditLogScreen, CreditEntryScreen, CreditCustomerScreen, CreditAllowScreen, MyCreditScreen } from '../screens/farmbook';
 import { VetApplyScreen, VetDeskScreen, VetBookingScreen } from '../screens/vetdesk';
+import { WantedNewScreen, MyWantedScreen, WantedDetailScreen, WantedBoardScreen } from '../screens/wanted';
 import { AgentJoinScreen, AgentDeskScreen, AgentSaleScreen, AgentBuyScreen, StoreAgentsScreen, StoreAgentScreen, StoreGiveStockScreen, JoinStoreScreen, AgentShopScreen } from '../screens/agents';
 import { LandingScreen, WebNav } from '../screens/landing';
 import { ExploreScreen } from '../screens/explore';
@@ -140,10 +141,10 @@ const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'inves
 const APP_SCREENS = ['Role', 'Business', 'VetApply', 'AgentJoin', 'Listings', 'Product', 'Store', 'Cart', 'Checkout', 'OrderSuccess', 'Tracking', 'Rate', 'Issue',
   'TopUp', 'Withdraw', 'Bank', 'ListingForm', 'VendorOrder', 'FlockForm', 'FlockDetail', 'FlockHistory', 'Log', 'Vaccinations', 'FarmDashboard', 'VetHome', 'VetList',
   'VetProfile', 'Consultation', 'Symptom', 'HealthRecords', 'Onsite', 'WasteHome', 'Profile', 'Pending', 'TxDetail', 'FarmBook', 'Inventory', 'CareGuide',
-  'InventoryForm', 'CreditLog', 'CreditEntry', 'CreditCustomer', 'CreditAllow', 'MyCredit', 'VetBooking', 'AgentSale', 'StoreAgents', 'Explore', 'JoinStore',
+  'InventoryForm', 'CreditLog', 'CreditEntry', 'CreditCustomer', 'CreditAllow', 'MyCredit', 'VetBooking', 'AgentSale', 'StoreAgents', 'Explore', 'JoinStore', 'WantedNew', 'MyWanted', 'WantedDetail', 'WantedBoard',
   'StoreAgent', 'AgentBuy', 'StoreGiveStock', 'ShopOrders', 'InvestHome', 'Kyc', 'Offering', 'Pools', 'Pool', 'RoiCalc', 'InvestAmount', 'InvestSuccess', 'Portfolio', 'InvestmentDetail', 'RaiseHome',
   'Badge', 'OfferingForm'];
-const RELOADABLE = new Set(['Product', 'Store', 'Listings', 'Tracking', 'VendorOrder', 'FlockDetail', 'AgentShop']);
+const RELOADABLE = new Set(['Product', 'Store', 'Listings', 'Tracking', 'VendorOrder', 'FlockDetail', 'AgentShop', 'WantedDetail']);
 function webLinking(signedIn) {
   if (Platform.OS !== 'web') return undefined;
   const screens = (names) => Object.fromEntries(names.map((n) => [n, kebab(n)]));
@@ -375,6 +376,10 @@ export default function Navigation() {
             <Stack.Screen name="StoreGiveStock" component={StoreGiveStockScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="ShopOrders" component={VendorOrdersScreen} />
             <Stack.Screen name="StoreAgents" component={StoreAgentsScreen} />
+            <Stack.Screen name="WantedNew" component={WantedNewScreen} />
+            <Stack.Screen name="MyWanted" component={MyWantedScreen} />
+            <Stack.Screen name="WantedDetail" component={WantedDetailScreen} />
+            <Stack.Screen name="WantedBoard" component={WantedBoardScreen} />
             <Stack.Screen name="Explore" component={ExploreScreen} />
             <Stack.Screen name="JoinStore" component={JoinStoreScreen} />
             <Stack.Screen name="StoreAgent" component={StoreAgentScreen} />

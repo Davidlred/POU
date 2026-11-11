@@ -11,6 +11,8 @@ export default {
     package: 'com.goshenfarms.poultry360',
     adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#FFFFFF' },
     softwareKeyboardLayoutMode: 'resize',
+    // CAMERA must be listed: without it every 'Take photo' silently falls back to the gallery.
+    permissions: ['CAMERA', 'ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'],
     config: { googleMaps: { apiKey: process.env.GOOGLE_MAPS_API_KEY } },
   },
   ios: { bundleIdentifier: 'com.goshenfarms.poultry360', supportsTablet: false },

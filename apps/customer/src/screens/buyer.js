@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, FlatList, ScrollView, Dimensions, RefreshControl, TextInput, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, Screen, AppBar, BackButton, Txt, Button, Card, Hearth, Icon, Banner, Empty, Chip, Skeleton, Pill, Segmented,
-  naira, rpc, publicUrl, supabase, HeaderBar, SectionHead, LiveDot, ProgressSegments, ArtPanel, PlaceholderArt, Thumb, TrustRow, MoneyLine, artTint, MAX_FONT_SCALE } from '@p360/shared';
+  naira, rpc, publicUrl, supabase, HeaderBar, SectionHead, LiveDot, ProgressSegments, ArtPanel, PlaceholderArt, Thumb, TrustRow, MoneyLine, artTint, MAX_FONT_SCALE, CountBadge } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { useCart } from '../context/CartContext';
-import { CATEGORIES, catLabel, fetchListings, deliveryContext, SUPPLY_CATEGORIES } from '../lib/catalog';
+import { CATEGORIES, catLabel, fetchListings, deliveryContext, SUPPLY_CATEGORIES, SUBTYPES, typeLine } from '../lib/catalog';
 import { distanceKm, deliveryFee, kmLabel, byDistance } from '../lib/nearby';
 import { useSpot } from '../lib/spot';
 import { liveOrder, ACTIVE, deliveryWindow } from '../lib/eta';
@@ -45,6 +45,7 @@ export function ListingCard({ l, onPress, hideFarm, wide: fixed, spot, onAdd }) 
       </View>
       <View style={{ padding: 12, gap: 4, flex: 1 }}>
         <Txt v="bold" numberOfLines={2} style={{ fontSize: 15 }}>{l.title}</Txt>
+        {typeLine(l) ? <Txt v="small" numberOfLines={1}>{typeLine(l)}</Txt> : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Icon name="check-decagram" size={14} color={c.acc} />
           <Txt v="small" color={c.acc} numberOfLines={1} style={{ flexShrink: 1 }}>{hideFarm ? 'Verified ' + sellerWord(l.category) + ' near you' : l.vendor?.business_name}</Txt>
@@ -167,9 +168,11 @@ export function HomeScreen({ navigation }) {
   const [live, setLive] = useState(null);
   const [fresh, setFresh] = useState(null);
   const [owed, setOwed] = useState(null);
+  const [wantedInfo, setWantedInfo] = useState(null);   // { open, offers } from the buyer's Wanted requests
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     setBusy(true);
+    rpc('my_buy_requests').then((r) => { const open = (r || []).filter((x) => x.status === 'open'); setWantedInfo({ open: open.length, offers: open.reduce((t, x) => t + x.offers.filter((o) => o.status === 'pending').length, 0) }); }).catch(() => setWantedInfo(null));
     try {
       const [d, orders, l, credit] = await Promise.all([deliveryContext(), rpc('buyer_orders'), fetchListings({ limit: 24 }), rpc('my_credit').catch(() => [])]);
       setCtx(d); setFresh(l); refreshWallet();
@@ -204,12 +207,33 @@ export function HomeScreen({ navigation }) {
     ? <View style={{ flexDirection: 'row', gap: 12 }}>{CATEGORIES.map((k) => <CategoryTile key={k.id} k={k} wide onPress={() => navigation.navigate('Market', { category: k.id })} />)}</View>
     : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 20 }} style={{ marginRight: -20 }}>
         {CATEGORIES.map((k) => <CategoryTile key={k.id} k={k} onPress={() => navigation.navigate('Market', { category: k.id })} />)}</ScrollView>;
-  const invest = INVEST_ENABLED && !(profile?.roles || []).includes('investor') ? (
-    <Card onPress={() => navigation.navigate('InvestHome')} style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.t3, alignItems: 'center', justifyContent: 'center' }}><Icon name="chart-line" color={c.t3i} /></View>
-      <View style={{ flex: 1 }}><Txt v="bold">Invest in verified farms</Txt><Txt v="small">Fund a farm or a pool and track what it returns.</Txt></View>
-      <Icon name="chevron-right" color={c.mute} />
+  // Wanted: buyers who can't find something post what they need; sellers reply with a price.
+  const wantedCard = (
+    <Card onPress={() => navigation.navigate(wantedInfo?.open ? 'MyWanted' : 'WantedNew')} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 }}>
+      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.t4, alignItems: 'center', justifyContent: 'center' }}><Icon name="clipboard-text-search-outline" color={c.t4i} /></View>
+      {wantedInfo?.open ? <>
+        <View style={{ flex: 1 }}><Txt v="bold">{wantedInfo.offers ? wantedInfo.offers + (wantedInfo.offers === 1 ? ' new offer' : ' new offers') + ' on your requests' : 'Waiting for offers'}</Txt>
+          <Txt v="small">{wantedInfo.open + (wantedInfo.open === 1 ? ' request' : ' requests') + ' taking offers'}</Txt></View>
+        {wantedInfo.offers ? <CountBadge n={wantedInfo.offers} /> : null}
+        <Button small variant="outline" title="View" onPress={() => navigation.navigate('MyWanted')} style={{ paddingHorizontal: 16 }} />
+      </> : <>
+        <View style={{ flex: 1 }}><Txt v="bold">Buying in bulk or can't find it?</Txt><Txt v="small">Post what you need. Verified sellers reply with a price.</Txt></View>
+        <Button small variant="outline" title="Post" onPress={() => navigation.navigate('WantedNew')} style={{ paddingHorizontal: 16 }} />
+      </>}
     </Card>
+  );
+  // Invest banner: a tinted card at the top of home (beside the wallet on the website).
+  const invest = INVEST_ENABLED && !(profile?.roles || []).includes('investor') ? (
+    <Pressable onPress={() => navigation.navigate('InvestHome')} accessibilityRole="button"
+      style={({ hovered }) => ({ backgroundColor: c.t3, borderRadius: 20, padding: wide ? 24 : 18, flexDirection: 'row', alignItems: 'center', gap: 18, opacity: hovered ? 0.92 : 1, ...(wide && !live ? { flex: 2 } : null) })}>
+      <View style={{ flex: 1, gap: 6 }}>
+        <Txt v="label" color={c.t3i}>Invest</Txt>
+        <Txt v={wide ? 'h1' : 'h2'}>Grow with verified farms</Txt>
+        <Txt v="small" color={c.ink} style={{ opacity: 0.75 }}>Fund a farm or a pool and track what it returns.</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 }}><Txt v="bold" color={c.t3i}>See farms raising</Txt><Icon name="arrow-right" size={18} color={c.t3i} /></View>
+      </View>
+      <View style={{ width: wide ? 88 : 64, height: wide ? 88 : 64, borderRadius: wide ? 44 : 32, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name="chart-line" size={wide ? 40 : 30} color={c.t3i} /></View>
+    </Pressable>
   ) : null;
 
   if (wide) return (
@@ -226,11 +250,14 @@ export function HomeScreen({ navigation }) {
             <WalletCard wallet={wallet} owed={owed} navigation={navigation} style={{ flex: 1 }} />
           </View>
         ) : null}
+        {live ? invest : invest ? (
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{invest}<WalletCard wallet={wallet} owed={owed} navigation={navigation} style={{ flex: 1 }} /></View>
+        ) : null}
         <SearchButton onPress={() => navigation.navigate('Market', { search: true })} />
         <View style={{ gap: 14 }}><SectionHead title="Shop by category" />{categories}</View>
+        {wantedCard}
         {freshList}
-        {!live ? <WalletCard wallet={wallet} owed={owed} navigation={navigation} style={{ maxWidth: 420 }} /> : null}
-        {invest}
+        {!live && !invest ? <WalletCard wallet={wallet} owed={owed} navigation={navigation} style={{ maxWidth: 420 }} /> : null}
       </ScrollView>
     </Screen>
   );
@@ -249,10 +276,11 @@ export function HomeScreen({ navigation }) {
         </View>
         {outside}
         {live ? <LiveHearth live={live} onTrack={track} /> : null}
+        {invest}
         <SearchButton onPress={() => navigation.navigate('Market', { search: true })} />
         <View style={{ gap: 12 }}><SectionHead title="Shop by category" />{categories}</View>
+        {wantedCard}
         {freshList}
-        {invest}
       </ScrollView>
     </Screen>
   );
@@ -272,24 +300,26 @@ function Browse({ navigation, route, tab: tabRoute }) {
   const { count, add } = useCart();
   const tab = tabRoute && !!session;   // the Market tab (signed-out website visitors get the plain page)
   const p = route.params || {};
-  const [category, setCategory] = useState(p.category || null);
+  const [category, setCategoryRaw] = useState(p.category || null);
+  const [type, setType] = useState(p.type || null);   // sub-category, e.g. Wings or Day-old broiler chicks
+  const setCategory = (k) => { setCategoryRaw(k); setType(null); };
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('nearest');
   const [items, setItems] = useState(null);
   const [area, setArea] = useState(null);
   const { spot, locate } = useSpot();
-  useEffect(() => { if (p.category !== undefined) setCategory(p.category || null); }, [p.category]);
+  useEffect(() => { if (p.category !== undefined) { setCategoryRaw(p.category || null); setType(p.type || null); } }, [p.category, p.type]);
   useEffect(() => { if (session) deliveryContext().then((d) => setArea(d.primary?.area || null)).catch(() => {}); }, [session]);
   const load = useCallback(async () => {
     setItems(null);
-    try { setItems(await fetchListings({ category: category || undefined, q: q.trim() || undefined, waste: !!p.waste, sort: sort === 'cheapest' ? 'cheapest' : 'newest', limit: 60 })); }
+    try { setItems(await fetchListings({ category: category || undefined, type: type || undefined, q: q.trim() || undefined, waste: !!p.waste, sort: sort === 'cheapest' ? 'cheapest' : 'newest', limit: 60 })); }
     catch { setItems([]); }
-  }, [category, q, sort, p.waste]);
+  }, [category, type, q, sort, p.waste]);
   useEffect(() => { const t = setTimeout(load, q ? 350 : 0); return () => clearTimeout(t); }, [load]);
   const shown = items && sort === 'nearest' && spot ? byDistance(items, spot) : items;
   const where = area || (spot ? 'you' : null);
   const openExtra = (id) => (!session ? navigation.navigate('SignIn') : navigation.navigate(id === 'vet' ? 'VetHome' : 'WasteHome'));
-  const title = p.waste ? 'Waste & manure' : tab ? 'Market' : category ? catLabel(category) : 'Market';
+  const title = p.waste ? 'Waste & manure' : tab ? 'Market' : type || (category ? catLabel(category) : 'Market');
   const searchBox = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 52, borderRadius: 16, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line2, paddingHorizontal: 16, flex: wide || tab ? undefined : 1, width: wide ? 360 : undefined }}>
       <Icon name="magnify" color={c.mute} />
@@ -305,6 +335,21 @@ function Browse({ navigation, route, tab: tabRoute }) {
       {tab && !p.waste ? EXTRA.map((k) => <Chip key={k.id} icon={k.icon} label={k.label} onPress={() => openExtra(k.id)} />) : null}
     </ScrollView>
   );
+  // Second row: the kinds inside the picked category (chicken parts, chicks, egg types…), as light chips.
+  const subs = category && !p.waste ? SUBTYPES[category] : null;
+  const typeChips = subs ? (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: wide ? 0 : 20 }} style={wide ? null : { marginRight: -20 }}>
+      {['All ' + catLabel(category).toLowerCase(), ...subs].map((t, i) => {
+        const on = i ? type === t : !type;
+        return (
+          <Pressable key={t} onPress={() => setType(i ? (on ? null : t) : null)} accessibilityRole="button" accessibilityState={{ selected: on }}
+            style={{ minHeight: 40, paddingHorizontal: 14, borderRadius: 20, justifyContent: 'center', backgroundColor: on ? c.navact : 'transparent', borderWidth: 1.5, borderColor: on ? c.navact : c.line2 }}>
+            <Txt v={on ? 'bold' : 'strong'} color={on ? c.navactink : c.ink} style={{ fontSize: 14 }}>{t}</Txt>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  ) : null;
   const summary = (
     <View style={{ flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : 'stretch', gap: 10 }}>
       <Txt v="strong" style={{ flex: wide ? 1 : undefined }}>{items ? (items.length === 1 ? '1 listing' : items.length + ' listings') + (where ? ' near ' + where : '') : 'Loading…'}</Txt>
@@ -315,9 +360,10 @@ function Browse({ navigation, route, tab: tabRoute }) {
   );
   const kind = category || (p.waste ? 'feed' : 'eggs');
   const empty = items && !shown.length ? (
-    <Empty art={kind} title={q ? 'Nothing for "' + q + '"' : 'No ' + (category ? catLabel(category).toLowerCase() : 'products') + ' listed' + (where ? ' near ' + where : '') + ' yet'}
-      body={q ? 'Try a shorter word, or pick a category.' : 'Verified sellers add stock every day. Try another category for now.'}
-      action={category || q ? 'See everything' : undefined} onAction={() => { setCategory(null); setQ(''); }} />
+    <Empty art={kind} title={q ? 'Nothing for "' + q + '"' : 'No ' + (type ? type.toLowerCase() : category ? catLabel(category).toLowerCase() : 'products') + ' listed' + (where ? ' near ' + where : '') + ' yet'}
+      body={session ? 'Post what you need and verified sellers reply with a price.' : q ? 'Try a shorter word, or pick a category.' : 'Verified sellers add stock every day. Try another category for now.'}
+      action={session ? 'Post what you need' : type ? 'All ' + catLabel(category).toLowerCase() : category || q ? 'See everything' : undefined}
+      onAction={() => { if (session) navigation.navigate('WantedNew', { category: category || undefined }); else if (type) setType(null); else { setCategory(null); setQ(''); } }} />
   ) : null;
   const header = wide ? (
     <HeaderBar title={title}>{searchBox}<Button small variant="outline" icon="shopping-outline" title={'Cart · ' + count} onPress={() => navigation.navigate('Cart')} style={{ paddingHorizontal: 16 }} /></HeaderBar>
@@ -336,7 +382,7 @@ function Browse({ navigation, route, tab: tabRoute }) {
     <Screen pad={false}>
       <FlatList key={cols} data={items && shown.length ? padRows(shown, cols) : []} keyExtractor={(x) => x.id} numColumns={cols} columnWrapperStyle={{ gap: 12 }}
         contentContainerStyle={[{ padding: 20, paddingTop: wide ? 20 : 8, gap: 12 }, page]} keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={<View style={{ gap: 16, marginBottom: 6 }}>{header}{chips}{summary}</View>}
+        ListHeaderComponent={<View style={{ gap: 16, marginBottom: 6 }}>{header}{chips}{typeChips}{summary}</View>}
         ListEmptyComponent={items === null ? <View style={{ flexDirection: 'row', gap: 12 }}><Skeleton h={250} r={20} w="auto" style={{ flex: 1 }} /><Skeleton h={250} r={20} w="auto" style={{ flex: 1 }} /></View> : empty}
         renderItem={({ item }) => <ListingCard l={item} hideFarm spot={spot} onAdd={(l) => add(l, 1, true)} onPress={() => navigation.navigate('Product', { id: item.id, viaSearch: true })} />} />
     </Screen>
@@ -398,6 +444,7 @@ export function ProductScreen({ navigation, route }) {
       </View>;
   const details = <>
     <Txt v="display" style={{ fontSize: wide ? 32 : 26, lineHeight: wide ? 37 : 31 }}>{l.title}</Txt>
+    {typeLine(l) ? <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>{[l.attributes.type, l.attributes.form].filter(Boolean).map((t) => <Pill key={t} label={t} />)}</View> : null}
     <Txt v="mono" style={{ fontSize: 34, lineHeight: 40, letterSpacing: -0.6 }}>{naira(l.price)}<Txt v="small" style={{ fontSize: 15 }}> / {l.unit}</Txt></Txt>
     {out ? <Pill tone="err" label="Sold out" /> : <Pill tone="ok" label={'In stock · ' + Number(l.quantity).toLocaleString() + ' ' + l.unit + (l.quantity === 1 ? '' : 's')} />}
     {outside ? <Banner tone="warn" icon="map-marker-off-outline" title={"We can't deliver to " + ctx.primary.area + ' yet'} body="Switch to an address in our delivery area to add this to your cart." />

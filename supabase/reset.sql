@@ -37,6 +37,7 @@ drop table if exists
   public.order_items, public.sub_orders, public.orders, public.listings, public.addresses,
   public.coverage_areas, public.withdrawal_codes, public.transactions, public.wallets,
   public.credit_entries, public.credit_customers,
+  public.buy_offers, public.buy_requests,
   public.agent_stock_moves, public.agent_claims, public.agent_payouts, public.agent_sales, public.store_agents,
   public.roi_calculations, public.investments, public.pool_farms, public.investment_pools, public.investment_offerings, public.kyc_records,
   public.vendor_profiles, public.profiles, public.admins, public.admin_emails

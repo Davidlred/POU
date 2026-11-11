@@ -25,8 +25,8 @@ export async function getPhotos(camera, max = 1) {
   }
 }
 
-// Phones ask camera or gallery; the website goes straight to the browser's picker (which offers the camera on phones).
-export const asksSource = Platform.OS !== 'web';
+// Always ask: take a photo or choose one (on the website too; a phone browser opens its camera).
+export const asksSource = true;
 
 // The camera-or-gallery choice behind a "+" photo tile.
 export function PhotoSourceSheet({ visible, onClose, onPick }) {
@@ -34,7 +34,7 @@ export function PhotoSourceSheet({ visible, onClose, onPick }) {
     <Sheet visible={visible} onClose={onClose}>
       <Txt v="h1">Add a photo</Txt>
       <Button icon="camera-outline" title="Take photo" onPress={() => { onClose(); onPick(true); }} />
-      <Button variant="outline" icon="image-outline" title="Choose from gallery" onPress={() => { onClose(); onPick(false); }} />
+      <Button variant="outline" icon="image-outline" title={Platform.OS === 'web' ? 'Upload a photo' : 'Choose from gallery'} onPress={() => { onClose(); onPick(false); }} />
     </Sheet>
   );
 }

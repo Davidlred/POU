@@ -523,13 +523,13 @@ export function Fab({ icon = 'plus', label, onPress, accessibilityLabel }) {
   return <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 28 }}><View pointerEvents="box-none" style={[PAGE, { paddingHorizontal: 40, alignItems: 'flex-end' }]}>{btn}</View></View>;
 }
 
-// Add-a-photo buttons. Phone: camera or gallery. Website: one upload button (a computer has no camera to point at a document).
+// Add-a-photo buttons: take a photo or pick one, on phones and on the website (a phone browser opens its camera;
+// a computer without one falls back to its file picker).
 export function PhotoButtons({ onCamera, onGallery }) {
-  if (Platform.OS === 'web') return <Button small variant="outline" icon="upload" title="Upload photo" onPress={onGallery} />;
   return (
     <View style={{ flexDirection: 'row', gap: 8 }}>
       <Button small variant="outline" icon="camera-outline" title="Take photo" onPress={onCamera} style={{ flex: 1 }} />
-      <Button small variant="outline" icon="image-outline" title="Gallery" onPress={onGallery} style={{ flex: 1 }} />
+      <Button small variant="outline" icon="image-outline" title={Platform.OS === 'web' ? 'Upload photo' : 'Gallery'} onPress={onGallery} style={{ flex: 1 }} />
     </View>
   );
 }

@@ -41,6 +41,7 @@ export function ProfileScreen({ navigation }) {
       {roles.includes('buyer') ? <>
         <Txt v="label">Buying</Txt>
         <Group>
+          <Row icon="clipboard-text-search-outline" title="Wanted requests" subtitle="What you asked sellers for, and their offers" onPress={() => navigation.navigate('MyWanted')} />
           <Row last icon="credit-card-clock-outline" title="Pay later" subtitle="Credit you have with farms, and what you owe" onPress={() => navigation.navigate('MyCredit')} />
         </Group>
       </> : null}

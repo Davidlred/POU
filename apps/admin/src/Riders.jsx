@@ -67,6 +67,11 @@ export default function Riders() {
   const selected = (riders || []).find((r) => r.id === selId) || null;
   const panelOpen = !!form || !!selected;
 
+  const toggle = async (r) => {
+    if (r.active && !window.confirm('Deactivate ' + r.name + '? They will stop receiving new deliveries.')) return;
+    try { await rpc('admin_set_rider_active', { p_id: r.id, p_active: !r.active }); setToast(r.name + (r.active ? ' deactivated.' : ' reactivated.')); load(); }
+    catch (e) { setToast(friendlyError(e)); }
+  };
   const saved = (r, isNew) => {
     setForm(null); setSelId(r.id); setTab(r.active ? 'active' : tab);
     setToast(isNew ? r.name + ' added. Send them their sign-in details.' : r.name + ' updated.');
@@ -75,9 +80,9 @@ export default function Riders() {
 
   return (
     <>
-      <main className={'main' + (panelOpen ? ' has-detail' : '')}>
+      <main className={'page ' + (panelOpen ? 'split has-detail' : 'single')}>
         <section className="list-pane">
-          <div className="pane-head row between wrap gap">
+          <div className="page-head row between wrap gap">
             <div>
               <h1>Riders</h1>
               <p className="muted">Riders sign in to the rider app with the email you add here.</p>
@@ -90,10 +95,10 @@ export default function Riders() {
             <Stat label="On delivery" value={counts.onJob} />
           </div>
           <div className="toolbar">
-            <div className="tabs" role="tablist">
+            <div className="seg" role="tablist">
               {TABS.map((t) => (
-                <button key={t.id} role="tab" aria-selected={tab === t.id} className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => setTab(t.id)}>
-                  {t.label}<span className="count">{counts[t.id]}</span>
+                <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+                  {t.label} <span className="count">{counts[t.id]}</span>
                 </button>
               ))}
             </div>
@@ -109,29 +114,35 @@ export default function Riders() {
             </div>
           ) : null}
 
-          <ul className="farm-list">
-            {shown.map((r) => {
-              const st = statusOf(r);
-              return (
-                <li key={r.id}>
-                  <button className={'farm-row' + (r.id === selId && !form ? ' on' : '')} onClick={() => { setForm(null); setSelId(r.id); }}>
-                    <div className="avatar rider">{r.name.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase()}</div>
-                    <div className="grow">
-                      <div className="row gap-sm wrap"><span className="strong">{r.name}</span><span className={'pill ' + st.key}>{st.label}</span></div>
-                      <div className="muted small">{r.vehicle}{r.plate ? ' · ' + r.plate : ''}{r.zone ? ' · ' + r.zone : ''}</div>
-                    </div>
-                    {!r.signed_in ? <span className="muted small nowrap">Not signed in</span> : <span className="muted small mono nowrap">{r.delivered} done</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          {shown.length ? (
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>Rider</th><th>Status</th><th>Zone</th><th className="right">Deliveries</th><th className="right">Rating</th><th className="right"><span className="sr">Actions</span></th></tr></thead>
+                <tbody>
+                  {shown.map((r) => {
+                    const st = statusOf(r);
+                    return (
+                      <tr key={r.id} className={r.id === selId && !form ? 'on' : ''} onClick={() => { setForm(null); setSelId(r.id); }} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') { setForm(null); setSelId(r.id); } }}>
+                        <td><div className="row gap-sm"><div className="avatar rider">{r.name.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase()}</div>
+                          <div><div className="strong">{r.name}</div><div className="muted small">{r.vehicle}{r.plate ? ' · ' + r.plate : ''}{!r.signed_in ? ' · not signed in' : ''}</div></div></div></td>
+                        <td><span className={'pill ' + st.key}>{st.label}</span></td>
+                        <td className="small">{r.zone || '—'}</td>
+                        <td className="right mono">{r.delivered}</td>
+                        <td className="right mono">{r.rating ? Number(r.rating).toFixed(1) + ' ★' : '—'}</td>
+                        <td className="right"><button className={'btn sm ' + (r.active ? 'ghost danger-text' : 'outline')} onClick={(e) => { e.stopPropagation(); toggle(r); }}>{r.active ? 'Deactivate' : 'Reactivate'}</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </section>
 
         {form ? <RiderForm key={form.id || 'new'} initial={form} zones={zones} onCancel={() => setForm(null)} onSaved={saved} />
           : selected ? <RiderDetail key={selected.id} rider={selected} onClose={() => setSelId(null)} onEdit={() => setForm({ ...EMPTY, ...selected, phone: selected.phone || '', plate: selected.plate || '', zone: selected.zone || '' })}
               onToast={setToast} onChanged={load} />
-          : <aside className="detail-pane placeholder hide-sm"><p className="muted">Select a rider, or add a new one.</p></aside>}
+          : null}
       </main>
       {toast ? <div className="toast" role="status">{toast}</div> : null}
     </>

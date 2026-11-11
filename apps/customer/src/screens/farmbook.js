@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Toggle,
+import { usePage, useWide, HeaderBar, SectionHead, DataTable, MeterBar, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Toggle,
   naira, isoDate, shortDate, rpc, uploadImage, friendlyError, supabase, Fab, PhotoButtons } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 
@@ -11,8 +11,10 @@ const entryPill = (e) => (e.status === 'paid' ? { tone: 'ok', label: 'Payment co
 const typeLabel = (t) => (t === 'business' ? 'Business' : 'Individual');
 
 // ---------- Farm side ----------
-export function FarmBookScreen({ navigation }) {
+// embedded: shown as a tab inside Farm Hub (no title bar of its own).
+export function FarmBookScreen({ navigation, embedded }) {
   const page = usePage();
+  const wide = useWide();
   const { c } = useTheme();
   const { seller, bookName } = useAuth();
   const [book, setBook] = useState(null);
@@ -26,57 +28,76 @@ export function FarmBookScreen({ navigation }) {
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const pending = (book?.entries || []).filter((e) => e.status === 'pending');
   const paid = (book?.entries || []).filter((e) => e.status === 'paid');
-  const qualifying = (book?.eligible || []).filter((x) => x.qualifies);
   const rows = tab === 'pending' ? pending : paid;
+  const close = (book?.eligible || []).slice(0, 5);
+  const hearth = book ? (
+    <Hearth style={wide ? { flex: 1.3 } : null}>
+      <Txt v="label" color={c.hmute}>Customers owe you</Txt>
+      <Txt v="monoLg" color={c.hink} style={{ fontSize: wide ? 44 : 38, lineHeight: wide ? 50 : 44 }}>{naira(book.outstanding)}</Txt>
+      {Number(book.overdue) > 0 ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="alert-outline" size={16} color={c.herr} /><Txt v="strong" color={c.herr}>{naira(book.overdue) + ' is overdue'}</Txt></View>
+        : <Txt v="small" color={c.hmute}>Nothing overdue</Txt>}
+      <Txt v="small" color={c.hmute}>{'Collected in the last 30 days · ' + naira(book.collected_30d)}</Txt>
+      <Button small variant="onHearth" icon="plus" title="Log a credit sale" onPress={() => navigation.navigate('CreditLog')} style={{ alignSelf: 'flex-start', paddingHorizontal: 20 }} />
+    </Hearth>
+  ) : null;
+  const closeCard = book ? (
+    <Card style={[{ gap: 12, padding: 18 }, wide ? { flex: 1 } : null]}>
+      <Txt v="h2">Close to pay later</Txt>
+      <Txt v="small">{'App buyers qualify after buying ' + naira(THRESHOLD.individual) + ' from your ' + seller + ' (' + naira(THRESHOLD.business) + ' for a business).'}</Txt>
+      {close.length ? close.map((x) => (
+        <View key={x.buyer_id} style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Txt v="strong" style={{ flex: 1 }} numberOfLines={1}>{x.name}</Txt>
+            {x.qualifies ? <Button small title="Allow" onPress={() => navigation.navigate('CreditAllow', { buyer: x })} style={{ height: 36, paddingHorizontal: 14 }} />
+              : <Txt v="small">{naira(x.bought) + ' of ' + naira(x.threshold)}</Txt>}
+          </View>
+          <MeterBar pct={Number(x.bought) / Number(x.threshold)} />
+        </View>
+      )) : <Txt v="small">No app buyers yet. They show up after their first delivered order from you.</Txt>}
+    </Card>
+  ) : null;
+  const seg = <Segmented options={[{ value: 'pending', label: 'Pending · ' + pending.length }, { value: 'paid', label: 'Paid · ' + paid.length }, { value: 'customers', label: 'Customers · ' + (book?.customers?.length || 0) }]} value={tab} onChange={setTab} />;
+  const table = tab !== 'customers' ? (
+    <DataTable minWidth={640} columns={[{ label: 'Customer', flex: 1.4 }, { label: 'Items', flex: 2 }, { label: 'Status', flex: 1.1 }, { label: 'Amount', right: true }, { label: '', width: 120, right: true }]}
+      rows={rows.map((e) => { const p = entryPill(e); return { key: e.id, onPress: () => navigation.navigate('CreditEntry', { id: e.id }), cells: [
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name={e.on_app ? 'cellphone-check' : 'account-outline'} size={18} color={c.mute} /><Txt v="strong" numberOfLines={1} style={{ flexShrink: 1 }}>{e.customer}</Txt></View>,
+        <Txt v="small" numberOfLines={2}>{e.description}</Txt>,
+        <Pill tone={e.overdue ? 'err' : p.tone} icon={e.overdue ? 'alert-outline' : undefined} label={e.status === 'pending' && e.due_date && !e.overdue ? 'Due ' + shortDate(e.due_date) : p.label} />,
+        <Txt v="mono">{naira(e.amount)}</Txt>,
+        e.status === 'pending' ? <Button small variant="outline" title="Mark paid" onPress={() => navigation.navigate('CreditEntry', { id: e.id })} style={{ height: 40, paddingHorizontal: 14 }} /> : <Pill tone="ok" label="Paid" />] }; })}
+      empty={<Empty icon={tab === 'pending' ? 'check-circle-outline' : 'receipt-text-outline'} title={tab === 'pending' ? 'Nobody owes you right now' : 'No payments recorded yet'}
+        body={tab === 'pending' ? 'When a customer takes goods without paying, write it down here so nothing is forgotten.' : 'Paid entries show here once you upload a receipt or a buyer pays in the app.'} style={{ borderWidth: 0 }} />} />
+  ) : (
+    <DataTable minWidth={560} columns={[{ label: 'Customer', flex: 1.6 }, { label: 'Type', flex: 1.4 }, { label: 'Limit', right: true }, { label: 'Owes you', right: true }]}
+      rows={(book?.customers || []).map((k) => ({ key: k.id, onPress: () => navigation.navigate('CreditCustomer', { id: k.id }), cells: [
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name={k.on_app ? 'cellphone-check' : 'account-outline'} size={18} color={c.mute} /><Txt v="strong" numberOfLines={1} style={{ flexShrink: 1 }}>{k.name}</Txt></View>,
+        <Txt v="small">{typeLabel(k.customer_type) + (k.on_app ? ' · on the app' : '') + (k.status === 'blocked' ? ' · blocked' : '')}</Txt>,
+        <Txt v="mono">{k.on_app ? naira(k.credit_limit) : '–'}</Txt>, <Txt v="mono">{naira(k.outstanding)}</Txt>] }))}
+      empty={<Empty icon="account-multiple-outline" title="No customers yet" body="Customers show here when you log a credit sale or allow an app buyer to pay later." style={{ borderWidth: 0 }} />} />
+  );
+  const body = <>
+    {err ? <Banner tone="err" title="Couldn't load your book" body={err} action="Retry" onAction={load} /> : null}
+    {book === null && !err ? <Skeleton h={160} r={24} /> : null}
+    {book ? <>
+      {wide ? <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{hearth}{closeCard}</View> : <>{hearth}{closeCard}</>}
+      <SectionHead title="Credit sales" right={wide ? <View style={{ width: 400 }}>{seg}</View> : null} />
+      {!wide ? seg : null}
+      {table}
+    </> : null}
+  </>;
+  if (embedded) return <View style={{ gap: wide ? 24 : 16 }}>{body}</View>;
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
-        <View style={{ marginHorizontal: -20 }}><AppBar title={bookName} subtitle="Sales on credit" /></View>
-        {err ? <Banner tone="err" title="Couldn't load your book" body={err} action="Retry" onAction={load} /> : null}
-        {book === null && !err ? <Skeleton h={140} r={24} /> : null}
-        {book ? <>
-          <Hearth>
-            <Txt v="label" color={c.hmute}>Customers owe you</Txt>
-            <Txt v="monoLg" color={c.hink} style={{ fontSize: 34 }}>{naira(book.outstanding)}</Txt>
-            <View style={{ flexDirection: 'row', gap: 20 }}>
-              <View><Txt v="label" color={c.hmute}>Overdue</Txt><Txt v="mono" color={Number(book.overdue) ? c.ember : c.hink}>{naira(book.overdue)}</Txt></View>
-              <View><Txt v="label" color={c.hmute}>Collected · 30 days</Txt><Txt v="mono" color={c.hink}>{naira(book.collected_30d)}</Txt></View>
-            </View>
-          </Hearth>
-          {qualifying.length ? <Banner tone="info" icon="account-star-outline" title={qualifying.length + ' customer' + (qualifying.length === 1 ? ' has' : 's have') + ' bought enough to qualify for credit'} body="Choose who you trust to pay later." action="Review" onAction={() => setTab('customers')} /> : null}
-          <Segmented options={[{ value: 'pending', label: 'Pending' + (pending.length ? ' · ' + pending.length : '') }, { value: 'paid', label: 'Paid' }, { value: 'customers', label: 'Customers' }]} value={tab} onChange={setTab} />
-          {tab !== 'customers' ? (
-            !rows.length ? <Empty icon={tab === 'pending' ? 'check-circle-outline' : 'receipt-text-outline'} title={tab === 'pending' ? 'Nobody owes you right now' : 'No payments recorded yet'}
-              body={tab === 'pending' ? 'When a customer takes goods without paying, write it down here so nothing is forgotten.' : 'Paid entries appear here once you upload a receipt or a buyer pays in the app.'} />
-              : <Group>{rows.map((e, i) => { const p = entryPill(e); return (
-                <Row key={e.id} last={i === rows.length - 1} icon={e.on_app ? 'cellphone-check' : 'account-outline'} title={e.customer}
-                  subtitle={e.description + (e.status === 'pending' && e.due_date ? ' · due ' + shortDate(e.due_date) : '')} onPress={() => navigation.navigate('CreditEntry', { id: e.id })}
-                  right={<View style={{ alignItems: 'flex-end', gap: 4 }}><Txt v="mono" style={{ fontSize: 14 }}>{naira(e.amount)}</Txt><Pill tone={p.tone} label={p.label} /></View>} />); })}</Group>
-          ) : <>
-            {book.customers.length ? <Group>{book.customers.map((k, i) => (
-              <Row key={k.id} last={i === book.customers.length - 1} icon={k.on_app ? 'cellphone-check' : 'account-outline'} title={k.name}
-                subtitle={typeLabel(k.customer_type) + (k.on_app ? ' · on the app · limit ' + naira(k.credit_limit) : ' · not on the app') + (k.status === 'blocked' ? ' · blocked' : '')}
-                onPress={() => navigation.navigate('CreditCustomer', { id: k.id })}
-                right={<Txt v="mono" color={Number(k.outstanding) ? c.ink : c.mute} style={{ fontSize: 14 }}>{naira(k.outstanding)}</Txt>} />))}</Group>
-              : <Card><Txt v="small">Customers appear here when you log a credit sale or allow an app buyer to pay later.</Txt></Card>}
-            <Txt v="label">App buyers · credit eligibility</Txt>
-            <Txt v="small">A buyer qualifies after buying {naira(THRESHOLD.individual)} from your {seller}, or {naira(THRESHOLD.business)} if they are a business.</Txt>
-            {book.eligible.length ? <Group>{book.eligible.map((x, i) => (
-              <Row key={x.buyer_id} last={i === book.eligible.length - 1} icon={x.qualifies ? 'account-star-outline' : 'account-clock-outline'} iconColor={x.qualifies ? c.sage : c.mute} title={x.name}
-                subtitle={typeLabel(x.buyer_type) + ' · bought ' + naira(x.bought) + ' of ' + naira(x.threshold)}
-                onPress={x.qualifies ? () => navigation.navigate('CreditAllow', { buyer: x }) : undefined}
-                right={x.qualifies ? <Pill tone="ok" label="Qualifies" /> : <Txt v="small">{Math.floor((Number(x.bought) / Number(x.threshold)) * 100)}%</Txt>} />))}</Group>
-              : <Card><Txt v="small">No app buyers yet. They show up here after their first delivered order from you.</Txt></Card>}
-          </>}
-        </> : null}
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: wide ? 20 : 0, gap: wide ? 24 : 16, paddingBottom: 100 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+        {wide ? <HeaderBar title={bookName} subtitle="Sales on credit"><Button small icon="plus" title="Log a credit sale" onPress={() => navigation.navigate('CreditLog')} style={{ paddingHorizontal: 18 }} /></HeaderBar>
+          : <View style={{ marginHorizontal: -20 }}><AppBar title={bookName} subtitle="Sales on credit" /></View>}
+        {body}
       </ScrollView>
-      <Fab label="Log credit sale" accessibilityLabel="Log a credit sale" onPress={() => navigation.navigate('CreditLog')} />
     </Screen>
   );
 }
 
-// Write down a sale someone took without paying. Works for people who aren't on the app.
-// What one line costs, and how a unit reads ("5 crates", "2.5 kg").
+// How a unit reads ("5 crates", "2.5 kg"), and a key for each line of the sale.
 const plural = (u, q) => (Number(q) === 1 || !u || u === 'kg' || u.endsWith('s') ? u : u + 's');
 let lineKey = 0;
 

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export function ProfileScreen({ navigation }) {
   const { c, pref, setPref } = useTheme();
-  const { profile, vendor, signOut, setActiveRole, refresh, seller } = useAuth();
+  const { profile, vendor, signOut, refresh, seller } = useAuth();
   const [typeSheet, setTypeSheet] = useState(false);
   const [bType, setBType] = useState(profile?.buyer_type || 'individual');
   const [bName, setBName] = useState(profile?.buyer_business_name || '');
@@ -17,6 +17,7 @@ export function ProfileScreen({ navigation }) {
   };
   const roles = profile?.roles || [];
   const vs = vendor?.verification_status;
+  const active = profile?.active_role;
   return (
     <Screen scroll>
       <AppBar title="Profile" />
@@ -25,12 +26,13 @@ export function ProfileScreen({ navigation }) {
         <View><Txt v="h1">{profile?.full_name || 'Your name'}</Txt><Txt v="small" color={c.mute} style={{ fontSize: 13 }}>{profile?.email || (profile?.phone ? '+' + profile.phone : '')}</Txt></View>
       </View>
       <Txt v="label">Your roles</Txt>
+      {/* Roles are switched only with the role switcher (sidebar on the website, the pill at the top on phones). */}
       <Group>
-        {roles.includes('buyer') ? <Row icon="basket-outline" title="Buyer" onPress={() => setActiveRole('buyer')} right={profile.active_role === 'buyer' ? <Pill tone="ok" label="Active" /> : <Txt v="small">Switch</Txt>} /> : null}
-        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon={seller === 'store' ? 'storefront-outline' : 'barn'} title={vendor?.business_name || (seller === 'store' ? 'Store' : 'Farm')} subtitle={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Needs attention' : 'In review'} onPress={() => (vs === 'approved' ? setActiveRole(seller === 'store' ? 'supplier' : 'vendor') : navigation.navigate('Pending'))}
-          right={profile.active_role === 'vendor' ? <Pill tone="ok" label="Active" /> : <Pill tone={vs === 'approved' ? 'ok' : vs === 'rejected' ? 'err' : 'warn'} label={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Rejected' : 'Pending'} />} /> : null}
-        {roles.includes('vet') ? <Row icon="stethoscope" title="Vet desk" subtitle="Licence status, bookings and time slots" onPress={() => setActiveRole('vet').then(() => navigation.popTo('Tabs'))} right={profile.active_role === 'vet' ? <Pill tone="ok" label="Active" /> : <Txt v="small">Switch</Txt>} /> : null}
-        {roles.includes('agent') ? <Row icon="account-tie-outline" title="Agent shop" subtitle="Your stock, orders and rebate" onPress={() => setActiveRole('agent').then(() => navigation.popTo('Tabs'))} /> : null}
+        {roles.includes('buyer') ? <Row icon="basket-outline" title="Buyer" subtitle={profile?.buyer_type === 'business' ? 'Business · ' + (profile.buyer_business_name || '') : 'Individual'} onPress={() => setTypeSheet(true)} right={active === 'buyer' ? <Pill tone="ok" label="Active" /> : null} /> : null}
+        {roles.includes('vendor') || roles.includes('supplier') ? <Row icon={seller === 'store' ? 'storefront-outline' : 'barn'} title={vendor?.business_name || (seller === 'store' ? 'Store' : 'Farm')} subtitle={seller === 'store' ? 'Store' : 'Farm'} onPress={vs === 'approved' ? undefined : () => navigation.navigate('Pending')}
+          right={<Pill tone={vs === 'approved' ? 'ok' : vs === 'rejected' ? 'err' : 'warn'} label={vs === 'approved' ? 'Verified' : vs === 'rejected' ? 'Needs changes' : 'In review'} />} /> : null}
+        {roles.includes('vet') ? <Row icon="stethoscope" title="Vet" subtitle="Bookings, hours and fee are on the vet desk" right={active === 'vet' ? <Pill tone="ok" label="Active" /> : null} /> : null}
+        {roles.includes('agent') ? <Row icon="account-tie-outline" title="Agent shop" subtitle="Stock, orders and rebate are on your dashboard" right={active === 'agent' ? <Pill tone="ok" label="Active" /> : null} /> : null}
         {(roles.includes('vendor') || roles.includes('supplier')) && vs === 'approved' ? <Row icon="account-group-outline" title="Agents" subtitle="Your invite code and top agents" onPress={() => navigation.navigate('StoreAgents')} /> : null}
         {roles.includes('investor') ? <Row icon="chart-line" title="Investor" subtitle="Portfolio and identity verification" onPress={() => navigation.navigate('InvestHome')} /> : null}
         <Row icon="compass-outline" title="Explore" subtitle="Shop, add a farm, work as a vet or agent" onPress={() => navigation.navigate('Explore')} />
@@ -39,12 +41,11 @@ export function ProfileScreen({ navigation }) {
       {roles.includes('buyer') ? <>
         <Txt v="label">Buying</Txt>
         <Group>
-          <Row icon={profile?.buyer_type === 'business' ? 'storefront-outline' : 'account-outline'} title={profile?.buyer_type === 'business' ? 'Business buyer · ' + (profile.buyer_business_name || '') : 'Individual buyer'} subtitle="Farms use this when deciding on credit" onPress={() => setTypeSheet(true)} />
           <Row last icon="credit-card-clock-outline" title="Pay later" subtitle="Credit you have with farms, and what you owe" onPress={() => navigation.navigate('MyCredit')} />
         </Group>
       </> : null}
       <Txt v="label">Appearance</Txt>
-      <Segmented options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Night' }]} value={pref} onChange={setPref} />
+      <Segmented options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} value={pref} onChange={setPref} />
       <Txt v="label">Settings</Txt>
       <Group>
         {vendor ? <Row icon="bank-outline" title="Payout account" subtitle={vendor.bank_verified ? vendor.bank_name + ' ••' + vendor.bank_account_last4 : 'Not added'} onPress={() => navigation.navigate('Bank')} /> : null}

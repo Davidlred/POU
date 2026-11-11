@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Linking, Image, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
-import { useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Pill, Stat, Group, Row, Skeleton,
+import { useWide, SectionHead, PlaceholderArt, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Pill, Stat, Group, Row, Skeleton,
   naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { useFarm, save } from '../lib/offlineQueue';
@@ -11,28 +11,96 @@ import { SIGNS, triage } from '../lib/triage';
 
 const Avatar = ({ v, size = 56 }) => { const { c } = useTheme(); return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.t2, alignItems: 'center', justifyContent: 'center' }}><Txt v="h2" color={c.t2i}>{v.initials}</Txt></View>; };
 
-export function VetHomeScreen({ navigation }) {
+// Vet care (a tab inside Farm Hub, or its own page): symptom check, the next consult, verified vets.
+export function VetHomeScreen({ navigation, embedded }) {
   const { c } = useTheme();
+  const wide = useWide();
   const [up, setUp] = useState(null);
-  useFocusEffect(useCallback(() => { supabase.from('consultations').select('*, vet:vets(name,initials)').in('status', ['requested', 'proposed', 'confirmed']).order('created_at', { ascending: false }).then(({ data }) => setUp(data || [])); }, []));
+  const [vets, setVets] = useState(null);
+  useFocusEffect(useCallback(() => {
+    supabase.from('consultations').select('*, vet:vets(name,initials)').in('status', ['requested', 'proposed', 'confirmed']).order('created_at', { ascending: false }).then(({ data }) => setUp(data || []));
+    Promise.all([supabase.from('vets').select('*').order('rating', { ascending: false }).limit(6),
+      supabase.from('vet_slots').select('vet_id,starts_at').eq('booked', false).gt('starts_at', new Date().toISOString()).order('starts_at')])
+      .then(([{ data: v }, { data: s }]) => setVets((v || []).map((x) => ({ ...x, next: (s || []).find((y) => y.vet_id === x.id)?.starts_at }))));
+  }, []));
+  const next = (up || []).find((k) => k.status === 'confirmed') || (up || [])[0];
+  const others = (up || []).filter((k) => k !== next);
+  const triageCard = (
+    <View style={[{ backgroundColor: c.t2, borderRadius: 20, padding: 18, gap: 10 }, wide ? { flex: 1 } : null]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <PlaceholderArt kind="bird" size={56} round style={{ backgroundColor: c.sf }} />
+        <View style={{ flex: 1 }}><Txt v="h2">Birds looking unwell?</Txt><Txt v="strong" color={c.t2i} style={{ fontSize: 14 }}>Preliminary triage, not a diagnosis.</Txt></View>
+      </View>
+      <Txt v="small">Tick the signs and add photos. You get a triage note, then can talk to a vet today.</Txt>
+      <Button icon="camera-outline" title="Check symptoms" onPress={() => navigation.navigate('Symptom')} style={{ alignSelf: wide ? 'flex-start' : 'stretch', paddingHorizontal: 22 }} />
+    </View>
+  );
+  const consult = next ? (
+    <Hearth style={wide ? { flex: 1 } : null} onPress={() => navigation.navigate('Consultation', { id: next.id })}>
+      <Txt v="label" color={c.hmute}>{next.status === 'confirmed' ? 'Next consult' : next.status === 'proposed' ? 'The vet proposed a time' : 'Waiting for the vet'}</Txt>
+      <Txt v="monoLg" color={c.hink} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 36, lineHeight: 42 }}>{next.proposed_at ? shortDate(next.proposed_at) + ', ' + clock(next.proposed_at) : 'Time to be set'}</Txt>
+      <Txt v="body" color={c.hmute}>{next.vet?.name + ' · ' + (next.type === 'video' ? 'Video consult' : 'Farm visit')}</Txt>
+      <Button small variant="onHearth" icon={next.type === 'video' ? 'video-outline' : 'calendar-check'} title={next.type === 'video' && next.status === 'confirmed' ? 'Join video call' : 'Open'} onPress={() => navigation.navigate('Consultation', { id: next.id })} style={{ alignSelf: 'flex-start', paddingHorizontal: 20 }} />
+    </Hearth>
+  ) : (
+    <Card style={[{ gap: 8, padding: 18 }, wide ? { flex: 1 } : null]}>
+      <Txt v="label">Next consult</Txt>
+      <Txt v="h2">None booked</Txt>
+      <Txt v="small">Book a video consult or a farm visit with a verified vet.</Txt>
+      <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+        <Button small title="Find a vet" onPress={() => navigation.navigate('VetList')} style={{ paddingHorizontal: 18 }} />
+        <Button small variant="outline" title="Farm visit" onPress={() => navigation.navigate('VetList', { onsite: true })} style={{ paddingHorizontal: 18 }} />
+      </View>
+    </Card>
+  );
+  const vetCards = (
+    <View style={{ gap: 12 }}>
+      <SectionHead title="Verified vets" action="See all" onAction={() => navigation.navigate('VetList')} />
+      {vets === null ? <Skeleton h={120} r={20} /> : !vets.length ? <Empty icon="stethoscope" title="No vets listed yet" body="Verified vets show here as soon as they join." /> : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {vets.map((v) => (
+            <Card key={v.id} onPress={() => navigation.navigate('VetProfile', { id: v.id })} style={{ flexBasis: wide ? '30%' : '100%', flexGrow: 1, gap: 12, padding: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Avatar v={v} size={48} />
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Txt v="bold" numberOfLines={1} style={{ flexShrink: 1 }}>{v.name}</Txt><Icon name="check-decagram" size={16} color={c.acc} /></View>
+                  <Txt v="small" numberOfLines={1}>{v.specialty}</Txt>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', borderTopWidth: 1, borderColor: c.line, paddingTop: 10 }}>
+                {[['Fee', naira(v.fee)], ['Rating', v.rating ? '★ ' + Number(v.rating).toFixed(1) : 'New'], ['Next free', v.next ? shortDate(v.next).replace(/^\w+,?\s/, '') + ' ' + clock(v.next) : 'Full']].map(([l, val]) => (
+                  <View key={l} style={{ flex: 1, gap: 2 }}><Txt v="small">{l}</Txt><Txt v="mono" numberOfLines={1} style={{ fontSize: 14 }}>{val}</Txt></View>
+                ))}
+              </View>
+              <Button small title="Book" disabled={!v.next} onPress={() => navigation.navigate('VetProfile', { id: v.id })} />
+            </Card>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+  const more = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {[['Drugs & vaccines', 'pill', 't1', () => navigation.navigate('Inventory', { tab: 'health' })], ['Health records', 'folder-heart-outline', 't3', () => navigation.navigate('HealthRecords')]].map(([l, i, t, fn]) => (
+        <Pressable key={l} onPress={fn} accessibilityRole="button" style={({ hovered }) => ({ flexBasis: '45%', flexGrow: 1, minHeight: 60, borderRadius: 18, backgroundColor: c[t], paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, opacity: hovered ? 0.9 : 1 })}>
+          <Icon name={i} color={c[t + 'i']} /><Txt v="bold" style={{ fontSize: 14 }}>{l}</Txt></Pressable>))}
+    </View>
+  );
+  const body = <>
+    {wide ? <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{triageCard}{consult}</View> : <>{triageCard}{consult}</>}
+    {others.length ? <View style={{ gap: 10 }}><SectionHead title="Other requests" />{others.map((k) => (
+      <Card key={k.id} onPress={() => navigation.navigate('Consultation', { id: k.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Avatar v={k.vet} size={44} /><View style={{ flex: 1 }}><Txt v="bold">{k.vet.name}</Txt><Txt v="small">{k.type === 'video' ? 'Video' + (k.proposed_at ? ' · ' + shortDate(k.proposed_at) + ' ' + clock(k.proposed_at) : '') : 'Farm visit · ' + (k.status === 'requested' ? 'waiting for the vet' : k.status)}</Txt></View>
+        <Pill tone={k.status === 'confirmed' ? 'ok' : 'warn'} label={k.status === 'confirmed' ? 'Confirmed' : k.status === 'proposed' ? 'New time' : 'Requested'} />
+      </Card>))}</View> : null}
+    {vetCards}
+    {more}
+  </>;
+  if (embedded) return <View style={{ gap: wide ? 24 : 16 }}>{body}</View>;
   return (
     <Screen scroll>
       <AppBar title="Vet care" />
-      <Hearth>
-        <Txt v="h1" color={c.hink}>Birds looking unwell?</Txt>
-        <Txt v="small" color={c.hmute}>Upload a photo for a quick triage note, then talk to a vet if needed.</Txt>
-        <Button icon="camera-outline" title="Check symptoms" onPress={() => navigation.navigate('Symptom')} />
-      </Hearth>
-      {up && up.length ? <><Txt v="label">Upcoming</Txt>{up.map((k) => (
-        <Card key={k.id} onPress={() => navigation.navigate('Consultation', { id: k.id })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Avatar v={k.vet} size={48} /><View style={{ flex: 1 }}><Txt v="bold">{k.vet.name}</Txt><Txt v="small">{k.type === 'video' ? 'Video · ' + (k.proposed_at ? shortDate(k.proposed_at) + ' ' + clock(k.proposed_at) : '') : 'On-site · ' + (k.status === 'requested' ? 'awaiting vet' : k.status)}</Txt></View>
-          <Pill tone={k.status === 'confirmed' ? 'ok' : 'warn'} label={k.status === 'confirmed' ? 'Confirmed' : k.status === 'proposed' ? 'New time' : 'Requested'} />
-        </Card>))}</> : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {[['Find a vet', 'stethoscope', 't2', () => navigation.navigate('VetList')], ['On-site visit', 'home-heart', 't4', () => navigation.navigate('VetList', { onsite: true })],
-          ['Drugs & vaccines', 'pill', 't1', () => navigation.navigate('Inventory', { tab: 'health' })], ['Health records', 'folder-heart-outline', 't3', () => navigation.navigate('HealthRecords')]].map(([l, i, t, fn]) => (
-          <Pressable key={l} onPress={fn} style={{ flexBasis: '45%', flexGrow: 1, minHeight: 96, borderRadius: 20, backgroundColor: c[t], padding: 14, gap: 10, justifyContent: 'space-between' }}><Icon name={i} size={26} color={c[t + 'i']} /><Txt v="bold" style={{ fontSize: 14 }}>{l}</Txt></Pressable>))}
-      </View>
+      {body}
     </Screen>
   );
 }

@@ -15,7 +15,7 @@ export function CartProvider({ children }) {
     const i = items.findIndex((x) => x.listing_id === listing.id);
     if (i >= 0) { const n = [...items]; n[i] = { ...n[i], qty: n[i].qty + qty }; return save(n); }
     save([...items, { listing_id: listing.id, title: listing.title, price: Number(listing.price), unit: listing.unit, qty,
-      vendor_id: listing.vendor_id, vendor_name: listing.vendor?.business_name, photo: listing.photos?.[0] || null, via_search: viaSearch }]);
+      vendor_id: listing.vendor_id, vendor_name: listing.vendor?.business_name, photo: listing.photos?.[0] || null, via_search: viaSearch, category: listing.category }]);
   };
   const setQty = (id, qty) => save(qty <= 0 ? items.filter((x) => x.listing_id !== id) : items.map((x) => (x.listing_id === id ? { ...x, qty } : x)));
   const remove = (id) => save(items.filter((x) => x.listing_id !== id));

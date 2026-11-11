@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Pressable, ScrollView, Alert } from 'react-native';
-import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate, naira, Fab } from '@p360/shared';
+import { usePage, useWide, HeaderBar, DataTable, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Sheet, isoDate, shortDate, naira, Fab } from '@p360/shared';
 import { useFarm, save } from '../lib/offlineQueue';
 
 const TABS = [{ value: 'health', label: 'Vaccines' }, { value: 'feed', label: 'Feeds' }, { value: 'other', label: 'Farm assets' }];
@@ -34,16 +34,18 @@ export function itemAlert(it) {
   return null;
 }
 
-export function InventoryScreen({ navigation, route }) {
+// embedded: shown as a tab inside Farm Hub (no title bar of its own).
+export function InventoryScreen({ navigation, route, embedded }) {
   const page = usePage();
+  const wide = useWide();
   const { c } = useTheme();
   const { data } = useFarm();
-  const [tab, setTab] = useState(route.params?.tab || 'health');   // first tab: Vaccines (Vet care also opens it here)
+  const [tab, setTab] = useState(route?.params?.tab || 'health');   // first tab: Vaccines (Vet care also opens it here)
   const [sel, setSel] = useState(null);       // item being adjusted
   const [amount, setAmount] = useState('');
   const items = useMemo(() => (data.farm_inventory || []).filter((x) => x.status !== 'removed').sort((a, b) => a.name.localeCompare(b.name)), [data]);
   const shown = items.filter((x) => cat(x.category).tab === tab);
-  const alerts = items.map(itemAlert).filter(Boolean);
+  const count = (t) => items.filter((x) => cat(x.category).tab === t).length;
   const current = sel ? items.find((x) => x.id === sel) : null;
   const n = Number(amount || 0);
   const adjust = async (dir) => {
@@ -52,46 +54,67 @@ export function InventoryScreen({ navigation, route }) {
     await save('farm_inventory', { ...current, _pending: undefined, _failed: undefined, quantity: Number(current.quantity) + dir * n });
     setSel(null); setAmount('');
   };
+  const seg = <Segmented options={TABS.map((t) => ({ value: t.value, label: t.label + ' · ' + count(t.value) }))} value={tab} onChange={setTab} />;
+  const shop = tab === 'health' ? { title: 'Shop for drugs & vaccines', cat: 'drugs' } : tab === 'feed' ? { title: 'Shop for feed', cat: 'feed' } : { title: 'Shop for equipment', cat: 'equipment' };
+  const table = (
+    <DataTable minWidth={640} columns={[{ label: 'Item', flex: 2 }, { label: 'In store', flex: 1.1 }, { label: 'Alert', flex: 1.2 }, { label: 'Price', flex: 1, right: true }, { label: '', width: 110, right: true }]}
+      rows={shown.map((it) => {
+        const a = itemAlert(it);
+        const noPrice = it.category === 'feed' && !perKg(it);
+        return { key: it.id, onPress: () => { setSel(it.id); setAmount(''); }, cells: [
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: c.sf2, alignItems: 'center', justifyContent: 'center' }}><Icon name={cat(it.category).icon} size={18} color={c.mute} /></View>
+            <View style={{ flexShrink: 1 }}><Txt v="strong" numberOfLines={1}>{it.name}</Txt><Txt v="small">{cat(it.category).label + (it._pending ? ' · saving' : '')}</Txt></View></View>,
+          <Txt v="mono">{num(it.quantity) + ' ' + (it.unit || '')}</Txt>,
+          a ? <Pill tone={a.tone} icon={a.tone === 'warn' || a.tone === 'err' ? 'alert-outline' : undefined} label={a.label} /> : noPrice ? <Pill tone="warn" icon="tag-outline" label="No price" /> : <Pill tone="ok" label="OK" />,
+          <Txt v="mono">{it.category === 'feed' && it.bag_price ? naira(it.bag_price) + ' / bag' : '–'}</Txt>,
+          a || noPrice ? <Button small variant="outline" title={noPrice ? 'Add price' : 'Restock'} onPress={() => (noPrice ? navigation.navigate('InventoryForm', { id: it.id }) : (setSel(it.id), setAmount('')))} style={{ height: 40, paddingHorizontal: 14 }} /> : <Txt v="small"> </Txt>] };
+      })}
+      empty={<Empty art={tab === 'feed' ? 'feed' : tab === 'health' ? 'vial' : 'feed'} title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No vaccines or drugs recorded yet' : 'No farm assets recorded yet'}
+        body={tab === 'feed' ? 'Add the feed you have in store, with the price of a bag, so feed costs work themselves out.' : tab === 'health' ? 'Add what is in your store, with expiry dates, so nothing goes off unnoticed.' : 'Feeders, drinkers, crates, shavings and anything else you keep.'}
+        action={tab === 'health' ? 'Add what you have' : 'Add an item'} onAction={() => navigation.navigate('InventoryForm', { tab })} style={{ borderWidth: 0 }} />} />
+  );
+  const guide = tab !== 'other' ? (
+    <Card onPress={() => navigation.navigate('CareGuide', { view: tab === 'feed' ? 'feed' : 'health' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={tab === 'feed' ? 'sack' : 'calendar-heart'} size={20} color={c.navactink} /></View>
+      <View style={{ flex: 1 }}><Txt v="bold">{tab === 'feed' ? 'Feed chart' : 'Vaccination chart'}</Txt><Txt v="small">Broilers and layers, by age</Txt></View><Icon name="chevron-right" color={c.mute} />
+    </Card>
+  ) : null;
+  const actions = <>
+    <Button small variant="outline" icon="storefront-outline" title={shop.title} onPress={() => navigation.navigate('Listings', { category: shop.cat })} style={{ paddingHorizontal: 14 }} />
+    <Button small icon="plus" title="Add item" onPress={() => navigation.navigate('InventoryForm', { tab })} style={{ paddingHorizontal: 18 }} />
+  </>;
+  const body = <>
+    <View style={{ flexDirection: wide ? 'row' : 'column', alignItems: wide ? 'center' : 'stretch', gap: 12 }}>
+      <View style={{ flex: wide ? 1 : undefined, maxWidth: wide ? 520 : undefined }}>{seg}</View>
+      {wide ? <View style={{ flexDirection: 'row', gap: 10 }}>{actions}</View> : null}
+    </View>
+    {table}
+    {guide}
+    {!wide ? <Button variant="outline" icon="storefront-outline" title={shop.title} onPress={() => navigation.navigate('Listings', { category: shop.cat })} /> : null}
+  </>;
+  const sheet = (
+    <Sheet visible={!!current} onClose={() => setSel(null)}>
+      {current ? <>
+        <Txt v="h1">{current.name}</Txt>
+        <Txt v="body" color={c.mute}>You have <Txt v="mono">{num(current.quantity)}</Txt> {current.unit || ''}</Txt>
+        <Input label={'How many ' + (current.unit || 'units') + '?'} keyboardType="decimal-pad" value={amount} onChangeText={(t) => setAmount(t.replace(/[^\d.]/g, ''))} mono autoFocus />
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button variant="outline" icon="minus" title="Used" disabled={!(n > 0)} onPress={() => adjust(-1)} style={{ flex: 1 }} />
+          <Button icon="plus" title="Added" disabled={!(n > 0)} onPress={() => adjust(1)} style={{ flex: 1 }} />
+        </View>
+        <Button variant="ghost" title="Edit details" onPress={() => { const id = current.id; setSel(null); navigation.navigate('InventoryForm', { id }); }} />
+      </> : null}
+    </Sheet>
+  );
+  if (embedded) return <View style={{ gap: 16 }}>{body}{!wide ? <Button icon="plus" title="Add item" onPress={() => navigation.navigate('InventoryForm', { tab })} /> : null}{sheet}</View>;
   return (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 0, gap: 14, paddingBottom: 100 }, page]}>
-        <View style={{ marginHorizontal: -20 }}><AppBar title="Inventory" subtitle="What you have on the farm" /></View>
-        {items.length ? (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Stat label="Items" value={items.length} />
-            <Stat label="Need attention" value={alerts.length} sub={alerts.length ? 'Low, out or expiring' : 'All good'} subColor={alerts.length ? c.err : c.sage} />
-          </View>
-        ) : null}
-        <Segmented options={TABS} value={tab} onChange={setTab} />
-        {tab === 'health' ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'health' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Icon name="calendar-heart" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Vaccination chart</Txt><Txt v="small">Broilers and layers, by age</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
-        {tab === 'feed' ? <Card onPress={() => navigation.navigate('CareGuide', { view: 'feed' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Icon name="sack" size={26} color={c.acc} /><View style={{ flex: 1 }}><Txt v="bold">Feed chart</Txt><Txt v="small">Broilers and layers, by age</Txt></View><Icon name="chevron-right" color={c.mute} /></Card> : null}
-        {!shown.length ? <Empty icon={tab === 'feed' ? 'sack' : tab === 'health' ? 'pill' : 'tools'}
-          title={tab === 'feed' ? 'No feed recorded yet' : tab === 'health' ? 'No vaccines or drugs recorded yet' : 'No farm assets recorded yet'}
-          body={tab === 'feed' ? 'Add the feed you have in store so you know when to restock.' : tab === 'health' ? 'Add what is in your store, with expiry dates, so nothing goes off unnoticed.' : 'Feeders, drinkers, crates, shavings and anything else you keep.'}
-          action={tab === 'health' ? 'Add what you have' : 'Add an item'} onAction={() => navigation.navigate('InventoryForm', { tab })} />
-          : <Group>{shown.map((it, i) => { const a = itemAlert(it); return (
-            <Row key={it.id} last={i === shown.length - 1} icon={cat(it.category).icon} title={it.name}
-              subtitle={cat(it.category).label + (it.category === 'feed' && perKg(it) ? ' · ' + naira(it.bag_price) + ' a bag' : '') + (it.expiry_date ? ' · expires ' + shortDate(it.expiry_date) : '') + (it._pending ? ' · saving' : '')}
-              onPress={() => { setSel(it.id); setAmount(''); }}
-              right={<View style={{ alignItems: 'flex-end', gap: 4 }}><Txt v="mono" style={{ fontSize: 15 }}>{num(it.quantity)} <Txt v="small">{it.unit || ''}</Txt></Txt>{a ? <Pill tone={a.tone} label={a.label} /> : it.category === 'feed' && !perKg(it) ? <Pill tone="warn" label="No price" /> : null}</View>} />); })}</Group>}
-        {tab === 'health' ? <Button variant="outline" icon="storefront-outline" title="Shop for drugs & vaccines" onPress={() => navigation.navigate('Listings', { category: 'drugs' })} /> : null}
-        {tab === 'feed' ? <Button variant="outline" icon="storefront-outline" title="Shop for feed" onPress={() => navigation.navigate('Listings', { category: 'feed' })} /> : null}
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: wide ? 20 : 0, gap: 16, paddingBottom: 100 }, page]}>
+        {wide ? <HeaderBar title="Inventory" subtitle="What you have on the farm" /> : <View style={{ marginHorizontal: -20 }}><AppBar title="Inventory" subtitle="What you have on the farm" /></View>}
+        {body}
       </ScrollView>
-      <Fab label="Add item" accessibilityLabel="Add an item" onPress={() => navigation.navigate('InventoryForm', { tab })} />
-      <Sheet visible={!!current} onClose={() => setSel(null)}>
-        {current ? <>
-          <Txt v="h1">{current.name}</Txt>
-          <Txt v="body" color={c.mute}>You have <Txt v="mono">{num(current.quantity)}</Txt> {current.unit || ''}</Txt>
-          <Input label={'How many ' + (current.unit || 'units') + '?'} keyboardType="decimal-pad" value={amount} onChangeText={(t) => setAmount(t.replace(/[^\d.]/g, ''))} mono autoFocus />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button variant="outline" icon="minus" title="Used" disabled={!(n > 0)} onPress={() => adjust(-1)} style={{ flex: 1 }} />
-            <Button icon="plus" title="Added" disabled={!(n > 0)} onPress={() => adjust(1)} style={{ flex: 1 }} />
-          </View>
-          <Button variant="ghost" title="Edit details" onPress={() => { const id = current.id; setSel(null); navigation.navigate('InventoryForm', { id }); }} />
-        </> : null}
-      </Sheet>
+      {!wide ? <Fab label="Add item" accessibilityLabel="Add an item" onPress={() => navigation.navigate('InventoryForm', { tab })} /> : null}
+      {sheet}
     </Screen>
   );
 }

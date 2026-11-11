@@ -7,7 +7,8 @@ const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLa
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite, pendingInviteNow } from '@p360/shared';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite, pendingInviteNow, rpc, CountBadge } from '@p360/shared';
+import { RoleSwitcher } from '../components/RoleSwitcher';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -70,10 +71,40 @@ function VaccinationReminders() {
 }
 const Tab = createBottomTabNavigator();
 
+// Orange counts beside nav items: new or accepted orders for a seller or agent, orders on their way for a buyer.
+// Refreshed when the page changes (at most every 30 s) and every 2 minutes.
+const BADGES = { at: 0, key: '', value: {} };
+function useNavBadges(trigger) {
+  const { profile, uid } = useAuth();
+  const mode = profile?.active_role;
+  const [b, setB] = useState(BADGES.key === uid + mode ? BADGES.value : {});
+  useEffect(() => {
+    if (!uid || mode === 'vet') return undefined;
+    let alive = true;
+    const run = (force) => {
+      if (!force && BADGES.key === uid + mode && Date.now() - BADGES.at < 30000) return;
+      BADGES.at = Date.now(); BADGES.key = uid + mode;
+      const seller = ['vendor', 'supplier', 'agent'].includes(mode);
+      (seller ? rpc('vendor_orders') : rpc('buyer_orders')).then((list) => {
+        const n = seller ? (list || []).filter((o) => o.status === 'placed' || o.status === 'confirmed').length
+          : (list || []).filter((o) => (o.subs || []).some((x) => ['placed', 'confirmed', 'ready', 'picked_up', 'out_for_delivery'].includes(x.status))).length;
+        const value = seller ? { VendorOrders: n } : { Orders: n };
+        BADGES.value = value;
+        if (alive) setB(value);
+      }).catch(() => {});
+    };
+    run(false);
+    const t = setInterval(() => run(true), 120000);
+    return () => { alive = false; clearInterval(t); };
+  }, [uid, mode, trigger]);
+  return b;
+}
+
 // The sections of the signed-in app for the current mode. The phone shows them as the bottom tab bar,
 // the website as the left sidebar.
 function useTabItems() {
   const { profile, isVendorMode, supplierOnly, storeLocked } = useAuth();
+  if (profile?.active_role === 'vet') return [{ name: 'VetDeskHome', component: VetDeskScreen, title: 'Vet desk', icon: 'stethoscope', iconOff: 'stethoscope' }];
   if (profile?.active_role === 'agent') return [
     { name: 'AgentHome', component: AgentDeskScreen, title: 'Dashboard', icon: 'view-dashboard', iconOff: 'view-dashboard-outline' },
     { name: 'VendorOrders', component: VendorOrdersScreen, title: 'Orders', icon: 'receipt-text', iconOff: 'receipt-text-outline' },
@@ -103,7 +134,7 @@ function useTabItems() {
 // swipe back in Chrome) returns to the previous page instead of leaving the site. Paths are the screen names
 // in kebab case (/product, /farm-book); the tabs sit at the top level (/market, /orders).
 const kebab = (n) => n.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'invest', Wallet: 'wallet', VendorHome: 'dashboard', MyListings: 'products', VendorOrders: 'sales', Agents: 'agents', FarmHome: 'farm-hub', AgentHome: 'my-shop' };
+const TAB_PATHS = { Home: '', Market: 'market', Orders: 'orders', Invest: 'invest', Wallet: 'wallet', VendorHome: 'dashboard', MyListings: 'products', VendorOrders: 'sales', Agents: 'agents', FarmHome: 'farm-hub', AgentHome: 'my-shop', VetDeskHome: 'vet-desk' };
 // Pages that can be reopened from their address alone after a reload (their params are plain ids).
 // Any other page with params reopens at home: a reload can't bring back what was passed to it.
 const APP_SCREENS = ['Role', 'Business', 'VetApply', 'AgentJoin', 'Listings', 'Product', 'Store', 'Cart', 'Checkout', 'OrderSuccess', 'Tracking', 'Rate', 'Issue',
@@ -154,21 +185,26 @@ function openSection(name) {
 function Sidebar({ current }) {
   const { c, f, mode, toggle } = useTheme();
   const items = useTabItems();
+  const badges = useNavBadges(current);
   const sel = current || items[0].name;
-  const item = (key, icon, label, on, onPress, role) => (
+  const item = (key, icon, label, on, onPress, role, badge) => (
     <Pressable key={key} accessibilityRole={role} accessibilityState={role === 'tab' ? { selected: on } : undefined} onPress={onPress}
       style={({ hovered }) => ({ height: 48, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, backgroundColor: on ? c.navact : hovered ? c.sf2 : 'transparent' })}>
       <Icon name={icon} size={22} color={on ? c.navactink : c.mute} />
-      <Text style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 15, color: on ? c.ink : c.mute }}>{label}</Text>
+      <Text style={{ flex: 1, fontFamily: on ? f.bold : f.semibold, fontSize: 15, color: on ? c.navactink : c.ink }}>{label}</Text>
+      <CountBadge n={badge} />
     </Pressable>
   );
+  const goTo = (name, params) => { if (navRef.isReady()) navRef.navigate(name, params); };
+  const goHome = () => { if (!navRef.isReady()) return; const root = navRef.getRootState(); if (root.routes[root.index]?.name !== 'Tabs') navRef.dispatch(StackActions.popTo('Tabs')); };
   return (
     <View style={{ width: 248, backgroundColor: c.nav, borderRightWidth: 1, borderColor: c.line, paddingVertical: 20, paddingHorizontal: 14, gap: 4 }}>
       <Pressable onPress={() => openSection(items[0].name)} accessibilityRole="link" accessibilityLabel="Poultry360 home" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, marginBottom: 20 }}>
         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: c.logobg, alignItems: 'center', justifyContent: 'center' }}><Image source={LOGO_MARK} style={{ width: 34, height: 34 }} /></View>
         <Txt v="h2" style={{ fontSize: 20 }}>Poultry360</Txt>
       </Pressable>
-      {items.map((t) => { const on = sel === t.name && current !== 'Profile'; return item(t.name, on ? t.icon : t.iconOff || t.icon, t.title, on, () => openSection(t.name), 'tab'); })}
+      <View style={{ marginBottom: 14 }}><RoleSwitcher variant="sidebar" go={goTo} home={goHome} /></View>
+      {items.map((t) => { const on = sel === t.name && current !== 'Profile'; return item(t.name, on ? t.icon : t.iconOff || t.icon, t.title, on, () => openSection(t.name), 'tab', badges[t.name]); })}
       <View style={{ flex: 1 }} />
       {item('theme', mode === 'dark' ? 'white-balance-sunny' : 'weather-night', mode === 'dark' ? 'Light mode' : 'Dark mode', false, toggle, 'button')}
       {item('Profile', 'account-circle-outline', 'Profile', current === 'Profile', () => { if (current !== 'Profile' && navRef.isReady()) navRef.navigate('Profile'); }, 'link')}
@@ -178,7 +214,8 @@ function Sidebar({ current }) {
 
 function TabBar({ state, descriptors, navigation }) {
   const { c, f } = useTheme();
-  if (useWide()) return null;   // the website uses Sidebar instead
+  const badges = useNavBadges(state.index);
+  if (useWide() || state.routes.length < 2) return null;   // the website uses Sidebar instead; one section needs no tab bar
   return (
     <SafeAreaView edges={['bottom']} style={{ backgroundColor: c.nav, borderTopWidth: 1, borderColor: c.line }}>
       <View style={{ height: 72, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 }}>
@@ -191,8 +228,9 @@ function TabBar({ state, descriptors, navigation }) {
                 {/* The pill is its own view with fixed styles: toggling backgroundColor on one view rendered square corners on Android. */}
                 {on ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 17, overflow: 'hidden', backgroundColor: c.navact }} /> : null}
                 <Icon name={on ? o.icon : o.iconOff || o.icon} size={22} color={on ? c.navactink : c.mute} />
+                {badges[r.name] ? <CountBadge n={badges[r.name]} style={{ position: 'absolute', top: -6, right: 6 }} /> : null}
               </View>
-              <Text maxFontSizeMultiplier={1.15} numberOfLines={1} style={{ fontFamily: on ? f.bold : f.medium, fontSize: 12, color: on ? c.ink : c.mute }}>{o.title}</Text>
+              <Text maxFontSizeMultiplier={1.15} numberOfLines={1} style={{ fontFamily: on ? f.semibold : f.medium, fontSize: 13, color: on ? c.ink : c.mute }}>{o.title}</Text>
             </Pressable>
           );
         })}
@@ -211,10 +249,8 @@ function MainTabs({ mode }) {
 }
 function Tabs(props) {
   const { isVendorMode, profile } = useAuth();
-  const wide = useWide();
-  if (profile?.active_role === 'vet') return <VetDeskScreen {...props} />;
-  // agent: one desk on phones; on the website, sections in the sidebar like the other dashboards
-  if (profile?.active_role === 'agent') return wide ? <MainTabs mode="agent" /> : <AgentDeskScreen {...props} />;
+  if (profile?.active_role === 'vet') return <MainTabs mode="vet" />;
+  if (profile?.active_role === 'agent') return <MainTabs mode="agent" />;
   return <MainTabs mode={isVendorMode ? 'vendor' : 'buyer'} />;
 }
 
@@ -233,8 +269,8 @@ function AuthFlow() {
       {Platform.OS === 'web' ? PUBLIC_SHOP.map(([name, C]) => <Stack.Screen key={name} name={name}>{(p) => <WebAuth navigation={p.navigation} shop><C {...p} /></WebAuth>}</Stack.Screen>) : null}
       {Platform.OS === 'web' ? <Stack.Screen name="JoinStore">{(p) => <WebAuth navigation={p.navigation}><JoinStoreScreen {...p} /></WebAuth>}</Stack.Screen> : null}
       <Stack.Screen name="SignIn">{({ navigation }) => <WebAuth navigation={navigation}><SignInScreen onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} /></WebAuth>}</Stack.Screen>
-      <Stack.Screen name="Email">{({ navigation, route }) => <WebAuth navigation={navigation}><EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email })} /></WebAuth>}</Stack.Screen>
-      <Stack.Screen name="Otp">{({ navigation, route }) => <WebAuth navigation={navigation}><OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} /></WebAuth>}</Stack.Screen>
+      <Stack.Screen name="Email">{({ navigation, route }) => <WebAuth navigation={navigation}><EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()} onSent={(email) => navigation.navigate('Otp', { email, mode: route.params?.mode })} /></WebAuth>}</Stack.Screen>
+      <Stack.Screen name="Otp">{({ navigation, route }) => <WebAuth navigation={navigation}><OtpScreen email={route.params.email} onEdit={() => navigation.goBack()} step={route.params?.mode === 'reset' ? null : 2} /></WebAuth>}</Stack.Screen>
     </Stack.Navigator>
   );
 }
@@ -267,8 +303,8 @@ export default function Navigation() {
   if (loading) return <Splash />;
   const needsRole = session && !(profile?.roles || []).length;
   const farms = (profile?.roles || []).some((r) => r === 'vendor' || r === 'supplier');
-  // Website, signed in: the sidebar stays beside every page (the vet desk is a single page of its own).
-  const sidebar = wide && session && !needsRole && profile?.active_role !== 'vet';
+  // Website, signed in: the sidebar stays beside every page, for every role (it carries the role switcher).
+  const sidebar = wide && session && !needsRole;
   // The key on Stack.Navigator matters: Role, Business and VetApply exist in both groups (they double as "add a role" later).
   // Without it, finishing registration keeps you on the same-named screen instead of opening the app. A new key starts the main group at Tabs.
   return (

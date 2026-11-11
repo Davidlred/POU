@@ -6,9 +6,9 @@ import { palettes, fonts } from './theme';
 const Ctx = createContext(null);
 const KEY = 'p360-theme';
 
-export function ThemeProvider({ children }) {
+export function ThemeProvider({ children, initial }) {
   const system = useColorScheme();
-  const [pref, setPref] = useState(Platform.OS === 'web' ? 'light' : 'system'); // 'system' | 'light' | 'dark'; the website opens in light mode
+  const [pref, setPref] = useState(initial || (Platform.OS === 'web' ? 'light' : 'system')); // 'system' | 'light' | 'dark'; the website opens in light mode
   useEffect(() => { AsyncStorage.getItem(KEY).then((v) => v && setPref(v)); }, []);
   const mode = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
   const value = useMemo(() => ({

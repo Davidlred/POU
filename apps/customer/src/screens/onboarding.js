@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Pressable, Image } from 'react-native';
+import { View, Image, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useTheme, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Banner, Hearth, Steps, Card, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow, PhotoButtons } from '@p360/shared';
+import { useTheme, useWide, Screen, AppBar, Txt, Button, Input, ChipRow, Segmented, Icon, Hearth, Steps, Card, Pill, PhotoBox, rpc, uploadImage, friendlyError, supabase, LOGO_FULL, pendingInviteNow, PhotoButtons,
+  AuthTop, SelectCard, PlaceholderArt, SuccessMoment, TrustRow, LiveDot } from '@p360/shared';
 import { getHere } from '../lib/spot';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
@@ -17,29 +18,32 @@ export function Splash() {
 }
 
 const ROLES = [
-  { id: 'buyer', title: 'Buy', body: 'Order poultry for home, a restaurant or catering', icon: 'basket-outline', tone: 't1' },
-  { id: 'vendor', title: 'Sell as a farm', body: 'List birds and eggs, and manage your flock', icon: 'barn', tone: 't2' },
-  { id: 'supplier', title: 'Supply farms', body: 'Sell feed, medicine or poultry equipment to farmers', icon: 'package-variant', tone: 't4' },
-  { id: 'vet', title: 'Work as a vet', body: 'Offer video consults and farm visits to poultry farmers', icon: 'stethoscope', tone: 't2' },
-  { id: 'agent', title: 'Sell for a store', body: "Open your own shop with a store's products, using the store's code", icon: 'account-tie-outline', tone: 't3' },
-  ...(INVEST_ENABLED ? [{ id: 'investor', title: 'Invest in farms', body: 'Fund verified farms and track your returns', icon: 'chart-line', tone: 't3' }] : []),
+  { id: 'buyer', title: 'Buy', body: 'Poultry for home, a restaurant or catering', art: 'eggs' },
+  { id: 'vendor', title: 'Sell as a farm', body: 'List birds and eggs, run your flock records', art: 'bird' },
+  { id: 'supplier', title: 'Supply farms', body: 'Sell feed, medicine or equipment to farmers', art: 'feed' },
+  { id: 'vet', title: 'Work as a vet', body: 'Video consults and farm visits', art: 'vial' },
+  { id: 'agent', title: 'Sell for a store', body: "Open your own shop with a store's products", art: 'feed' },
+  ...(INVEST_ENABLED ? [{ id: 'investor', title: 'Invest in farms', body: 'Fund verified farms and track returns', icon: 'chart-line' }] : []),
 ];
 const PLAIN = ['buyer', 'investor'];   // roles that need no business details
 const SELLERS = ['vendor', 'supplier'];
 // What a supplier sells: farm supplies only. Each maps to the supplier_type stored for the business.
-const SUPPLIES = [{ label: 'Feed', type: 'feed' }, { label: 'Drugs & vaccines', type: 'medicine' }, { label: 'Equipment & accessories', type: 'equipment' }, { label: 'Packaging & egg crates', type: 'equipment' }];
+const SUPPLIES = [{ label: 'Feed', type: 'feed' }, { label: 'Drugs & vaccines', type: 'medicine' }, { label: 'Equipment', type: 'equipment' }, { label: 'Packaging', type: 'equipment' }];
+const OLD_SUPPLY = { 'Equipment & accessories': 'Equipment', 'Packaging & egg crates': 'Packaging' };
 
+// Step 3 of 4 (or "Add a role" from Profile): what the account is for.
 export function RoleScreen({ navigation, route }) {
   const { c } = useTheme();
+  const wide = useWide();
   const { profile, refresh } = useAuth();
   const adding = !!route.params?.adding;
-  const [sel, setSel] = useState(adding ? [] : pendingInviteNow() ? ['agent'] : ['buyer']);   // came from a store's invite link
+  const [sel, setSel] = useState(adding ? [] : pendingInviteNow() ? ['agent'] : []);   // came from a store's invite link
   const [name, setName] = useState(profile?.full_name || '');
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);   // buyer-only sign-up: show the success moment before the app opens
   const [buyerType, setBuyerType] = useState(profile?.buyer_type || 'individual');
   const [bizName, setBizName] = useState(profile?.buyer_business_name || '');
   const owned = profile?.roles || [];
-  // A vet registers with a licence and a farm/supplier with business details, so those are set up one at a time.
   const toggle = (id) => setSel((s) => {
     if (s.includes(id)) return s.filter((x) => x !== id);
     // vet, agent and the seller roles each have their own setup step, so only one of them at a time
@@ -49,8 +53,8 @@ export function RoleScreen({ navigation, route }) {
   });
   const needsBizName = sel.includes('buyer') && buyerType === 'business' && !bizName.trim();
   const needsName = !adding && !name.trim();
-  // What is stopping them, in plain words. The button stays tappable and says why, instead of sitting greyed out.
-  const problem = !sel.length ? 'Tick at least one option above to continue.' : needsName ? 'Type your name in the box at the top to continue.' : needsBizName ? 'Type your business name to continue.' : null;
+  // The button stays tappable and says why, instead of sitting greyed out.
+  const problem = !sel.length ? 'Pick one to continue' : needsName ? 'Type your name to continue' : needsBizName ? 'Type your business name to continue' : null;
   const [tried, setTried] = useState(false);
   const go = async () => {
     if (problem) { setTried(true); return; }
@@ -64,62 +68,74 @@ export function RoleScreen({ navigation, route }) {
       if (sellers.length) navigation.navigate('Business', { roles: sellers });
       else if (sel.includes('vet')) navigation.navigate('VetApply');   // the vet role is added when the application is submitted
       else if (sel.includes('agent')) navigation.navigate('AgentJoin');   // the agent role is added when they join a store
-      else { await refresh(); if (adding) navigation.goBack(); }
+      else if (adding) { await refresh(); navigation.goBack(); }
+      else setDone(true);
     } catch (e) { alert(friendlyError(e)); } finally { setBusy(false); }
   };
+  if (done) return (
+    <Screen scroll style={{ justifyContent: 'center', flexGrow: 1, maxWidth: 520, width: '100%', alignSelf: 'center' }} footer={<Button title="Start shopping" onPress={refresh} />}>
+      <SuccessMoment title={"You're all set" + (name.trim() ? ', ' + name.trim().split(' ')[0] : '')} body="Browse verified farms near you. Delivery is by Poultry360 riders." />
+    </Screen>
+  );
+  const visible = ROLES.filter((r) => !owned.includes(r.id) && !(owned.includes('agent') && SELLERS.includes(r.id)) && !(r.id === 'agent' && owned.some((x) => SELLERS.includes(x))));
+  const footer = <>
+    {problem && (tried || !sel.length) ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.warnbg, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 }}>
+        <Icon name="alert-outline" size={18} color={c.warn} /><Txt v="strong" color={c.warn} style={{ flex: 1 }}>{problem}</Txt>
+      </View>
+    ) : null}
+    <Button title={sel.length === 1 && sel[0] === 'buyer' ? 'Continue as a buyer' : 'Continue'} onPress={go} loading={busy} />
+  </>;
   return (
-    <Screen scroll footer={<>
-      {problem ? <Txt v="small" color={tried ? c.err : undefined} style={{ textAlign: 'center', fontSize: 14 }}>{problem}</Txt> : null}
-      <Button title={sel.length === 1 && sel[0] === 'buyer' ? 'Continue as a buyer' : 'Continue'} onPress={go} loading={busy} />
-    </>}>
-      {adding ? <AppBar title="Add a role" /> : <View style={{ height: 56 }} />}
-      <Txt v="display">How will you use Poultry360?</Txt>
-      <Txt v="small" style={{ fontSize: 15 }}>{adding ? 'Choose what to add.' : 'Pick one or more. Just buying is fine: you can add other roles later from your profile.'}</Txt>
-      {!adding ? <Input label="Your name" value={name} onChangeText={setName} placeholder="Adaeze Okafor" autoCapitalize="words" error={tried && needsName ? 'Enter your name' : null} /> : null}
-      {/* an agent's account can't also be a farm or store (and the other way round) */}
-      {ROLES.filter((r) => !owned.includes(r.id) && !(owned.includes('agent') && SELLERS.includes(r.id)) && !(r.id === 'agent' && owned.some((x) => SELLERS.includes(x)))).map((r) => {
-        const on = sel.includes(r.id);
-        return (
-          <Pressable key={r.id} onPress={() => toggle(r.id)} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
-            style={{ backgroundColor: c.sf, borderRadius: 20, padding: 16, flexDirection: 'row', gap: 14, alignItems: 'center', borderWidth: on ? 2 : 1.5, borderColor: on ? c.ember : c.line2 }}>
-            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: c[r.tone], alignItems: 'center', justifyContent: 'center' }}><Icon name={r.icon} size={26} color={c[r.tone + 'i']} /></View>
-            <View style={{ flex: 1, gap: 2 }}><Txt v="bold" style={{ fontSize: 16 }}>{r.title}</Txt><Txt v="small">{r.body}</Txt></View>
-            <View style={{ width: 26, height: 26, borderRadius: 8, backgroundColor: on ? c.ember : 'transparent', borderWidth: on ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>{on ? <Icon name="check" size={18} color={c.onember} /> : null}</View>
-          </Pressable>
-        );
-      })}
-      {sel.includes('buyer') ? (
-        <View style={{ gap: 10 }}>
-          <Txt v="strong" style={{ fontSize: 13 }}>Are you buying for yourself or a business?</Txt>
-          <Segmented options={[{ value: 'individual', label: 'Myself' }, { value: 'business', label: 'A business' }]} value={buyerType} onChange={setBuyerType} />
-          {buyerType === 'business' ? <Input label="Business name" value={bizName} onChangeText={setBizName} placeholder="Mama T's Kitchen" autoCapitalize="words" error={tried && needsBizName ? 'Enter your business name' : null} hint="Restaurants, caterers, hotels, retailers and other resellers." /> : null}
-        </View>
-      ) : null}
-      <View style={{ flexDirection: 'row', gap: 8 }}><Icon name="shield-check-outline" size={18} color={c.mute} /><Txt v="small" style={{ flex: 1 }}>Farms, suppliers and vets are verified before buyers and farmers can see them.</Txt></View>
+    <Screen pad={false}>
+      {adding ? <View style={{ paddingHorizontal: 16 }}><AppBar title="Add a role" /></View> : <AuthTop step={3} />}
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 14, width: '100%', maxWidth: wide ? 460 : undefined, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+        <Txt v="display">{adding ? 'Add a role' : 'How will you use Poultry360?'}</Txt>
+        {!adding ? <Input label="Your name" value={name} onChangeText={setName} placeholder="Adaeze Okafor" autoCapitalize="words" error={tried && needsName ? 'Enter your name' : null} /> : null}
+        {visible.map((r) => (
+          <SelectCard key={r.id} selected={sel.includes(r.id)} onPress={() => toggle(r.id)} title={r.title} subtitle={r.body} error={tried && !sel.length}
+            lead={r.art ? <PlaceholderArt kind={r.art} size={52} radius={14} /> : <View style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: c.t3, alignItems: 'center', justifyContent: 'center' }}><Icon name={r.icon} size={26} color={c.t3i} /></View>}>
+            {r.id === 'buyer' && sel.includes('buyer') ? (
+              <View style={{ gap: 10, paddingTop: 4 }}>
+                <Segmented options={[{ value: 'individual', label: 'For myself' }, { value: 'business', label: 'For a business' }]} value={buyerType} onChange={setBuyerType} />
+                {buyerType === 'business' ? <Input label="Business name" value={bizName} onChangeText={setBizName} placeholder="Mama T's Kitchen" autoCapitalize="words" error={tried && needsBizName ? 'Enter your business name' : null} /> : null}
+              </View>
+            ) : null}
+          </SelectCard>
+        ))}
+        <TrustRow icon="shield-check-outline" text="Farms, stores and vets are checked before anyone can buy from them." />
+        {!wide ? null : <View style={{ gap: 10, marginTop: 6 }}>{footer}</View>}
+      </ScrollView>
+      {!wide ? <View style={{ padding: 16, gap: 10, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.bg }}>{footer}</View> : null}
     </Screen>
   );
 }
 
-const CATS = ['Eggs', 'Broilers', 'Turkey', 'Live birds', 'Feed & supplies', 'Drugs'];   // what a farm sells
+const CATS = ['Eggs', 'Broilers', 'Layers', 'Turkey', 'Live birds'];   // what a farm sells
 
+// Step 4 of 4: name, what you sell, then location and ID as one checklist card.
 export function BusinessScreen({ navigation, route }) {
   const { c } = useTheme();
+  const wide = useWide();
   const { uid, vendor, refresh } = useAuth();
   const [biz, setBiz] = useState(vendor?.business_name || '');
   const roles = route.params?.roles || [];
   const isSupplier = roles.includes('supplier') || (!roles.length && !!vendor?.supplier_type);
   const isFarm = roles.includes('vendor') || (!roles.length && !vendor?.supplier_type);
   const supplyLabels = SUPPLIES.map((x) => x.label);
-  const [cats, setCats] = useState((vendor?.categories || []).filter((x) => CATS.includes(x)));
-  const [supplies, setSupplies] = useState((vendor?.categories || []).filter((x) => supplyLabels.includes(x)));
+  const saved = (vendor?.categories || []).map((x) => OLD_SUPPLY[x] || x);
+  const farmOptions = [...CATS, ...saved.filter((x) => !CATS.includes(x) && !supplyLabels.includes(x))];
+  const [cats, setCats] = useState(saved.filter((x) => farmOptions.includes(x)));
+  const [supplies, setSupplies] = useState(saved.filter((x) => supplyLabels.includes(x)));
   const [loc, setLoc] = useState(vendor?.location || '');
   const [geo, setGeo] = useState(vendor?.lat != null ? { lat: vendor.lat, lng: vendor.lng } : null);   // nearby buyers see pinned sellers first
   const [pinning, setPinning] = useState(false);
   const pin = async () => { setPinning(true); try { const h = await getHere(); if (h) setGeo(h); } finally { setPinning(false); } };
   const [photo, setPhoto] = useState(null);
   const [upload, setUpload] = useState({ state: vendor?.id_doc_path ? 'done' : 'empty', path: vendor?.id_doc_path });
-  const [errs, setErrs] = useState({});
+  const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
+  const word = isFarm ? 'farm' : 'store';
 
   const pick = async (camera) => {
     const fn = camera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
@@ -133,14 +149,17 @@ export function BusinessScreen({ navigation, route }) {
     try { const path = await uploadImage('id-docs', uid, uri); setUpload({ state: 'done', path }); }
     catch (e) { setUpload({ state: 'failed', error: friendlyError(e) }); }
   };
+  // What is still missing, in order; the submit button names the first one.
+  const missing = [
+    !biz.trim() && 'your ' + word + ' name',
+    isSupplier && !supplies.length && 'what you supply',
+    isFarm && !cats.length && 'what you sell',
+    !loc.trim() && 'your ' + word + "'s address",
+    upload.state !== 'done' && 'a photo of your ID',
+  ].filter(Boolean);
   const submit = async () => {
-    const e = {};
-    if (!biz.trim()) e.biz = 'Enter your business name';
-    if (isFarm && !cats.length) e.cats = 'Pick at least one';
-    if (isSupplier && !supplies.length) e.sup = 'Pick at least one';
-    if (!loc.trim()) e.loc = isFarm ? 'Enter your farm location' : 'Enter your business location';
-    if (upload.state !== 'done') e.id = 'Upload a photo of your ID';
-    setErrs(e); if (Object.keys(e).length) return;
+    setTried(true);
+    if (missing.length || upload.state === 'uploading') return;
     setBusy(true);
     try {
       const supType = isSupplier ? SUPPLIES.find((x) => x.label === supplies[0])?.type || null : null;
@@ -153,80 +172,107 @@ export function BusinessScreen({ navigation, route }) {
       if (inMain) navigation.replace('Pending');
     } catch (er) { alert(friendlyError(er)); } finally { setBusy(false); }
   };
+  const status = (ok, busyNow) => busyNow ? <Pill tone="neutral" label="Uploading" /> : ok ? <Pill tone="ok" label="Done" /> : <Pill tone="warn" label="Needed" />;
+  const checkRow = (ok, icon, title, detail, right, last) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: last ? 0 : 1, borderColor: c.line }}>
+      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: ok ? c.yolk : c.sf2, alignItems: 'center', justifyContent: 'center' }}><Icon name={ok ? 'check' : icon} size={22} color={ok ? c.onyolk : c.ink} /></View>
+      <View style={{ flex: 1, gap: 2 }}><Txt v="bold">{title}</Txt><Txt v="small">{detail}</Txt></View>
+      {right}
+    </View>
+  );
+  const button = <Button title={busy ? 'Sending' : missing.length ? 'Add ' + missing[0] : 'Submit for review'} onPress={submit} loading={busy} disabled={upload.state === 'uploading'} />;
+  const missingNote = tried && missing.length ? <Txt v="small" color={c.err} style={{ fontSize: 14 }}>{'Still needed: ' + missing.join(', ') + '.'}</Txt> : null;
   return (
-    <Screen scroll footer={<Button title="Submit for review" onPress={submit} loading={busy} disabled={upload.state === 'uploading' || upload.state === 'failed'} />}>
-      <AppBar title={isFarm ? 'About your farm' : 'About your business'} subtitle="Step 2 of 2" />
-      <Input label="Business name" value={biz} onChangeText={setBiz} placeholder={isFarm ? 'Garden City Poultry' : 'Rivers Agro Supplies'} error={errs.biz} />
-      {isSupplier ? (
-        <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>What do you supply?</Txt>
-          <ChipRow options={supplyLabels} value={supplies} multi onChange={(v) => { setSupplies(v); setErrs((x) => ({ ...x, sup: undefined })); }} />
-          {errs.sup ? <Txt v="small" color={c.err}>{errs.sup}</Txt> : null}</View>
-      ) : null}
-      {isFarm ? <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 13 }}>{isSupplier ? 'What does your farm sell?' : 'What do you sell?'}</Txt><ChipRow options={CATS} value={cats} onChange={setCats} multi />{errs.cats ? <Txt v="small" color={c.err}>{errs.cats}</Txt> : null}</View> : null}
-      <Input label={isFarm ? 'Farm location' : 'Business location'} value={loc} onChangeText={setLoc} placeholder={isFarm ? 'Igwuruta, Rivers State' : 'Trans-Amadi, Port Harcourt'} error={errs.loc} />
-      <Button small variant="outline" icon={geo ? 'check' : 'crosshairs-gps'} title={geo ? 'Location pinned' : 'Pin my location'} loading={pinning} onPress={pin} />
-      <Txt v="small">Pin it while you're there: nearby buyers see you first and pay less for delivery.</Txt>
-      <Txt v="strong" style={{ fontSize: 13 }}>Government-issued ID</Txt>
-      {upload.state === 'failed' ? (
-        <Card tone="err">
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><PhotoBox uri={photo} size={56} /><View style={{ flex: 1 }}><Txt v="bold">Upload didn't finish</Txt><Txt v="small">Your other details are saved. Only the photo needs another try.</Txt></View></View>
-          <View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="dark" icon="refresh" title="Retry upload" onPress={() => doUpload(photo)} style={{ flex: 1 }} /><Button small variant="outline" title="Retake" onPress={() => pick(true)} style={{ flex: 1 }} /></View>
-        </Card>
-      ) : (
-        <Card>
-          <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-            <PhotoBox uri={photo} size={56} />
-            <View style={{ flex: 1 }}><Txt v="strong">{upload.state === 'done' ? 'ID uploaded' : upload.state === 'uploading' ? 'Uploading…' : "NIN slip, voter card or driver's licence"}</Txt>
-              <Txt v="small">{upload.state === 'done' ? 'Tap to replace' : 'All four corners in frame, good light'}</Txt></View>
+    <Screen pad={false}>
+      {roles.length || !vendor ? <AuthTop onBack={navigation.canGoBack() ? () => navigation.goBack() : null} step={4} /> : <View style={{ paddingHorizontal: 16 }}><AppBar title={isFarm ? 'Farm details' : 'Store details'} /></View>}
+      <ScrollView contentContainerStyle={{ padding: 20, paddingTop: 8, gap: 16, width: '100%', maxWidth: wide ? 460 : undefined, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+        <Txt v="display">{isFarm ? 'About your farm' : 'About your store'}</Txt>
+        <Input label={isFarm ? 'Farm name' : 'Store name'} value={biz} onChangeText={setBiz} placeholder={isFarm ? 'Garden City Poultry' : 'Rivers Agro Supplies'} error={tried && !biz.trim() ? 'Enter your ' + word + ' name' : null} />
+        {isSupplier ? (
+          <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 14 }}>What you supply</Txt>
+            <ChipRow options={supplyLabels} value={supplies} multi onChange={setSupplies} />
+            {tried && !supplies.length ? <Txt v="small" color={c.err}>Pick at least one</Txt> : null}</View>
+        ) : null}
+        {isFarm ? (
+          <View style={{ gap: 8 }}><Txt v="strong" style={{ fontSize: 14 }}>{isSupplier ? 'What your farm sells' : 'What you sell'}</Txt>
+            <ChipRow options={farmOptions} value={cats} onChange={setCats} multi />
+            {tried && !cats.length ? <Txt v="small" color={c.err}>Pick at least one</Txt> : null}</View>
+        ) : null}
+        <Input label={isFarm ? 'Farm address' : 'Store address'} value={loc} onChangeText={setLoc} placeholder={isFarm ? 'Igwuruta, Rivers State' : 'Trans-Amadi, Port Harcourt'} error={tried && !loc.trim() ? 'Enter the address riders collect from' : null} />
+        <View style={{ backgroundColor: c.sf, borderRadius: 20, borderWidth: 1, borderColor: tried && upload.state !== 'done' ? c.err : c.line, overflow: 'hidden' }}>
+          {checkRow(!!geo, 'crosshairs-gps', 'Pin my location', geo ? 'Pinned. Nearby buyers see you first.' : "Do it at the " + word + ': nearby buyers pay less delivery.',
+            <Button small variant={geo ? 'ghost' : 'outline'} title={geo ? 'Again' : 'Pin'} loading={pinning} onPress={pin} style={{ height: 40, paddingHorizontal: 14 }} />)}
+          {checkRow(upload.state === 'done', 'card-account-details-outline', 'Photo of your ID',
+            upload.state === 'failed' ? "Upload didn't finish. Try again." : upload.state === 'done' ? 'Uploaded' : "NIN slip, voter card or driver's licence",
+            status(upload.state === 'done', upload.state === 'uploading'), true)}
+          <View style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 10 }}>
+            {photo ? <PhotoBox uri={photo} size={72} /> : null}
+            {upload.state === 'failed' ? <Button small variant="dark" icon="refresh" title="Retry upload" onPress={() => doUpload(photo)} />
+              : <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />}
           </View>
-          {errs.id ? <Txt v="small" color={c.err}>{errs.id}</Txt> : null}
-          <PhotoButtons onCamera={() => pick(true)} onGallery={() => pick(false)} />
-        </Card>
-      )}
+        </View>
+        {missingNote}
+        {wide ? button : null}
+      </ScrollView>
+      {!wide ? <View style={{ padding: 16, borderTopWidth: 1, borderColor: c.line, backgroundColor: c.bg }}>{button}</View> : null}
     </Screen>
   );
 }
 
+// After submitting: what happens next, and what they can do while they wait.
 export function PendingScreen({ navigation }) {
   const { c } = useTheme();
+  const wide = useWide();
   const { vendor, refresh, supplierOnly } = useAuth();
   const st = vendor?.verification_status;
+  const word = supplierOnly ? 'store' : 'farm';
   const dev = async (s) => { await rpc('dev_set_verification', { p_status: s, p_reason: s === 'rejected' ? 'ID photo unclear. Retake it in good light with all four corners in frame.' : null }); refresh(); };
+  const col = { padding: 20, gap: 18, width: '100%', maxWidth: wide ? 620 : undefined, alignSelf: 'center' };
   if (st === 'rejected') return (
-    <Screen scroll footer={<Button title="Retake ID photo" onPress={() => navigation.navigate('Business')} />}>
-      <AppBar />
-      <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.errbg, alignItems: 'center', justifyContent: 'center' }}><Icon name="card-account-details-outline" size={32} color={c.err} /></View>
-      <Txt v="display">One thing to fix before you can sell</Txt>
-      <Card><Txt v="label" color={c.err}>Reason</Txt><Txt v="body">{vendor?.rejection_reason || 'We could not verify your ID.'}</Txt></Card>
-      <Txt v="small">You won't need to start over. Only the ID step reopens.</Txt>
+    <Screen pad={false}>
+      <View style={{ paddingHorizontal: 16 }}><AppBar /></View>
+      <ScrollView contentContainerStyle={col}>
+        <Txt v="display">One thing to fix</Txt>
+        <Card tone="err" style={{ gap: 8 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="alert-outline" color={c.err} /><Txt v="bold" color={c.err}>Reason</Txt></View><Txt v="body">{vendor?.rejection_reason || 'We could not verify your ID.'}</Txt></Card>
+        <Txt v="small">Your other details are kept.</Txt>
+        <Button title="Update and resubmit" onPress={() => navigation.navigate('Business')} />
+      </ScrollView>
     </Screen>
   );
   if (st === 'approved') return (
-    <Screen scroll footer={<Button title="Add your first listing" onPress={() => navigation.replace('ListingForm')} />}>
-      <AppBar />
-      <Banner tone="ok" icon="check-decagram" title="You're verified" body="Your listings can now go live on the Marketplace." />
-      <Txt v="display">{vendor.business_name} is approved</Txt>
+    <Screen scroll style={{ justifyContent: 'center', flexGrow: 1, maxWidth: 520, width: '100%', alignSelf: 'center' }} footer={<Button title={supplierOnly ? 'Add your first product' : 'Add your first listing'} onPress={() => navigation.replace('ListingForm')} />}>
+      <SuccessMoment title={(vendor.business_name || 'You') + ' is verified'} body={supplierOnly ? 'Your products can go live now.' : 'Your listings can go live now.'} />
     </Screen>
   );
   return (
-    <Screen scroll>
-      <AppBar />
-      <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.warnbg, alignItems: 'center', justifyContent: 'center' }}><Icon name="timer-sand" size={32} color={c.warn} /></View>
-      <Txt v="display">We're reviewing {vendor?.business_name || (supplierOnly ? 'your business' : 'your farm')}</Txt>
-      <Txt v="small" style={{ fontSize: 15 }}>We'll notify you as soon as it's approved. Then you can publish listings.</Txt>
-      <Steps steps={[{ label: 'Application submitted', state: 'done' }, { label: 'ID and business review', state: 'current' }, { label: 'Approved. Listings unlocked', state: 'todo' }]} />
-      {supplierOnly ? <>
-        <Txt v="h2">While you wait</Txt>
-        <ExploreOptions navigation={navigation} />
-      </> : (
+    <Screen pad={false}>
+      <View style={{ paddingHorizontal: 16 }}><AppBar /></View>
+      <ScrollView contentContainerStyle={col}>
         <Hearth>
-          <Txt v="label" color={c.ember}>Available now</Txt>
-          <Txt v="h2" color={c.hink}>Run your farm in Farm Hub while you wait</Txt>
-          <Txt v="small" color={c.hmute}>Track flocks, feed, mortality and production. No approval needed.</Txt>
-          <Button title="Open Farm Hub" onPress={() => navigation.popTo('Tabs', { screen: 'FarmHome' })} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><LiveDot size={10} /><Txt v="label" color={c.hmute}>In review</Txt></View>
+          <Txt v="display" color={c.hink}>We're checking your details</Txt>
+          <Txt v="small" color={c.hmute}>{(vendor?.business_name || 'Your ' + word) + ' · usually within a working day'}</Txt>
         </Hearth>
-      )}
-      {__DEV__ ? <Card><Txt v="label">Developer only</Txt><View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Approve" onPress={() => dev('approved')} style={{ flex: 1 }} /><Button small variant="outline" title="Reject" onPress={() => dev('rejected')} style={{ flex: 1 }} /></View></Card> : null}
+        <Card style={{ padding: 18 }}>
+          <Steps steps={[
+            { label: 'Details received', state: 'done' },
+            { label: 'ID check', state: 'current' },
+            { label: 'Location check', state: 'todo', detail: vendor?.lat != null ? 'Pinned' : 'Not pinned yet' },
+            { label: 'Verified', state: 'todo' },
+          ]} />
+        </Card>
+        <View style={{ backgroundColor: c.t1, borderRadius: 20, padding: 18, gap: 10 }}>
+          <Txt v="h2" color={c.t1i}>{supplierOnly ? 'Add products while you wait' : 'Farm Hub is open while you wait'}</Txt>
+          <Txt v="small">{supplierOnly ? 'They go live when you are verified.' : 'Flocks, feed, mortality and output. No approval needed.'}</Txt>
+          <Button small title={supplierOnly ? 'Add a product' : 'Open Farm Hub'} style={{ alignSelf: 'flex-start', paddingHorizontal: 18 }}
+            onPress={() => (supplierOnly ? navigation.navigate('ListingForm') : navigation.popTo('Tabs', { screen: 'FarmHome' }))} />
+        </View>
+        {supplierOnly ? <>
+          <Txt v="h2">More while you wait</Txt>
+          <ExploreOptions navigation={navigation} />
+        </> : null}
+        {__DEV__ ? <Card><Txt v="label">Developer only</Txt><View style={{ flexDirection: 'row', gap: 8 }}><Button small variant="outline" title="Approve" onPress={() => dev('approved')} style={{ flex: 1 }} /><Button small variant="outline" title="Reject" onPress={() => dev('rejected')} style={{ flex: 1 }} /></View></Card> : null}
+      </ScrollView>
     </Screen>
   );
 }

@@ -6,7 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
-import { ThemeProvider, liveChannel, ErrorBoundary, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, startPasswordChange, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Group, Row, Pill, Stat,
+import { ThemeProvider, liveChannel, ErrorBoundary, useTheme, useP360Fonts, Loading, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, startPasswordChange, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Group, Row, Pill, Stat, palettes, ProgressSegments, SuccessMoment,
   Stars, Sheet, OtpBoxes, supabase, rpc, uploadImage, friendlyError, timeAgo, naira } from '@p360/shared';
 
 const Stack = createNativeStackNavigator();
@@ -44,6 +44,15 @@ function useRider() {
   }, [load]);
   return { rider, trip, reload: load };
 }
+
+// Straight-line km between two pins (null when either is missing).
+const kmBetween = (a, b) => {
+  if (!a?.lat || !b?.lat) return null;
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+const BIG = { height: 64, borderRadius: 32 };
 
 function Home({ navigation, ctx }) {
   const { c } = useTheme();
@@ -85,98 +94,166 @@ function Home({ navigation, ctx }) {
     try { for (const o of offered) await rpc('rider_respond', { p_assignment: o.id, p_accept: accept }).catch(() => {}); } finally { setBusy(false); reload(); }
   };
 
+  // The offer screen is always dark (the dark palette's Hearth colours), whatever the phone's theme.
   if (offered.length) {
+    const D = palettes.dark;
     const pay = offered.reduce((s, o) => s + Number(o.earning || 0), 0);
+    let km = 0, known = true, prev = trip.pickup;
+    for (const o of offered) { const k = kmBetween(prev, o.dropoff); if (k == null) known = false; else km += k; prev = o.dropoff; }
+    const urgent = left <= 20;
     return (
-      <Screen bg="#0C0D0D" scroll style={{ paddingTop: 24, gap: 18 }}>
-        <View style={{ alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 132, height: 132, borderRadius: 66, borderWidth: 8, borderColor: left > 20 ? '#2DCB8C' : '#F3857A', alignItems: 'center', justifyContent: 'center' }}>
-            <Txt v="monoLg" color="#F4F5F3">0:{String(Math.max(0, left)).padStart(2, '0')}</Txt><Txt v="label" color="#9AA09C">to accept</Txt></View>
-          <Txt v="h1" color="#F4F5F3">{offered.length > 1 ? offered.length + ' deliveries, one pickup' : 'New delivery'}</Txt>
-          <Txt v="mono" color="#5FC7A0" style={{ fontSize: 18 }}>You earn {naira(pay)}</Txt>
+      <Screen bg={D.hc} scroll style={{ paddingTop: 20, gap: 20 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: D.orange }} />
+            <Txt v="h2" color={D.hink}>{offered.length > 1 ? offered.length + ' deliveries, one pickup' : 'New delivery'}</Txt>
+          </View>
+          <View accessibilityLabel={Math.max(0, left) + ' seconds to accept'} style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 6, borderColor: urgent ? D.orange : D.hbtn, alignItems: 'center', justifyContent: 'center' }}>
+            <Txt v="mono" color={D.hink} style={{ fontSize: 20 }}>{Math.max(0, left)}</Txt>
+          </View>
         </View>
-        <View style={{ backgroundColor: '#161818', borderColor: '#262929', borderWidth: 1, borderRadius: 22, padding: 16, gap: 14 }}>
-          <View style={{ gap: 2 }}><Txt v="label" color="#9AA09C">Pickup</Txt><Txt v="bold" color="#F4F5F3" style={{ fontSize: 16 }}>{trip.pickup.name}</Txt><Txt v="small" color="#9AA09C">{trip.pickup.location}</Txt></View>
+        <View style={{ gap: 4 }}>
+          <Txt v="body" color={D.hmute}>You earn</Txt>
+          <Txt v="monoLg" color={D.hink} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 64, lineHeight: 72 }}>{naira(pay)}</Txt>
+          <Txt v="body" color={D.hmute}>{known && km > 0 ? km.toFixed(1) + ' km · about ' + Math.max(10, Math.round(km * 4 + 10)) + ' min' : offered.length + (offered.length === 1 ? ' drop-off' : ' drop-offs')}</Txt>
+        </View>
+        <View style={{ backgroundColor: D.sf, borderRadius: 24, padding: 18, gap: 0 }}>
+          <View style={{ flexDirection: 'row', gap: 14 }}>
+            <View style={{ alignItems: 'center', width: 16 }}>
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: D.hbtn, marginTop: 4 }} />
+              <View style={{ width: 2, flex: 1, backgroundColor: D.line2, marginVertical: 4 }} />
+            </View>
+            <View style={{ flex: 1, gap: 2, paddingBottom: 16 }}>
+              <Txt v="small" color={D.mute}>Pickup</Txt>
+              <Txt v="bold" color={D.ink} style={{ fontSize: 17 }}>{trip.pickup.name}</Txt>
+              <Txt v="small" color={D.mute}>{trip.pickup.location}</Txt>
+            </View>
+          </View>
           {offered.map((o, i) => (
-            <View key={o.id} style={{ gap: 2, borderTopWidth: 1, borderColor: '#262929', paddingTop: 12 }}>
-              <Txt v="label" color="#9AA09C">Drop-off {offered.length > 1 ? i + 1 : ''} · {o.code}</Txt>
-              <Txt v="bold" color="#F4F5F3" style={{ fontSize: 16 }}>{o.dropoff.area || o.dropoff.line}</Txt>
-              <Txt v="small" color="#9AA09C">{itemsText(o)}</Txt>
+            <View key={o.id} style={{ flexDirection: 'row', gap: 14 }}>
+              <View style={{ alignItems: 'center', width: 16 }}>
+                <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: D.orange, marginTop: 4 }} />
+                {i < offered.length - 1 ? <View style={{ width: 2, flex: 1, backgroundColor: D.line2, marginVertical: 4 }} /> : null}
+              </View>
+              <View style={{ flex: 1, gap: 2, paddingBottom: i < offered.length - 1 ? 16 : 0 }}>
+                <Txt v="small" color={D.mute}>{'Drop-off' + (offered.length > 1 ? ' ' + (i + 1) : '') + ' · ' + o.code}</Txt>
+                <Txt v="bold" color={D.ink} style={{ fontSize: 17 }}>{o.dropoff.area || o.dropoff.line}</Txt>
+                <Txt v="small" color={D.mute}>{itemsText(o)}</Txt>
+              </View>
             </View>
           ))}
         </View>
-        <Button title={offered.length > 1 ? 'Accept all ' + offered.length : 'Accept delivery'} loading={busy} onPress={() => respond(true)} style={{ backgroundColor: '#2DCB8C', height: 60 }} />
-        <Button variant="ghost" title="Can't take this" disabled={busy} onPress={() => respond(false)} style={{ marginBottom: 12 }} />
+        <Button title={offered.length > 1 ? 'Accept all ' + offered.length : 'Accept delivery'} loading={busy} onPress={() => respond(true)}
+          variant="onHearth" style={{ height: 68, borderRadius: 34 }} />
+        <Pressable disabled={busy} onPress={() => respond(false)} accessibilityRole="button" style={{ height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          <Txt v="bold" color={D.hmute} style={{ fontSize: 16 }}>Decline</Txt>
+        </Pressable>
       </Screen>
     );
   }
   if (needLoc) return (
-    <Screen scroll footer={<><Button title="Open settings" onPress={() => Linking.openSettings()} /><Button variant="ghost" title="Stay offline" onPress={() => setNeedLoc(false)} /></>}>
+    <Screen scroll footer={<><Button title="Open settings" onPress={() => Linking.openSettings()} style={BIG} /><Button variant="ghost" title="Stay offline" onPress={() => setNeedLoc(false)} /></>}>
       <View style={{ height: 32 }} />
-      <Hearth><Icon name="crosshairs-gps" size={36} color={c.hacc} /></Hearth>
+      <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.t1, alignItems: 'center', justifyContent: 'center' }}><Icon name="crosshairs-gps" size={36} color={c.t1i} /></View>
       <Txt v="display">Allow location to start your shift</Txt>
-      <Txt v="body" color={c.mute}>Dispatch only sends pickups to riders it can locate. Location is shared only while you're available or on a delivery, and stops when a delivery completes.</Txt>
+      <Txt v="body" color={c.mute} style={{ fontSize: 16 }}>Dispatch only sends pickups to riders it can locate. Location is shared only while you're available or on a delivery.</Txt>
     </Screen>
   );
   const on = rider.status !== 'offline';
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayCount = (money?.transactions || []).filter((t) => t.type === 'earning' && new Date(t.at) >= todayStart).length;
   return (
-    <Screen style={{ gap: 18, paddingTop: 8 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View><Txt v="h1">Hi, {rider.name.split(' ')[0]}</Txt><Txt v="small">Zone · {rider.zone || 'Unassigned'}</Txt></View>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={() => navigation.navigate('History')} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="History"><Icon name="history" /></Pressable>
-          <Pressable onPress={() => navigation.navigate('Profile')} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Profile and wallet"><Icon name="account-circle-outline" /></Pressable>
+    <Screen scroll style={{ gap: 18, paddingTop: 8 }} footer={
+      <Button title={on ? 'Go offline' : 'Go available'} variant={on ? 'outline' : 'primary'} icon="power" loading={busy} onPress={() => goAvailable(!on)} style={BIG} />}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: c.t2, alignItems: 'center', justifyContent: 'center' }}><Txt v="h2" color={c.t2i}>{rider.name[0]}</Txt></View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Txt v="h1">{rider.name.split(' ')[0]}</Txt>
+          <View style={{ alignSelf: 'flex-start' }}>{on ? <Pill tone="ok" icon="circle" label="Available" /> : <Pill tone="neutral" label="Offline" />}</View>
         </View>
+        <Pressable onPress={() => navigation.navigate('History')} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="History"><Icon name="history" /></Pressable>
+        <Pressable onPress={() => navigation.navigate('Profile')} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Profile and wallet"><Icon name="account-circle-outline" /></Pressable>
       </View>
       {!rider.active ? <Banner tone="warn" title="Account deactivated" body="Finish any current delivery as normal. You won't receive new assignments." /> : null}
-      {money ? (
-        <Hearth onPress={() => navigation.navigate('Profile')}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <View><Txt v="label" color={c.hmute}>Earned today</Txt><Txt v="monoLg" color={c.hink} style={{ fontSize: 26 }}>{naira(money.earned_today)}</Txt></View>
-            <View style={{ alignItems: 'flex-end' }}><Txt v="label" color={c.hmute}>Wallet</Txt><Txt v="mono" color={c.hink}>{naira(money.balance)}</Txt></View>
+      <Hearth onPress={() => navigation.navigate('Profile')}>
+        <Txt v="label" color={c.hmute}>Earned today</Txt>
+        <Txt v="monoLg" color={c.hink} style={{ fontSize: 44, lineHeight: 50 }}>{naira(money?.earned_today || 0)}</Txt>
+        <Txt v="body" color={c.hmute}>{todayCount === 1 ? '1 delivery' : todayCount + ' deliveries'}{rider.zone ? ' · ' + rider.zone : ''}</Txt>
+      </Hearth>
+      {on ? (
+        <View style={{ alignItems: 'center', gap: 14, paddingVertical: 28 }}>
+          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.yolk, alignItems: 'center', justifyContent: 'center' }}><Icon name="motorbike" size={30} color={c.onyolk} /></View>
           </View>
-        </Hearth>
-      ) : null}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <Pressable disabled={busy} onPress={() => goAvailable(!on)} accessibilityRole="switch" accessibilityState={{ checked: on }}
-          style={{ width: 200, height: 200, borderRadius: 100, alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: on ? c.sagebg : c.sf, borderWidth: 2, borderColor: on ? c.sage : c.line2 }}>
-          <Icon name="power" size={48} color={on ? c.sage : c.mute} /><Txt v="h2">{on ? 'Go offline' : 'Go available'}</Txt>
-        </Pressable>
-        <Txt v="strong" color={on ? c.sage : c.mute}>{on ? '● Available · waiting for a pickup' : "● You're offline"}</Txt>
-      </View>
+          <Txt v="h2">Looking for deliveries</Txt>
+          <Txt v="body" color={c.mute} style={{ textAlign: 'center', fontSize: 16 }}>Keep the app open. New pickups ring here.</Txt>
+        </View>
+      ) : <>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 20, borderWidth: 1, borderColor: c.line, padding: 16, gap: 4 }}><Txt v="small" style={{ fontSize: 15 }}>This week</Txt><Txt v="mono" style={{ fontSize: 22 }}>{naira(money?.earned_week || 0)}</Txt></View>
+          <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 20, borderWidth: 1, borderColor: c.line, padding: 16, gap: 4 }}><Txt v="small" style={{ fontSize: 15 }}>Wallet</Txt><Txt v="mono" style={{ fontSize: 22 }}>{naira(money?.balance || 0)}</Txt></View>
+        </View>
+        <Txt v="body" color={c.mute} style={{ fontSize: 16 }}>Go available to get pickups near you. You earn 80% of each delivery fee.</Txt>
+      </>}
     </Screen>
   );
 }
 
-const QC = ['Quantity matches the order', 'No damaged or below-grade items', 'Packed safely for transport'];
+const QC = ['Count is right', 'Good condition', 'Packed well'];
 const QC_FAIL = ['Short quantity', 'Poor packaging', 'Damaged items', 'Not as listed'];
+
+// Step header for the trip: four segments and "Step n of 4".
+function TripTop({ step, title, sub, onBack }) {
+  return (
+    <View style={{ gap: 12, paddingTop: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        {onBack ? <AppBar bare onBack={onBack} /> : null}
+        <ProgressSegments total={4} done={step - 1} style={{ flex: 1 }} />
+        <Txt v="small" style={{ fontSize: 15 }}>{'Step ' + step + ' of 4'}</Txt>
+      </View>
+      <View style={{ gap: 2 }}><Txt v="display">{title}</Txt>{sub ? <Txt v="body" color={undefined} style={{ fontSize: 16 }}>{sub}</Txt> : null}</View>
+    </View>
+  );
+}
 
 function QcCheck({ order, pickup, onDone, onBack }) {
   const { c } = useTheme();
-  const [checks, setChecks] = useState([null, null, null]);
+  const [checks, setChecks] = useState([false, false, false]);
+  const [failing, setFailing] = useState(false);
   const [reasons, setReasons] = useState([]); const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false);
-  const failing = checks.some((x) => x === false);
   const step = async (s, extra) => { setBusy(true); try { await rpc('rider_advance', { p_assignment: order.id, p_step: s, ...extra }); onDone(); } catch (e) { Alert.alert('Could not save', friendlyError(e)); } finally { setBusy(false); } };
+  const all = checks.every(Boolean);
   return (
-    <Screen scroll footer={failing ? <Button variant="danger" title="Flag and leave this order" disabled={!reasons.length} loading={busy} onPress={() => step('qc_fail', { p_notes: notes, p_reasons: reasons })} />
-      : <Button title="Passed · picked up" disabled={!checks.every((x) => x === true)} loading={busy} onPress={() => step('qc_pass', { p_notes: notes || null })} />}>
-      <AppBar title="Check before pickup" subtitle={order.code} onBack={onBack} />
-      <Card><Txt v="bold">{itemsText(order)}</Txt><Txt v="small">From {pickup.name} · for {order.dropoff.name}</Txt></Card>
-      <Group>{QC.map((q, i) => (
-        <View key={q} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderBottomWidth: i < 2 ? 1 : 0, borderColor: c.line }}>
-          <Txt v="strong" style={{ flex: 1 }}>{q}</Txt>
-          {[true, false].map((v) => <Pressable key={String(v)} onPress={() => setChecks(checks.map((x, j) => (j === i ? v : x)))} accessibilityLabel={v ? 'Pass' : 'Fail'}
-            style={{ width: 48, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: checks[i] === v ? (v ? c.sage : c.err) : 'transparent', borderWidth: checks[i] === v ? 0 : 1.5, borderColor: c.line2 }}>
-            <Icon name={v ? 'check' : 'close'} color={checks[i] === v ? '#fff' : c.ink} /></Pressable>)}
-        </View>))}</Group>
-      {failing ? <><Banner tone="err" icon="cancel" title="Don't collect this order" body="The buyer is refunded. Your other orders on this trip carry on as normal." />
+    <Screen scroll footer={failing
+      ? <><Button variant="danger" title={reasons.length ? 'Flag and leave this order' : 'Pick what is wrong'} disabled={!reasons.length} loading={busy} onPress={() => step('qc_fail', { p_notes: notes, p_reasons: reasons })} style={BIG} />
+        <Button variant="ghost" title="Back to the checks" onPress={() => setFailing(false)} /></>
+      : <><Button title={all ? 'Passed · picked up' : 'Tick all three to continue'} disabled={!all} loading={busy} onPress={() => step('qc_pass', { p_notes: notes || null })} style={BIG} />
+        <Pressable onPress={() => setFailing(true)} accessibilityRole="button" style={{ height: 48, alignItems: 'center', justifyContent: 'center' }}><Txt v="bold" color={c.err} style={{ fontSize: 16 }}>Something is wrong: flag and leave</Txt></Pressable></>}>
+      <TripTop step={2} title="Quality check" sub={order.code + ' · ' + itemsText(order)} onBack={onBack} />
+      <Txt v="small" style={{ fontSize: 15 }}>{'From ' + pickup.name + ' · for ' + order.dropoff.name}</Txt>
+      {failing ? <>
+        <Card tone="err" style={{ gap: 6 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="alert-outline" color={c.err} /><Txt v="bold" color={c.err}>Don't collect this order</Txt></View>
+          <Txt v="body">The buyer is refunded. Other orders on this trip carry on.</Txt></Card>
         <ChipRow options={QC_FAIL} value={reasons} onChange={setReasons} multi />
-        <Input value={notes} onChangeText={setNotes} placeholder="What did you see?" multiline /></> : null}
+        <Input value={notes} onChangeText={setNotes} placeholder="What did you see?" multiline />
+      </> : (
+        <View style={{ gap: 12 }}>
+          {QC.map((q, i) => (
+            <Pressable key={q} onPress={() => setChecks(checks.map((x, j) => (j === i ? !x : x)))} accessibilityRole="checkbox" accessibilityState={{ checked: checks[i] }}
+              style={{ minHeight: 72, borderRadius: 20, borderWidth: 2, borderColor: checks[i] ? c.yolk : c.line, backgroundColor: checks[i] ? c.navact : c.sf, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: checks[i] ? c.yolk : 'transparent', borderWidth: checks[i] ? 0 : 2, borderColor: c.line2, alignItems: 'center', justifyContent: 'center' }}>
+                {checks[i] ? <Icon name="check" size={24} color={c.onyolk} /> : null}
+              </View>
+              <Txt v="bold" style={{ fontSize: 18, flex: 1 }}>{q}</Txt>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </Screen>
   );
 }
 
-function Proof({ order, onDone, onBack }) {
+function Proof({ order, onDone }) {
   const { c } = useTheme();
   const [photo, setPhoto] = useState(null); const [up, setUp] = useState(null); const [busy, setBusy] = useState(false);
   const capture = async () => {
@@ -191,13 +268,14 @@ function Proof({ order, onDone, onBack }) {
     catch (e) { Alert.alert('Could not save', friendlyError(e)); } finally { setBusy(false); }
   };
   return (
-    <Screen scroll footer={<Button title="Mark delivered" disabled={!up?.path} loading={busy} onPress={deliver} />}>
-      <AppBar title="Proof of delivery" subtitle={order.code + ' · ' + order.dropoff.name} onBack={onBack} />
-      <Pressable onPress={capture} style={{ height: 300, borderRadius: 22, backgroundColor: c.sf2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        {photo ? <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} /> : <><Icon name="camera-outline" size={40} color={c.mute} /><Txt v="strong" color={c.mute}>Tap to photograph the handover</Txt></>}
+    <Screen scroll footer={<Button title={up?.path ? 'Mark delivered' : up === 'uploading' ? 'Uploading photo' : 'Take a photo first'} disabled={!up?.path} loading={busy} onPress={deliver} style={BIG} />}>
+      <TripTop step={4} title="Proof of delivery" sub={order.code + ' · ' + order.dropoff.name} />
+      <Pressable onPress={capture} accessibilityRole="button" accessibilityLabel="Take a photo of the handover"
+        style={{ height: 320, borderRadius: 24, borderWidth: photo ? 0 : 2, borderStyle: 'dashed', borderColor: c.line2, backgroundColor: c.sf2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10 }}>
+        {photo ? <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} /> : <><Icon name="camera-outline" size={48} color={c.acc} /><Txt v="bold" style={{ fontSize: 18 }}>Photo of the handover</Txt><Txt v="small" style={{ fontSize: 15 }}>Tap to open the camera</Txt></>}
       </Pressable>
-      {up === 'uploading' ? <Banner tone="warn" icon="cloud-upload-outline" title="Uploading proof…" /> : up === 'failed' ? <Banner tone="err" icon="cloud-off-outline" title="Upload failed" body="The photo is saved on your phone." action="Retake" onAction={capture} /> : up?.path ? <Banner tone="ok" title="Proof uploaded" /> : null}
-      <Txt v="small">"Mark delivered" stays off until the proof is uploaded.</Txt>
+      {up === 'uploading' ? <Pill tone="neutral" label="Uploading photo" /> : up === 'failed' ? <Banner tone="err" icon="cloud-off-outline" title="Upload failed" body="The photo is saved on your phone." action="Retake" onAction={capture} /> : up?.path ? <View style={{ alignSelf: 'flex-start' }}><Pill tone="ok" label="Photo uploaded" /></View> : null}
+      {photo && up?.path ? <Button variant="ghost" title="Retake" onPress={capture} /> : null}
     </Screen>
   );
 }
@@ -209,9 +287,18 @@ function Trip({ navigation, ctx }) {
   const [qcFor, setQcFor] = useState(null);
   const [nextId, setNextId] = useState(null);
   const [me, setMe] = useState(null);
+  const [done, setDone] = useState(null);   // the order just delivered: shows the payout before moving on
   const orders = (trip?.orders || []).filter((o) => LIVE.includes(o.status) && o.status !== 'offered');
   useEffect(() => { Location.getLastKnownPositionAsync().then((p) => p && setMe(p.coords)); }, [orders.length]);
-  useEffect(() => { if (!orders.length) { stopTracking(); navigation.popTo('Home'); } }, [orders.length]);   // back to the existing Home, not a second copy
+  useEffect(() => { if (!orders.length && !done) { stopTracking(); navigation.popTo('Home'); } }, [orders.length, done]);   // back to the existing Home, not a second copy
+  if (done) {
+    const fee = Math.round(Number(done.earning || 0) / 0.8);
+    return (
+      <Screen scroll style={{ justifyContent: 'center', flexGrow: 1 }} footer={<Button title={orders.length ? 'Next drop-off' : 'Back to home'} onPress={() => setDone(null)} style={BIG} />}>
+        <SuccessMoment title="Delivered" value={'+' + naira(done.earning)} body={'80% of the ' + naira(fee) + ' delivery fee. It is in your wallet.'} />
+      </Screen>
+    );
+  }
   if (!orders.length) return <Loading />;
 
   const step = async (o, s) => { setBusy(true); try { await rpc('rider_advance', { p_assignment: o.id, p_step: s }); await reload(); } catch (e) { Alert.alert('Could not update', friendlyError(e)); } finally { setBusy(false); } };
@@ -221,29 +308,32 @@ function Trip({ navigation, ctx }) {
   const atFarm = orders.filter((o) => o.status === 'at_farm');
   const drops = orders.filter((o) => ['picked_up', 'at_buyer'].includes(o.status));
 
-  // 1) Checking orders at the farm, one by one
+  // Step 2: checking orders at the farm, one by one
   if (qcFor) {
     const o = atFarm.find((x) => x.id === qcFor);
     if (o) return <QcCheck order={o} pickup={trip.pickup} onBack={() => setQcFor(null)} onDone={() => { setQcFor(null); reload(); }} />;
   }
-  if (atFarm.length && !toFarm.length) return (
-    <Screen scroll footer={<Txt v="small" style={{ textAlign: 'center' }}>Check every order before you leave. Failed orders are refunded to the buyer.</Txt>}>
-      <AppBar title={'At ' + trip.pickup.name} subtitle={atFarm.length + ' to check · ' + drops.length + ' picked up'} onBack={() => {}} />
-      {atFarm.map((o) => (
-        <Card key={o.id} onPress={() => setQcFor(o.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Icon name="clipboard-check-outline" color={c.acc} />
-          <View style={{ flex: 1 }}><Txt v="bold">{itemsText(o)}</Txt><Txt v="small">{o.code} · for {o.dropoff.name}, {o.dropoff.area}</Txt></View>
-          <Icon name="chevron-right" color={c.mute} />
-        </Card>
-      ))}
-      {drops.map((o) => <Row key={o.id} icon="check-circle" iconColor={c.sage} title={itemsText(o)} subtitle={o.code + ' · checked and picked up'} />)}
-      {atFarm.length > 1 ? <Txt v="bold" color={c.acc} onPress={() => release(atFarm[atFarm.length - 1])} style={{ textAlign: 'center' }}>I can't carry all of these</Txt> : null}
-    </Screen>
-  );
+  if (atFarm.length && !toFarm.length) {
+    if (atFarm.length === 1 && !drops.length) return <QcCheck order={atFarm[0]} pickup={trip.pickup} onDone={reload} />;
+    return (
+      <Screen scroll footer={atFarm.length > 1 ? <Pressable onPress={() => release(atFarm[atFarm.length - 1])} style={{ height: 48, alignItems: 'center', justifyContent: 'center' }}><Txt v="bold" color={c.acc} style={{ fontSize: 16 }}>I can't carry all of these</Txt></Pressable> : null}>
+        <TripTop step={2} title={'At ' + trip.pickup.name} sub={atFarm.length + ' to check · ' + drops.length + ' picked up'} />
+        {atFarm.map((o) => (
+          <Card key={o.id} onPress={() => setQcFor(o.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 72 }}>
+            <Icon name="clipboard-check-outline" color={c.acc} size={26} />
+            <View style={{ flex: 1 }}><Txt v="bold" style={{ fontSize: 16 }}>{itemsText(o)}</Txt><Txt v="small" style={{ fontSize: 15 }}>{o.code} · for {o.dropoff.name}, {o.dropoff.area}</Txt></View>
+            <Icon name="chevron-right" color={c.mute} />
+          </Card>
+        ))}
+        {drops.map((o) => <Row key={o.id} icon="check-circle" iconColor={c.sage} title={itemsText(o)} subtitle={o.code + ' · checked and picked up'} />)}
+      </Screen>
+    );
+  }
 
-  // 2) Riding to the farm, or 3) delivering stop by stop
+  // Step 4: proof at the buyer
   const atBuyer = drops.find((o) => o.status === 'at_buyer');
-  if (atBuyer) return <Proof order={atBuyer} onBack={() => {}} onDone={(o) => { Alert.alert('Delivered', naira(o.earning) + ' added to your wallet.'); reload(); }} />;
+  if (atBuyer) return <Proof order={atBuyer} onDone={(o) => { setDone(o); reload(); }} />;
+  // Step 1: riding to the farm, or step 3: delivering stop by stop
   const heading = toFarm.length > 0;
   const target = heading ? null : drops.find((o) => o.id === nextId) || drops[0];
   const dest = heading ? trip.pickup : target.dropoff;
@@ -251,26 +341,25 @@ function Trip({ navigation, ctx }) {
     <Screen pad={false} edges={[]}>
       <MapView provider={PROVIDER_GOOGLE} style={{ flex: 1 }} showsUserLocation
         initialRegion={{ latitude: dest.lat || me?.latitude || PH.latitude, longitude: dest.lng || me?.longitude || PH.longitude, latitudeDelta: 0.06, longitudeDelta: 0.06 }}>
-        {dest.lat ? <Marker coordinate={{ latitude: dest.lat, longitude: dest.lng }} title={dest.name} pinColor={heading ? '#5FC7A0' : '#2DCB8C'} /> : null}
+        {dest.lat ? <Marker coordinate={{ latitude: dest.lat, longitude: dest.lng }} title={dest.name} pinColor={heading ? c.yolk : c.orange} /> : null}
       </MapView>
       <View style={{ backgroundColor: c.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -24, padding: 20, paddingBottom: 32, gap: 14 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Txt v="label" color={c.acc}>● {heading ? 'To pickup · ' + orders.length + ' order' + (orders.length === 1 ? '' : 's') : 'Drop-off ' + (drops.length > 1 ? '· ' + drops.length + ' left' : '')}</Txt>
-          <Txt v="label">{heading ? '' : target.code}</Txt>
+        <TripTop step={heading ? 1 : 3} title={heading ? 'Pickup' : 'Delivery'} />
+        <View style={{ gap: 2 }}>
+          <Txt v="h1">{dest.name}</Txt>
+          <Txt v="body" style={{ fontSize: 16 }}>{heading ? trip.pickup.location : target.dropoff.line + ', ' + target.dropoff.area}</Txt>
+          {heading && orders.length > 1 ? <Txt v="small" style={{ fontSize: 15 }}>{orders.length + ' orders · ' + orders.map((o) => o.code).join(' · ')}</Txt> : !heading ? <Txt v="small" style={{ fontSize: 15 }}>{target.code + (drops.length > 1 ? ' · ' + drops.length + ' drop-offs left' : '')}</Txt> : null}
         </View>
-        <View><Txt v="h1">{dest.name}</Txt><Txt v="small">{heading ? trip.pickup.location : target.dropoff.line + ', ' + target.dropoff.area}</Txt></View>
-        {heading && orders.length > 1 ? <Txt v="small">{orders.map((o) => o.code).join(' · ')}</Txt> : null}
         {!heading && drops.length > 1 ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {drops.map((o) => <Pressable key={o.id} onPress={() => setNextId(o.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 100, borderWidth: 1.5, borderColor: o.id === target.id ? c.ember : c.line2, backgroundColor: o.id === target.id ? c.sf : 'transparent' }}>
-              <Txt v="small" color={o.id === target.id ? c.ink : c.mute}>{o.dropoff.area || o.code}</Txt></Pressable>)}
+            {drops.map((o) => <Chip key={o.id} label={o.dropoff.area || o.code} selected={o.id === target.id} onPress={() => setNextId(o.id)} />)}
           </View>
         ) : null}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button small variant="outline" icon="navigation-variant-outline" title="Navigate" onPress={() => navigateTo(dest)} style={{ flex: 1 }} />
-          {!heading && target.dropoff.phone ? <Button small variant="outline" icon="phone" title="Call" onPress={() => Linking.openURL('tel:+' + target.dropoff.phone)} style={{ flex: 1 }} /> : null}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button variant="outline" icon="navigation-variant-outline" title="Navigate" onPress={() => navigateTo(dest)} style={{ flex: 1, height: 56 }} />
+          {!heading && target.dropoff.phone ? <Button variant="outline" icon="phone" title="Call buyer" onPress={() => Linking.openURL('tel:+' + target.dropoff.phone)} style={{ flex: 1, height: 56 }} /> : null}
         </View>
-        <Button icon="chevron-double-right" title={heading ? "I'm at the farm" : "I've arrived"} loading={busy} onPress={() => step(heading ? toFarm[0] : target, heading ? 'arrived_farm' : 'arrived_buyer')} style={{ height: 60 }} />
+        <Button icon="chevron-double-right" title={heading ? "I'm at the farm" : "I've arrived"} loading={busy} onPress={() => step(heading ? toFarm[0] : target, heading ? 'arrived_farm' : 'arrived_buyer')} style={BIG} />
       </View>
     </Screen>
   );
@@ -437,7 +526,7 @@ function Root() {
   if (session && gate) return <PasswordScreen mode={gate} email={session.user?.email} />;
   if (!session) return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="SignIn">{({ navigation }) => <SignInScreen title="Rider sign-in" subtitle="Use the email Poultry360 ops registered for you, and your password." createLabel="First time here? Set up with a code"
+      <Stack.Screen name="SignIn">{({ navigation }) => <SignInScreen title="Rider sign-in" tagline="Deliveries for Poultry360." subtitle="Use the email ops registered for you." createLabel="First time? Set up with a code"
         onCreate={() => navigation.navigate('Email', { mode: 'signup' })} onForgot={(email) => navigation.navigate('Email', { mode: 'reset', email })} />}</Stack.Screen>
       <Stack.Screen name="Email">{({ navigation, route }) => <EmailScreen mode={route.params?.mode} initialEmail={route.params?.email} onBack={() => navigation.goBack()}
         title={route.params?.mode === 'reset' ? undefined : 'Set up your rider account'} subtitle={route.params?.mode === 'reset' ? undefined : "Enter the email Poultry360 ops registered for you. We'll send a 6-digit code, then you'll create a password."}
@@ -465,5 +554,5 @@ function Signed() {
 
 export default function App() {
   const fonts = useP360Fonts();
-  return <SafeAreaProvider><ThemeProvider>{fonts ? <ErrorBoundary><NavigationContainer><Root /></NavigationContainer></ErrorBoundary> : <Loading />}</ThemeProvider></SafeAreaProvider>;
+  return <SafeAreaProvider><ThemeProvider initial="light">{fonts ? <ErrorBoundary><NavigationContainer><Root /></NavigationContainer></ErrorBoundary> : <Loading />}</ThemeProvider></SafeAreaProvider>;
 }

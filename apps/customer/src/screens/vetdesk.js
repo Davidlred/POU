@@ -3,8 +3,9 @@ import { View, Pressable, ScrollView, RefreshControl, Alert, Linking, BackHandle
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Steps, PhotoBox, Toggle,
-  naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase, PhotoButtons } from '@p360/shared';
+  naira, isoDate, shortDate, clock, rpc, uploadImage, friendlyError, supabase, PhotoButtons, useWide, HeaderBar, SectionHead, DataTable, LiveDot } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
+import { TopBar } from '../components/RoleSwitcher';
 
 const SPECIALTIES = ['Layer health', 'Broiler health', 'Biosecurity', 'Nutrition', 'Turkey & waterfowl', 'General poultry'];
 const TIMES = ['09:00', '10:30', '12:00', '14:00', '16:00', '18:00'];
@@ -97,19 +98,11 @@ export function VetApplyScreen({ navigation }) {
   );
 }
 
-// The vet's home: bookings, time slots and profile. Shown in place of the buyer tabs when the active role is vet.
+// The vet's home (newdesign 6.5): header with the licence pill and Bookings / My hours / Profile.
 export function VetDeskScreen({ navigation }) {
   const page = usePage();
+  const wide = useWide();
   const { c } = useTheme();
-  const { profile, setActiveRole, homeRole } = useAuth();
-  const home = homeRole();   // null for a vet-only account
-  const leave = useCallback(() => { if (home) setActiveRole(home); }, [home]);
-  // Back (button or swipe) returns to the role they came from. Without this it would close the app, because the desk is the root screen.
-  useFocusEffect(useCallback(() => {
-    if (!home || Platform.OS === 'web') return undefined;   // browsers have no hardware Back; BackHandler only logs an error there
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; });
-    return () => sub.remove();
-  }, [home, leave]));
   const [d, setD] = useState(undefined);
   const [tab, setTab] = useState('bookings');
   const [busy, setBusy] = useState(false);
@@ -121,73 +114,107 @@ export function VetDeskScreen({ navigation }) {
     const t = setInterval(load, 30000);
     return () => { supabase.removeChannel(ch); clearInterval(t); };
   }, [load]);
-  const header = (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <View style={{ flex: 1 }}><Txt v="display" style={{ fontSize: 28 }}>Vet desk</Txt>{d?.vet ? <Txt v="small">{d.vet.name}</Txt> : null}</View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {home ? <Button small variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Shop' : home === 'supplier' ? 'My store' : 'My farm'} onPress={leave} style={{ height: 44 }} /> : null}
-        <Pressable onPress={() => navigation.navigate('Profile')} accessibilityLabel="Profile" style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.sf, alignItems: 'center', justifyContent: 'center' }}><Icon name="account-circle-outline" /></Pressable>
-      </View>
-    </View>
-  );
-  if (d === undefined) return <Screen style={{ paddingTop: 8, gap: 14 }}>{header}<Skeleton h={160} r={24} /></Screen>;
   const v = d?.vet;
-  if (!v) return <Screen scroll style={{ paddingTop: 8 }}>{header}<Empty icon="stethoscope" title="Finish your vet registration" body="Add your details and licence so we can review them." action="Register" onAction={() => navigation.navigate('VetApply')} /></Screen>;
-  if (v.status !== 'approved') return (
-    <Screen scroll style={{ paddingTop: 8 }}>
-      {header}
-      {v.status === 'rejected' ? <>
-        <Card tone="err"><Txt v="label" color={c.err}>What to fix</Txt><Txt v="body">{v.rejection_reason || 'We could not verify your licence.'}</Txt></Card>
-        <Button title="Update and resubmit" onPress={() => navigation.navigate('VetApply')} />
-      </> : <>
-        <Hearth><Icon name="shield-check-outline" size={32} color={c.hacc} /><Txt v="h2" color={c.hink}>We're checking your licence</Txt><Txt v="small" color={c.hmute}>This usually takes a working day. Farmers will be able to book you as soon as you're approved. This screen updates by itself.</Txt></Hearth>
-        <Card><Steps steps={[{ label: 'Details submitted', state: 'done' }, { label: 'Licence under review', state: 'current' }, { label: 'Open for bookings', state: 'todo' }]} /></Card>
-      </>}
-      {home ? <Button variant="outline" icon="arrow-left" title={home === 'buyer' ? 'Back to shopping' : home === 'supplier' ? 'Back to my store' : 'Back to my farm'} onPress={leave} /> : null}
-    </Screen>
-  );
-  const open = d.consultations.filter((k) => ['requested', 'proposed', 'confirmed'].includes(k.status));
-  const past = d.consultations.filter((k) => ['completed', 'cancelled'].includes(k.status));
-  const free = d.slots.filter((s) => !s.booked);
-  return (
+  const shell = (children) => (
     <Screen pad={false}>
-      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: 8, gap: 14, paddingBottom: 40 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
-        {header}
-        <Hearth>
-          <Txt v="label" color={c.hmute}>Wallet balance</Txt>
-          <Txt v="monoLg" color={c.hink} style={{ fontSize: 30 }}>{naira(d.balance)}</Txt>
-          <Txt v="small" color={c.hmute}>Earned from consults {naira(d.earned)} · you keep 90% of each fee, paid when you complete the consult</Txt>
-          <Button variant="hearth" icon="bank-transfer-out" title="Withdraw" disabled={!Number(d.balance)} onPress={() => navigation.navigate('Withdraw')} />
-        </Hearth>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <StatBox label="Upcoming" value={open.length} /><StatBox label="Open slots" value={free.length} /><StatBox label="Completed" value={past.filter((k) => k.status === 'completed').length} />
-        </View>
-        {!d.availability?.windows?.length ? <Banner tone="warn" icon="calendar-clock" title="Set your working hours" body="Farmers can book you once you do." action="Set hours" onAction={() => setTab('slots')} /> : null}
-        <Segmented options={[{ value: 'bookings', label: 'Bookings' }, { value: 'slots', label: 'My hours' }, { value: 'profile', label: 'Profile' }]} value={tab} onChange={setTab} />
-        {tab === 'bookings' ? <>
-          {!open.length ? <Empty icon="calendar-blank-outline" title="No upcoming bookings" body="New video consults and farm-visit requests appear here." /> : <Group>{open.map((k, i) => (
-            <Row key={k.id} last={i === open.length - 1} icon={k.type === 'video' ? 'video-outline' : 'map-marker-outline'} title={k.farmer}
-              subtitle={(k.type === 'video' ? 'Video' : 'Farm visit') + ' · ' + (k.status === 'requested' ? 'asked for ' + shortDate(k.requested_date) : when(k.at))}
-              onPress={() => navigation.navigate('VetBooking', { id: k.id })} right={<Pill tone={K_TONE[k.status]} label={K_LABEL[k.status]} />} />))}</Group>}
-          {past.length ? <><Txt v="label">Past</Txt><Group>{past.slice(0, 15).map((k, i, a) => (
-            <Row key={k.id} last={i === a.length - 1} icon={k.status === 'completed' ? 'check-circle-outline' : 'close-circle-outline'} iconColor={k.status === 'completed' ? c.sage : c.mute} title={k.farmer}
-              subtitle={(k.type === 'video' ? 'Video' : 'Farm visit') + (k.at ? ' · ' + shortDate(k.at) : '')} onPress={() => navigation.navigate('VetBooking', { id: k.id })} />))}</Group></> : null}
-        </> : null}
-        {tab === 'slots' ? <Slots slots={d.slots} availability={d.availability} reload={load} /> : null}
-        {tab === 'profile' ? <VetProfileEdit vet={v} reload={load} /> : null}
+      <ScrollView contentContainerStyle={[{ padding: 20, paddingTop: wide ? 20 : 8, gap: wide ? 24 : 18, paddingBottom: 48 }, page]} refreshControl={<RefreshControl refreshing={busy} onRefresh={load} />}>
+        {!wide ? <TopBar navigation={navigation} cart={false} /> : null}
+        {children}
       </ScrollView>
     </Screen>
   );
+  if (d === undefined) return shell(<><Skeleton h={60} r={16} /><Skeleton h={180} r={24} /></>);
+  if (!v) return shell(<Empty icon="stethoscope" title="Finish your vet registration" body="Add your details and licence so we can review them." action="Register" onAction={() => navigation.navigate('VetApply')} />);
+  const header = (
+    <HeaderBar lead={<View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.t2, alignItems: 'center', justifyContent: 'center' }}><Txt v="h1" color={c.t2i}>{(v.name || 'V').replace(/^Dr\.?\s*/i, '')[0]}</Txt></View>}
+      title={v.name}
+      subtitle={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {v.status === 'approved' ? <Pill tone="ok" label="Licence verified" /> : v.status === 'rejected' ? <Pill tone="err" label="Needs changes" /> : <Pill tone="warn" label="Licence in review" />}
+        <Txt v="small" style={{ fontSize: 14 }}>{(v.specialty || 'Poultry vet') + (v.rating ? ' · ★ ' + Number(v.rating).toFixed(1) : '')}</Txt>
+      </View>}>
+      {v.status === 'approved' && wide ? <View style={{ width: 380 }}><Segmented options={TABS} value={tab} onChange={setTab} /></View> : null}
+    </HeaderBar>
+  );
+  if (v.status !== 'approved') return shell(<>
+    {header}
+    {v.status === 'rejected' ? <>
+      <Card tone="err" style={{ gap: 8 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="alert-outline" color={c.err} /><Txt v="bold" color={c.err}>What to fix</Txt></View><Txt v="body">{v.rejection_reason || 'We could not verify your licence.'}</Txt></Card>
+      <Button title="Update and resubmit" onPress={() => navigation.navigate('VetApply')} />
+    </> : <>
+      <Hearth>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><LiveDot /><Txt v="strong" color={c.hink}>We're checking your licence</Txt></View>
+        <Txt v="small" color={c.hmute}>Usually within a working day. Farmers can book you as soon as you're approved. This page updates by itself.</Txt>
+      </Hearth>
+      <Card><Steps steps={[{ label: 'Details received', state: 'done' }, { label: 'Licence check', state: 'current' }, { label: 'Open for bookings', state: 'todo' }]} /></Card>
+    </>}
+  </>);
+  const open = d.consultations.filter((k) => ['requested', 'proposed', 'confirmed'].includes(k.status)).sort((a, b) => ((a.at || a.requested_date || '') > (b.at || b.requested_date || '') ? 1 : -1));
+  const past = d.consultations.filter((k) => ['completed', 'cancelled'].includes(k.status));
+  const next = open.find((k) => k.status === 'confirmed' && k.at);
+  const len = d.availability?.slot_minutes || 60;
+  const nextCard = next ? (
+    <Hearth style={wide ? { flex: 1.4 } : null}>
+      <Txt v="label" color={c.hmute}>Next consult</Txt>
+      <Txt v="monoLg" color={c.hink} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: wide ? 40 : 36, lineHeight: wide ? 46 : 42 }}>{when(next.at)}</Txt>
+      <Txt v="body" color={c.hmute}>{next.farmer + (next.flock ? ' · ' + next.flock : '') + ' · ' + (next.type === 'video' ? len + '-minute video consult' : 'Farm visit')}</Txt>
+      <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+        {next.type === 'video' && next.meeting_url ? <Button small variant="onHearth" icon="video-outline" title="Join video call" onPress={() => Linking.openURL(next.meeting_url)} style={{ paddingHorizontal: 18 }} /> : null}
+        <Button small variant="hearthOutline" title="Open" onPress={() => navigation.navigate('VetBooking', { id: next.id })} style={{ paddingHorizontal: 18 }} />
+      </View>
+    </Hearth>
+  ) : (
+    <Card style={[{ gap: 8, padding: 18 }, wide ? { flex: 1.4 } : null]}>
+      <Txt v="label">Next consult</Txt>
+      <Txt v="h2">Nothing booked yet</Txt>
+      <Txt v="small">{d.availability?.windows?.length ? 'Farmers can book your open hours up to 4 weeks ahead.' : 'Set your working hours so farmers can book you.'}</Txt>
+      {!d.availability?.windows?.length ? <Button small title="Set my hours" onPress={() => setTab('slots')} style={{ alignSelf: 'flex-start', paddingHorizontal: 18 }} /> : null}
+    </Card>
+  );
+  const walletCard = (
+    <Card style={[{ gap: 8, padding: 18 }, wide ? { flex: 1 } : null]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Icon name="wallet-outline" size={20} color={c.acc} /><Txt v="label">Wallet</Txt></View>
+      <Txt v="mono" style={{ fontSize: 28, lineHeight: 34 }}>{naira(d.balance)}</Txt>
+      <Txt v="small">{'Earned from consults ' + naira(d.earned) + ' · you keep 90% of each fee'}</Txt>
+      <Button small variant="outline" icon="bank-transfer-out" title="Withdraw" disabled={!Number(d.balance)} onPress={() => navigation.navigate('Withdraw')} />
+    </Card>
+  );
+  const upcoming = (
+    <View style={{ gap: 12 }}>
+      <SectionHead title="Upcoming" count={open.length} />
+      <DataTable minWidth={620} columns={[{ label: 'When', flex: 1.2 }, { label: 'Farm', flex: 1.4 }, { label: 'Note', flex: 1.6 }, { label: 'Status', flex: 1 }, { label: '', width: 150, right: true }]}
+        rows={open.map((k) => {
+          const needsTime = k.type === 'onsite' && k.status === 'requested';
+          return { key: k.id, onPress: () => navigation.navigate('VetBooking', { id: k.id }), cells: [
+            <Txt v="strong">{k.status === 'requested' ? 'Asked ' + shortDate(k.requested_date) : k.at ? when(k.at) : 'No time yet'}</Txt>,
+            <View><Txt v="strong" numberOfLines={1}>{k.farmer}</Txt><Txt v="small">{k.type === 'video' ? 'Video' : 'Farm visit'}{k.flock ? ' · ' + k.flock : ''}</Txt></View>,
+            <Txt v="small" numberOfLines={2}>{k.notes || '–'}</Txt>,
+            needsTime ? <Pill tone="warn" icon="clock-outline" label="Needs a time" /> : <Pill tone={K_TONE[k.status]} label={k.status === 'confirmed' && k.fee ? 'Paid' : K_LABEL[k.status]} />,
+            <Button small variant={needsTime ? 'primary' : 'outline'} title={needsTime ? 'Propose a time' : 'Open'} onPress={() => navigation.navigate('VetBooking', { id: k.id })} style={{ height: 40, paddingHorizontal: 14 }} />] };
+        })}
+        empty={<Empty icon="calendar-blank-outline" title="No upcoming bookings" body="Video consults and farm-visit requests show here." style={{ borderWidth: 0 }} />} />
+      {past.length ? <>
+        <SectionHead title="Past" />
+        <DataTable minWidth={480} columns={[{ label: 'When', flex: 1 }, { label: 'Farm', flex: 1.6 }, { label: 'Status', right: true }]}
+          rows={past.slice(0, 12).map((k) => ({ key: k.id, onPress: () => navigation.navigate('VetBooking', { id: k.id }), cells: [
+            <Txt v="small">{k.at ? shortDate(k.at) : '–'}</Txt>, <Txt v="strong" numberOfLines={1}>{k.farmer}</Txt>,
+            <Pill tone={k.status === 'completed' ? 'ok' : 'neutral'} label={k.status === 'completed' ? 'Done' : 'Cancelled'} />] }))} />
+      </> : null}
+    </View>
+  );
+  return shell(<>
+    {header}
+    {!wide ? <Segmented options={TABS} value={tab} onChange={setTab} /> : null}
+    {tab === 'bookings' ? <>
+      {wide ? <View style={{ flexDirection: 'row', gap: 16, alignItems: 'stretch' }}>{nextCard}{walletCard}</View> : <>{nextCard}{walletCard}</>}
+      {upcoming}
+    </> : tab === 'slots' ? <VetHours availability={d.availability} reload={load} /> : <VetProfileEdit vet={v} reload={load} />}
+  </>);
 }
-
-function StatBox({ label, value }) {
-  const { c } = useTheme();
-  return <View style={{ flex: 1, backgroundColor: c.sf, borderRadius: 16, padding: 12, gap: 2 }}><Txt v="label">{label}</Txt><Txt v="mono" style={{ fontSize: 20 }}>{value}</Txt></View>;
-}
+const TABS = [{ value: 'bookings', label: 'Bookings' }, { value: 'slots', label: 'My hours' }, { value: 'profile', label: 'Profile' }];
 
 const WEEK = [{ d: 1, l: 'Mon', full: 'Monday' }, { d: 2, l: 'Tue', full: 'Tuesday' }, { d: 3, l: 'Wed', full: 'Wednesday' }, { d: 4, l: 'Thu', full: 'Thursday' }, { d: 5, l: 'Fri', full: 'Friday' }, { d: 6, l: 'Sat', full: 'Saturday' }, { d: 0, l: 'Sun', full: 'Sunday' }];
 const HOURS = Array.from({ length: 31 }, (_, i) => String(6 + Math.floor(i / 2)).padStart(2, '0') + (i % 2 ? ':30' : ':00'));   // 06:00 to 21:00, every half hour
-const LENGTHS = [30, 45, 60, 90];
+const LENGTHS = [15, 30, 45, 60];
 const mins = (hm) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
 const slotsIn = (w, len) => Math.max(0, Math.floor((mins(w.to) - mins(w.from)) / len));
 // The saved schedule as an editable week: every day present, on or off, with its own hours.
@@ -196,101 +223,78 @@ const toWeek = (availability) => Object.fromEntries(WEEK.map((w) => {
   return [w.d, saved ? { on: true, from: saved.start, to: saved.end } : { on: false, from: '09:00', to: '15:00' }];
 }));
 
-function Slots({ slots, availability, reload }) {
+// My hours: one row per weekday (switch, day, hours or Off), the consult length, and how many slots farmers can book a week.
+function VetHours({ availability, reload }) {
   const { c } = useTheme();
-  // Weekly availability form: each day has its own hours
-  const [editing, setEditing] = useState(false);
+  const wide = useWide();
   const [week, setWeek] = useState(() => toWeek(availability));
-  const [len, setLen] = useState(availability?.slot_minutes || 60);
+  const [len, setLen] = useState(availability?.slot_minutes || 30);
   const [hoursFor, setHoursFor] = useState(null);   // weekday whose hours are being picked
   const [saving, setSaving] = useState(false);
   const onDays = WEEK.filter((w) => week[w.d].on);
   const bad = onDays.filter((w) => slotsIn(week[w.d], len) < 1);
   const perWeek = onDays.reduce((n, w) => n + slotsIn(week[w.d], len), 0);
+  const saved = JSON.stringify(toWeek(availability)) + (availability?.slot_minutes || 30);
+  const changed = JSON.stringify(week) + len !== saved;
   const setDayHours = (d, patch) => setWeek((p) => ({ ...p, [d]: { ...p[d], ...patch } }));
-  const startEdit = () => { setWeek(toWeek(availability)); setLen(availability?.slot_minutes || 60); setEditing(true); };
-  const saveWeekly = async () => {
+  const save = async () => {
     setSaving(true);
-    try {
-      await rpc('vet_set_weekly', { p_windows: onDays.map((w) => ({ weekday: w.d, start: week[w.d].from, end: week[w.d].to })), p_slot_minutes: len });
-      await reload(); setEditing(false);
-    } catch (e) { Alert.alert("Couldn't save your availability", friendlyError(e)); } finally { setSaving(false); }
+    try { await rpc('vet_set_weekly', { p_windows: onDays.map((w) => ({ weekday: w.d, start: week[w.d].from, end: week[w.d].to })), p_slot_minutes: len }); await reload(); }
+    catch (e) { Alert.alert("Couldn't save your hours", friendlyError(e)); } finally { setSaving(false); }
   };
-  const turnOff = () => Alert.alert('Turn off your hours?', 'Farmers will not be able to book you. Consults already booked stay.', [{ text: 'Cancel', style: 'cancel' },
-    { text: 'Turn off', style: 'destructive', onPress: async () => { try { await rpc('vet_set_weekly', { p_windows: [], p_slot_minutes: 60 }); await reload(); } catch (e) { Alert.alert("Couldn't turn it off", friendlyError(e)); } } }]);
-
+  const missing = bad.length ? bad.map((w) => w.full).join(', ') + ': end after start, room for one consult' : null;
   const picking = hoursFor === null ? null : WEEK.find((w) => w.d === hoursFor);
   return (
-    <>
-      <Txt v="label">Weekly availability</Txt>
-      {editing ? (
-        <Card>
-          <Txt v="strong" style={{ fontSize: 13 }}>Switch on the days you work and set the hours</Txt>
+    <View style={{ flexDirection: wide ? 'row' : 'column', gap: wide ? 24 : 16, alignItems: wide ? 'flex-start' : 'stretch' }}>
+      <View style={{ flex: wide ? 1.4 : undefined, gap: 12 }}>
+        <View style={{ backgroundColor: c.sf, borderRadius: 20, borderWidth: 1, borderColor: c.line, overflow: 'hidden' }}>
           {WEEK.map((w, i) => {
             const x = week[w.d]; const n = slotsIn(x, len);
             return (
-              <View key={w.d} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, borderTopWidth: i ? 1 : 0, borderColor: c.line, paddingTop: i ? 8 : 0 }}>
-                <Toggle value={x.on} onValueChange={(v) => setDayHours(w.d, { on: v })} />
-                <Txt v={x.on ? 'bold' : 'body'} color={x.on ? c.ink : c.mute} style={{ width: 92 }}>{w.full}</Txt>
+              <View key={w.d} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 60, paddingHorizontal: 16, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderColor: c.line }}>
+                <Toggle value={x.on} onValueChange={(on) => setDayHours(w.d, { on })} accessibilityLabel={w.full} />
+                <Txt v={x.on ? 'bold' : 'body'} color={x.on ? c.ink : c.mute} style={{ width: 100 }}>{w.full}</Txt>
                 {x.on ? (
-                  <Pressable onPress={() => setHoursFor(w.d)} accessibilityLabel={'Change ' + w.full + ' hours, ' + x.from + ' to ' + x.to}
-                    style={{ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1.5, borderColor: n < 1 ? c.err : c.line2, backgroundColor: c.sf2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 }}>
-                    <Txt v="mono" style={{ fontSize: 14 }}>{x.from} – {x.to}</Txt><Icon name="pencil-outline" size={16} color={c.acc} />
+                  <Pressable onPress={() => setHoursFor(w.d)} accessibilityRole="button" accessibilityLabel={'Change ' + w.full + ' hours, ' + x.from + ' to ' + x.to}
+                    style={({ hovered }) => ({ flex: 1, minHeight: 44, borderRadius: 12, borderWidth: 1.5, borderColor: n < 1 ? c.err : hovered ? c.line2 : c.line, backgroundColor: c.sf2, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 })}>
+                    <Txt v="mono">{x.from + ' to ' + x.to}</Txt><Icon name="pencil-outline" size={16} color={c.acc} />
                   </Pressable>
-                ) : <Txt v="small" style={{ flex: 1 }}>Not working</Txt>}
+                ) : <Txt v="small" style={{ flex: 1 }}>Off</Txt>}
               </View>
             );
           })}
-          <Txt v="strong" style={{ fontSize: 13 }}>Length of each consult</Txt>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{LENGTHS.map((m) => <Chip key={m} label={m + ' min'} selected={len === m} onPress={() => setLen(m)} />)}</View>
-          {!onDays.length ? <Txt v="small" color={c.err}>Switch on at least one day.</Txt>
-            : bad.length ? <Txt v="small" color={c.err}>{bad.map((w) => w.full).join(', ')}: the end time must be after the start, with room for at least one consult.</Txt>
-            : <Txt v="small">{perWeek} consult{perWeek === 1 ? '' : 's'} a week.</Txt>}
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button small variant="outline" title="Cancel" onPress={() => setEditing(false)} style={{ flex: 1 }} />
-            <Button small title="Save" loading={saving} disabled={!onDays.length || bad.length > 0} onPress={saveWeekly} style={{ flex: 1 }} />
-          </View>
-        </Card>
-      ) : availability ? (
-        <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Icon name="calendar-sync-outline" color={c.sage} />
-            <View style={{ flex: 1 }}><Txt v="bold">Your weekly hours</Txt><Txt v="small">{availability.slot_minutes}-minute consults</Txt></View>
-          </View>
-          {(availability.windows || []).map((x) => (
-            <View key={x.weekday} style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Txt v="body">{WEEK.find((w) => w.d === x.weekday)?.full}</Txt><Txt v="mono" style={{ fontSize: 14 }}>{x.start} – {x.end}</Txt></View>))}
-          <Txt v="small">Farmers can book these hours up to 4 weeks ahead.</Txt>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Button small variant="outline" title="Change" onPress={startEdit} style={{ flex: 1 }} />
-            <Button small variant="ghost" title="Turn off" onPress={turnOff} style={{ flex: 1 }} />
-          </View>
-        </Card>
-      ) : (
-        <Card>
-          <Txt v="bold">Set the days and hours you're free</Txt>
-          <Txt v="small">Farmers can then book you in those hours.</Txt>
-          <Button small icon="calendar-sync-outline" title="Set weekly availability" onPress={startEdit} />
-        </Card>
-      )}
-
+        </View>
+      </View>
+      <View style={{ flex: wide ? 1 : undefined, gap: 14 }}>
+        <Txt v="h2">Length of each consult</Txt>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[...new Set([...LENGTHS, len])].sort((a, b) => a - b).map((m) => <Chip key={m} label={m + ' min'} selected={len === m} onPress={() => setLen(m)} />)}</View>
+        <View style={{ backgroundColor: c.t1, borderRadius: 20, padding: 18, gap: 4 }}>
+          <Txt v="label" color={c.t1i}>Farmers can book</Txt>
+          <Txt v="mono" style={{ fontSize: 30, lineHeight: 36 }}>{perWeek + (perWeek === 1 ? ' slot' : ' slots')}</Txt>
+          <Txt v="small">{'a week · ' + onDays.length + (onDays.length === 1 ? ' working day' : ' working days') + ' · up to 4 weeks ahead'}</Txt>
+        </View>
+        {missing ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="alert-outline" size={16} color={c.err} /><Txt v="small" color={c.err} style={{ flex: 1 }}>{missing}</Txt></View> : null}
+        <Button title={!changed ? 'Saved' : missing ? 'Fix the hours to save' : !onDays.length ? 'Save · farmers can’t book you' : 'Save my hours'} loading={saving} disabled={!changed || !!missing} onPress={save} />
+      </View>
       <Sheet visible={!!picking} onClose={() => setHoursFor(null)}>
         {picking ? <>
-          <Txt v="h1">{picking.full} hours</Txt>
-          <Txt v="strong" style={{ fontSize: 13 }}>From</Txt>
+          <Txt v="h1">{picking.full + ' hours'}</Txt>
+          <Txt v="strong" style={{ fontSize: 14 }}>From</Txt>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{HOURS.slice(0, -1).map((h) => <Chip key={h} label={h} selected={week[picking.d].from === h} onPress={() => setDayHours(picking.d, { from: h })} />)}</ScrollView>
-          <Txt v="strong" style={{ fontSize: 13 }}>To</Txt>
+          <Txt v="strong" style={{ fontSize: 14 }}>To</Txt>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{HOURS.slice(1).map((h) => <Chip key={h} label={h} selected={week[picking.d].to === h} onPress={() => setDayHours(picking.d, { to: h })} />)}</ScrollView>
           {slotsIn(week[picking.d], len) < 1 ? <Txt v="small" color={c.err}>The end time must be after the start, with room for a {len}-minute consult.</Txt>
-            : <Txt v="small">{week[picking.d].from} to {week[picking.d].to}: {slotsIn(week[picking.d], len)} slot{slotsIn(week[picking.d], len) === 1 ? '' : 's'} of {len} minutes.</Txt>}
+            : <Txt v="small">{week[picking.d].from + ' to ' + week[picking.d].to + ': ' + slotsIn(week[picking.d], len) + (slotsIn(week[picking.d], len) === 1 ? ' slot' : ' slots') + ' of ' + len + ' minutes.'}</Txt>}
           <Button title="Done" onPress={() => setHoursFor(null)} />
-          {onDays.length > 1 ? <Button variant="ghost" title={'Use these hours for all ' + onDays.length + ' working days'} onPress={() => { const h = week[picking.d]; setWeek((p) => Object.fromEntries(Object.entries(p).map(([d, x]) => [d, x.on ? { ...x, from: h.from, to: h.to } : x]))); setHoursFor(null); }} /> : null}
+          {onDays.length > 1 ? <Button variant="ghost" title={'Use these hours for all ' + onDays.length + ' working days'} onPress={() => { const h = week[picking.d]; setWeek((p) => Object.fromEntries(Object.entries(p).map(([dd, x]) => [dd, x.on ? { ...x, from: h.from, to: h.to } : x]))); setHoursFor(null); }} /> : null}
         </> : null}
       </Sheet>
-    </>
+    </View>
   );
 }
 
 function VetProfileEdit({ vet, reload }) {
+  const wide = useWide();
   const [fee, setFee] = useState(String(Math.round(vet.fee || 0)));
   const [bio, setBio] = useState(vet.bio || '');
   const [onsite, setOnsite] = useState(vet.onsite !== false);
@@ -301,16 +305,19 @@ function VetProfileEdit({ vet, reload }) {
     catch (e) { Alert.alert("Couldn't save", friendlyError(e)); } finally { setBusy(false); }
   };
   return (
-    <>
-      <Card><Txt v="bold">{vet.name}</Txt><Txt v="small">{vet.specialty}{vet.years != null ? ' · ' + vet.years + ' years' : ''}</Txt><Pill tone="ok" label="Verified vet" /></Card>
-      <Input label="Fee per video consult" prefix="₦" keyboardType="number-pad" value={fee} onChangeText={(t) => setFee(t.replace(/\D/g, ''))} mono hint={Number(fee) > 0 ? 'You receive ' + naira(Math.round(Number(fee) * 0.9)) + ' per consult after the 10% Poultry360 fee.' : undefined} />
-      <Input label="About you" value={bio} onChangeText={setBio} multiline />
-      <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><View style={{ flex: 1 }}><Txt v="strong">I also do farm visits</Txt><Txt v="small">Farmers can request an on-site visit.</Txt></View><Toggle value={onsite} onValueChange={setOnsite} /></Card>
-      <Button title="Save changes" loading={busy} disabled={!(Number(fee) > 0)} onPress={save} />
+    <View style={{ gap: 14, maxWidth: wide ? 640 : undefined }}>
+      <Card style={{ gap: 14, padding: 18 }}>
+        <Input label="Fee per video consult" prefix="₦" keyboardType="number-pad" value={fee} onChangeText={(t) => setFee(t.replace(/\D/g, ''))} mono hint={Number(fee) > 0 ? 'You receive ' + naira(Math.round(Number(fee) * 0.9)) + ' per consult after the 10% Poultry360 fee.' : undefined} />
+        <View style={{ gap: 2 }}><Txt v="label">Experience</Txt><Txt v="strong">{(vet.years != null ? vet.years + ' years · ' : '') + (vet.specialty || 'Poultry vet')}</Txt></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><View style={{ flex: 1 }}><Txt v="strong">I also do farm visits</Txt><Txt v="small">Farmers can request an on-site visit.</Txt></View><Toggle value={onsite} onValueChange={setOnsite} accessibilityLabel="I also do farm visits" /></View>
+        <Input label="About you" value={bio} onChangeText={setBio} multiline />
+      </Card>
+      <Button title={Number(fee) > 0 ? 'Save changes' : 'Enter your fee'} loading={busy} disabled={!(Number(fee) > 0)} onPress={save} />
       <Txt v="small">To change your name, specialty or licence, contact Poultry360 support.</Txt>
-    </>
+    </View>
   );
 }
+
 
 // One booking, from the vet's side.
 export function VetBookingScreen({ navigation, route }) {

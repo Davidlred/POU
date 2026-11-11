@@ -46,15 +46,15 @@ export default function Invest() {
 
   return (
     <>
-      <main className="main single">
+      <main className="page single">
         <section className="list-pane">
-          <div className="pane-head">
+          <div className="page-head">
             <h1>Investments</h1>
             <p className="muted">Review investors and farms, start funded terms and pay out returns.</p>
           </div>
           <div className="toolbar">
-            <div className="tabs" role="tablist">
-              {TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={'tab' + (tab === t.id ? ' on' : '')} onClick={() => setTab(t.id)}>{t.label}{todo[t.id] ? <span className="count dot">{todo[t.id]}</span> : null}</button>)}
+            <div className="seg" role="tablist">
+              {TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}{todo[t.id] ? <span className="count dot">{todo[t.id]}</span> : null}</button>)}
             </div>
           </div>
           {loadErr ? <div className="banner err">{loadErr} {/does not exist|schema cache/i.test(loadErr) ? 'Run supabase/migrations/006_investment.sql first. ' : ''}<button className="link" onClick={load}>Try again</button></div> : null}
@@ -76,16 +76,21 @@ export function Decide({ onApprove, onReject, approveLabel = 'Approve', reasons 
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const go = async (fn) => { setBusy(true); setErr(null); const e = await fn(); setBusy(false); if (e) setErr(e); else { setRejecting(false); setReason(''); } };
+  const [note, setNote] = useState('');
+  const why = [reason, note.trim()].filter(Boolean).join('. ');
+  const go = async (fn) => { setBusy(true); setErr(null); const e = await fn(); setBusy(false); if (e) setErr(e); else { setRejecting(false); setReason(''); setNote(''); } };
   return (
-    <div className="reject">
+    <>
       {err ? <p className="error">{err}</p> : null}
-      {rejecting ? <>
-        <div className="chips">{reasons.map((r) => <button key={r} type="button" className={'chip btn-chip' + (reason === r ? ' on' : '')} onClick={() => setReason(r)}>{r}</button>)}</div>
-        <textarea className="input" rows={2} autoFocus placeholder="Tell them what to fix. They see this in the app." value={reason} onChange={(e) => setReason(e.target.value)} />
-        <div className="actions"><button className="btn ghost sm" onClick={() => setRejecting(false)}>Cancel</button><button className="btn danger sm" disabled={!reason.trim() || busy} onClick={() => go(() => onReject(reason.trim()))}>Reject</button></div>
-      </> : <div className="actions"><button className="btn primary sm" disabled={busy} onClick={() => go(onApprove)}>{busy ? 'Saving…' : approveLabel}</button><button className="btn outline sm" disabled={busy} onClick={() => setRejecting(true)}>Reject</button></div>}
-    </div>
+      {rejecting ? (
+        <div className="reject">
+          <p className="strong">Why reject?</p>
+          <div className="chips">{reasons.map((r) => <button key={r} type="button" aria-pressed={reason === r} className={'chip btn-chip' + (reason === r ? ' on' : '')} onClick={() => setReason(reason === r ? '' : r)}>{r}</button>)}</div>
+          <textarea className="input" rows={2} placeholder="Anything else they should fix (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="actions"><button className="btn ghost" onClick={() => setRejecting(false)}>Cancel</button><button className="btn danger" disabled={!why || busy} onClick={() => go(() => onReject(why))}>{busy ? 'Saving…' : why ? 'Confirm reject' : 'Pick a reason'}</button></div>
+        </div>
+      ) : <div className="actions"><button className="btn primary" disabled={busy} onClick={() => go(onApprove)}>{busy ? 'Saving…' : approveLabel}</button><button className="btn outline" disabled={busy} onClick={() => setRejecting(true)}>Reject</button></div>}
+    </>
   );
 }
 

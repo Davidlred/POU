@@ -8,3 +8,5 @@ export * from './fonts';
 export * from './Intro';
 export * from './web';
 export * from './links';
+export * from './kit';
+export * from './art';

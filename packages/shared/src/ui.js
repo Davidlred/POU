@@ -14,18 +14,33 @@ export function Icon({ name, size = 22, color, style }) {
 // The phone's font-size setting is respected up to this point. Past it, rows and tiles designed for normal text break.
 export const MAX_FONT_SCALE = 1.3;
 
-const VARIANTS = (f, c) => ({
-  display: { fontFamily: f.display, fontSize: 32, lineHeight: 37, letterSpacing: -0.8, color: c.ink },
-  h1: { fontFamily: f.display, fontSize: 24, lineHeight: 29, letterSpacing: -0.4, color: c.ink },
-  h2: { fontFamily: f.displayBold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: c.ink },
+// Type scale (newdesign.md section 2). The website uses the full weights; the phone (and a browser under 900 px)
+// is one weight step lighter everywhere and never uses 800.
+const VARIANTS = (f, c, wide) => (wide ? {
+  display: { fontFamily: f.extrabold, fontSize: 32, lineHeight: 37, letterSpacing: -0.5, color: c.ink },
+  h1: { fontFamily: f.extrabold, fontSize: 24, lineHeight: 29, letterSpacing: -0.4, color: c.ink },
+  h2: { fontFamily: f.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: c.ink },
   body: { fontFamily: f.regular, fontSize: 15, lineHeight: 22, color: c.ink },
   strong: { fontFamily: f.semibold, fontSize: 15, lineHeight: 21, color: c.ink },
   bold: { fontFamily: f.bold, fontSize: 15, lineHeight: 21, color: c.ink },
   small: { fontFamily: f.medium, fontSize: 13, lineHeight: 18, color: c.mute },
   label: { fontFamily: f.semibold, fontSize: 13, lineHeight: 18, color: c.mute },
-  mono: { fontFamily: f.mono, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
-  monoLg: { fontFamily: f.display, fontSize: 34, lineHeight: 40, letterSpacing: -1, color: c.ink, fontVariant: ['tabular-nums'] },
+  mono: { fontFamily: f.extrabold, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
+  monoLg: { fontFamily: f.extrabold, fontSize: 44, lineHeight: 50, letterSpacing: -1, color: c.ink, fontVariant: ['tabular-nums'] },
+} : {
+  display: { fontFamily: f.bold, fontSize: 28, lineHeight: 33, letterSpacing: -0.4, color: c.ink },
+  h1: { fontFamily: f.bold, fontSize: 24, lineHeight: 29, letterSpacing: -0.3, color: c.ink },
+  h2: { fontFamily: f.semibold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: c.ink },
+  body: { fontFamily: f.regular, fontSize: 15, lineHeight: 22, color: c.ink },
+  strong: { fontFamily: f.semibold, fontSize: 15, lineHeight: 21, color: c.ink },
+  bold: { fontFamily: f.semibold, fontSize: 15, lineHeight: 21, color: c.ink },
+  small: { fontFamily: f.medium, fontSize: 13, lineHeight: 18, color: c.mute },
+  label: { fontFamily: f.medium, fontSize: 13, lineHeight: 18, color: c.mute },
+  mono: { fontFamily: f.bold, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
+  monoLg: { fontFamily: f.bold, fontSize: 40, lineHeight: 46, letterSpacing: -1, color: c.ink, fontVariant: ['tabular-nums'] },
 });
+// The phone never uses 800: a heavier family asked for in a style override is drawn one step lighter.
+const PHONE_FAMILY = { HankenGrotesk_800ExtraBold: 'HankenGrotesk_700Bold' };
 // Hanken Grotesk has no ₦, so phones and browsers borrowed one from another font. Each ₦ is drawn
 // from P360Naira (Hanken's N plus two bars) in the same weight as the text around it.
 const NAIRA_FONT = { HankenGrotesk_400Regular: 'P360Naira_400', HankenGrotesk_500Medium: 'P360Naira_500',
@@ -41,12 +56,15 @@ export function withNaira(children, family) {
 
 export function Txt({ v = 'body', color, style, children, ...p }) {
   const { c, f } = useTheme();
-  const st = [VARIANTS(f, c)[v], color && { color }, style];
-  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={st}>{withNaira(children, StyleSheet.flatten(st).fontFamily)}</Text>;
+  const wide = useWide();
+  const flat = StyleSheet.flatten([VARIANTS(f, c, wide)[v], color && { color }, style]);
+  if (!wide && PHONE_FAMILY[flat.fontFamily]) flat.fontFamily = PHONE_FAMILY[flat.fontFamily];
+  if (flat.fontSize < 13) { flat.fontSize = 13; if (flat.lineHeight && flat.lineHeight < 18) flat.lineHeight = 18; }   // 13 px minimum
+  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={flat}>{withNaira(children, flat.fontFamily)}</Text>;
 }
 
 const PAGE = { width: '100%', maxWidth: 1080, alignSelf: 'center' };
-const WIDE_PAGE = [PAGE, { paddingHorizontal: 40, paddingTop: 28 }];
+const WIDE_PAGE = [PAGE, { paddingHorizontal: 32, paddingTop: 28 }];
 // Screens that scroll their own content (<Screen pad={false}>) add this to their scroll's contentContainerStyle,
 // so on the wide website the content is centred at page width like every other screen (null on phones).
 export function usePage() { return useWide() ? WIDE_PAGE : null; }
@@ -125,8 +143,13 @@ export function AppBar({ title, subtitle, right, close, onBack, bare }) {
 
 export function Button({ title, onPress, variant = 'primary', icon, loading, disabled, style, small }) {
   const { c, f } = useTheme();
+  const wide = useWide();
+  const strongBtn = variant === 'primary' || variant === 'onHearth' || variant === 'danger';
+  const fam = wide ? (strongBtn ? f.extrabold : f.bold) : (strongBtn ? f.bold : f.semibold);
   const map = {
     primary: [c.yolk, c.onyolk, 'transparent'],
+    onHearth: [c.hbtn, c.onhbtn, 'transparent'],
+    hearthOutline: ['transparent', c.hink, c.hline],
     dark: [c.ink, c.bg, 'transparent'],
     hearth: [c.hc, c.hink, c.hcb],
     outline: ['transparent', c.ink, c.line2],
@@ -134,14 +157,14 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
     danger: [c.err, '#fff', 'transparent'],
   };
   let [bg, fg, bd] = map[variant];
-  if (disabled) { bg = c.sf2; fg = c.mute; bd = 'transparent'; }
+  if (disabled) { bg = variant === 'onHearth' || variant === 'hearthOutline' ? 'rgba(255,255,255,0.10)' : c.sf2; fg = variant === 'onHearth' || variant === 'hearthOutline' ? c.hmute : c.mute; bd = 'transparent'; }
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} onPress={onPress} disabled={disabled || loading}
       style={({ pressed }) => [{ height: small ? 44 : 56, borderRadius: 100, backgroundColor: bg, borderWidth: 1.5, borderColor: bd, paddingHorizontal: 18,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 }, style]}>
       {loading ? <ActivityIndicator color={fg} /> : <>
         {icon ? <Icon name={icon} size={20} color={fg} /> : null}
-        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: f.bold, fontSize: small ? 14 : 16, flexShrink: 1 }}>{withNaira(title, f.bold)}</Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: fam, fontSize: small ? 14 : 16, flexShrink: 1 }}>{withNaira(title, fam)}</Text>
       </>}
     </Pressable>
   );
@@ -150,7 +173,7 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
 export function Card({ children, onPress, style, tone }) {
   const { c } = useTheme();
   const bg = tone === 'err' ? c.errbg : tone === 'warn' ? c.warnbg : tone === 'ok' ? c.sagebg : c.sf;
-  const body = [{ backgroundColor: bg, borderRadius: 22, padding: 16, gap: 10, borderWidth: 1, borderColor: tone ? 'transparent' : c.line }, style];
+  const body = [{ backgroundColor: bg, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: tone ? 'transparent' : c.line }, style];
   return onPress ? <Pressable onPress={onPress} style={({ pressed }) => [body, pressed && { opacity: 0.85 }]}>{children}</Pressable> : <View style={body}>{children}</View>;
 }
 
@@ -159,9 +182,8 @@ export function Hearth({ children, style, onPress }) {
   const { c } = useTheme();
   const C = onPress ? Pressable : View;
   return (
-    <C onPress={onPress} style={[{ backgroundColor: c.hc, borderColor: c.hcb, borderWidth: 1, borderRadius: 26, padding: 20, gap: 12, overflow: 'hidden' }, style]}>
-      <View pointerEvents="none" style={{ position: 'absolute', right: -80, top: -100, width: 230, height: 230, borderRadius: 115, backgroundColor: c.ember, opacity: 0.22 }} />
-      <View pointerEvents="none" style={{ position: 'absolute', left: -60, bottom: -90, width: 170, height: 170, borderRadius: 85, backgroundColor: c.hink, opacity: 0.05 }} />
+    <C onPress={onPress} style={[{ backgroundColor: c.hc, borderColor: c.hcb, borderWidth: 1, borderRadius: 24, padding: 22, gap: 12, overflow: 'hidden' }, style]}>
+      <View pointerEvents="none" style={{ position: 'absolute', right: -90, top: -110, width: 240, height: 240, borderRadius: 120, backgroundColor: c.hbtn, opacity: 0.12 }} />
       {children}
     </C>
   );
@@ -169,12 +191,14 @@ export function Hearth({ children, style, onPress }) {
 
 export function Chip({ label, selected, onPress, icon }) {
   const { c, f } = useTheme();
+  const wide = useWide();
+  const fam = selected ? (wide ? f.bold : f.semibold) : f.medium;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }}
-      style={{ height: 40, paddingHorizontal: 14, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 4,
-        backgroundColor: selected ? c.navact : c.sf, borderWidth: 1, borderColor: selected ? c.navactink : c.line2 }}>
-      {selected ? <Icon name="check" size={16} color={c.navactink} /> : icon ? <Icon name={icon} size={16} /> : null}
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: selected ? f.bold : f.medium, fontSize: 13, color: selected ? c.navactink : c.ink }}>{withNaira(label, selected ? f.bold : f.medium)}</Text>
+      style={({ hovered }) => ({ height: 40, paddingHorizontal: 14, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: selected ? c.ink : hovered ? c.sf2 : c.sf, borderWidth: 1, borderColor: selected ? c.ink : c.line2 })}>
+      {selected ? <Icon name="check" size={16} color={c.bg} /> : icon ? <Icon name={icon} size={16} /> : null}
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: fam, fontSize: 14, color: selected ? c.bg : c.ink }}>{withNaira(label, fam)}</Text>
     </Pressable>
   );
 }
@@ -218,11 +242,16 @@ export function Banner({ tone = 'info', icon, title, body, action, onAction }) {
   );
 }
 
-export function Pill({ label, tone = 'neutral' }) {
+export function Pill({ label, tone = 'neutral', icon }) {
   const { c, f } = useTheme();
-  const t = { ok: [c.sagebg, c.sage], warn: [c.warnbg, c.warn], err: [c.errbg, c.err], live: [c.navact, c.navactink], neutral: [c.sf2, c.mute] }[tone];
-  return <View style={{ alignSelf: 'flex-start', backgroundColor: t[0], borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 }}>
-    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: t[1], fontFamily: f.semibold, fontSize: 12 }}>{withNaira(label, f.semibold)}</Text></View>;
+  const wide = useWide();
+  const t = { ok: [c.sagebg, c.sage, 'check'], warn: [c.warnbg, c.warn, null], err: [c.errbg, c.err, 'alert-outline'], live: [c.navact, c.navactink, null],
+    neutral: [c.sf2, c.mute, null], orange: [c.obg, c.oink, null] }[tone] || [c.sf2, c.mute, null];
+  const ic = icon === undefined ? t[2] : icon;
+  const fam = wide ? f.bold : f.semibold;
+  return <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t[0], borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 }}>
+    {ic ? <Icon name={ic} size={14} color={t[1]} /> : null}
+    <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ color: t[1], fontFamily: fam, fontSize: 13 }}>{withNaira(label, fam)}</Text></View>;
 }
 
 export function Segmented({ options, value, onChange }) {
@@ -231,8 +260,8 @@ export function Segmented({ options, value, onChange }) {
     <View style={{ flexDirection: 'row', backgroundColor: c.sf2, borderRadius: 100, padding: 4 }}>
       {options.map((o) => {
         const on = (o.value ?? o) === value;
-        return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0 }}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 13, color: on ? c.ink : c.mute }}>{withNaira(o.label ?? o, on ? f.bold : f.semibold)}</Text></Pressable>;
+        return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0, paddingHorizontal: 10 }}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 14, color: on ? c.ink : c.mute }}>{withNaira(o.label ?? o, on ? f.bold : f.semibold)}</Text></Pressable>;
       })}
     </View>
   );
@@ -249,16 +278,18 @@ export function Row({ icon, iconColor, title, subtitle, right, onPress, last }) 
     </C>
   );
 }
-export const Group = ({ children, style }) => { const { c } = useTheme(); return <View style={[{ backgroundColor: c.sf, borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: c.line }, style]}>{children}</View>; };
+export const Group = ({ children, style }) => { const { c } = useTheme(); return <View style={[{ backgroundColor: c.sf, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: c.line }, style]}>{children}</View>; };
 
-export function Empty({ icon, title, body, action, onAction }) {
+export function Empty({ icon, art, title, body, action, onAction, style }) {
   const { c } = useTheme();
+  const { PlaceholderArt } = require('./art');
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 }}>
-      <View style={{ width: 76, height: 76, borderRadius: 38, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={34} color={c.navactink} /></View>
-      <Txt v="h1" style={{ textAlign: 'center' }}>{title}</Txt>
-      {body ? <Txt v="small" style={{ textAlign: 'center', fontSize: 14, lineHeight: 21 }}>{body}</Txt> : null}
-      {action ? <Button title={action} onPress={onAction} style={{ marginTop: 6, alignSelf: 'stretch' }} /> : null}
+    <View style={[{ alignItems: 'center', justifyContent: 'center', paddingVertical: 28, paddingHorizontal: 20, gap: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: c.line2, borderRadius: 20 }, style]}>
+      {art ? <PlaceholderArt kind={art} size={88} round />
+        : <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon || 'package-variant'} size={32} color={c.navactink} /></View>}
+      <Txt v="h2" style={{ textAlign: 'center' }}>{title}</Txt>
+      {body ? <Txt v="small" style={{ textAlign: 'center', fontSize: 14, lineHeight: 21, maxWidth: 360 }}>{body}</Txt> : null}
+      {action ? <Button small title={action} onPress={onAction} style={{ marginTop: 6, paddingHorizontal: 24 }} /> : null}
     </View>
   );
 }
@@ -272,13 +303,16 @@ export function Steps({ steps }) {
         return (
           <View key={st.label} style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ alignItems: 'center' }}>
-              {st.state === 'done' ? <View style={[s.dot, { backgroundColor: c.sage }]}><Icon name="check" size={14} color="#fff" /></View>
-                : st.state === 'current' ? <View style={[s.dot, { backgroundColor: c.ember, borderWidth: 4, borderColor: c.navact }]} />
+              {st.state === 'done' ? <View style={[s.dot, { backgroundColor: c.yolk }]}><Icon name="check" size={14} color={c.onyolk} /></View>
+                : st.state === 'current' ? <View style={[s.dot, { backgroundColor: c.orange, borderWidth: 4, borderColor: c.obg }]} />
                 : <View style={[s.dot, { borderWidth: 2, borderColor: c.line2 }]} />}
-              {!last ? <View style={{ width: 2, height: 24, backgroundColor: st.state === 'done' ? c.sage : c.line2 }} /> : null}
+              {!last ? <View style={{ width: 2, minHeight: 24, flex: 1, backgroundColor: st.state === 'done' ? c.yolk : c.line2 }} /> : null}
             </View>
-            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Txt v={st.state === 'current' ? 'bold' : 'strong'} color={st.state === 'todo' ? c.mute : undefined} style={{ fontSize: 14 }}>{st.label}</Txt>
+            <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingBottom: last ? 0 : 14 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt v={st.state === 'current' ? 'bold' : 'strong'} color={st.state === 'todo' ? c.mute : undefined} style={{ fontSize: 15 }}>{st.label}</Txt>
+                {st.detail ? <Txt v="small">{st.detail}</Txt> : null}
+              </View>
               {st.time ? <Txt v="label">{st.time}</Txt> : null}
             </View>
           </View>
@@ -296,7 +330,7 @@ export function OtpBoxes({ value, onChange, length = 6, error, autoFocus = true 
       {Array.from({ length }).map((_, i) => {
         const ch = value[i]; const active = i === value.length;
         return <View key={i} style={{ flex: 1, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: error ? c.errbg : c.sf,
-          borderWidth: active || error ? 2 : 1, borderColor: error ? c.err : active ? c.ember : c.line2 }}>
+          borderWidth: active || error ? 2 : 1, borderColor: error ? c.err : active ? c.yolk : c.line2 }}>
           <Text maxFontSizeMultiplier={1} style={{ fontFamily: f.mono, fontSize: 24, color: error ? c.err : c.ink }}>{ch || ''}</Text></View>;
       })}
       <TextInput ref={ref} value={value} onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, length))} keyboardType="number-pad"
@@ -305,9 +339,14 @@ export function OtpBoxes({ value, onChange, length = 6, error, autoFocus = true 
   );
 }
 
-export function Toggle({ value, onValueChange }) {
+export function Toggle({ value, onValueChange, accessibilityLabel, disabled }) {
   const { c } = useTheme();
-  return <Switch value={value} onValueChange={onValueChange} trackColor={{ false: c.line2, true: c.ember }} thumbColor="#fff" />;
+  return (
+    <Pressable onPress={() => !disabled && onValueChange?.(!value)} accessibilityRole="switch" accessibilityState={{ checked: !!value, disabled: !!disabled }} accessibilityLabel={accessibilityLabel}
+      hitSlop={6} style={{ width: 52, height: 32, borderRadius: 16, padding: 3, backgroundColor: value ? c.yolk : c.line2, opacity: disabled ? 0.5 : 1, justifyContent: 'center' }}>
+      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFFFFF', alignSelf: value ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
+    </Pressable>
+  );
 }
 
 export function Stars({ value, onChange, size = 36 }) {

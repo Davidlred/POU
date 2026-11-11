@@ -1,3 +1,5 @@
+> **Superseded (Nov 2026):** this describes the UI *before* the redesign. The design now in the code is `newdesign.md`; see the Design section of CLAUDE.md.
+
 # Poultry360 · Design brief (current UI/UX, every page and flow)
 
 A complete description of how Poultry360 looks and works today, written to hand to a designer or a design tool for a redesign.

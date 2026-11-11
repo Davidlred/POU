@@ -36,27 +36,48 @@ export default function App() {
   return <Shell user={session.user} onChangePassword={() => setReset(true)} />;
 }
 
-const SECTIONS = [{ id: 'farms', label: 'Farms & stores' }, { id: 'riders', label: 'Riders' }, { id: 'vets', label: 'Vets' }, { id: 'invest', label: 'Invest' }];
+const SECTIONS = [
+  { id: 'farms', label: 'Verification', icon: '✓' },
+  { id: 'riders', label: 'Riders', icon: '➜' },
+  { id: 'vets', label: 'Vets', icon: '✚' },
+  { id: 'invest', label: 'Investments', icon: '↗' },
+];
 
+// Dark-green sidebar (wordmark, Ops, nav with the pending count), page on the right. On a phone the sidebar is a top bar.
 function Shell({ user, onChangePassword }) {
   const [section, setSection] = useState(() => (SECTIONS.some((s) => '#' + s.id === window.location.hash) ? window.location.hash.slice(1) : 'farms'));
+  const [pending, setPending] = useState(0);
   const go = (id) => { setSection(id); window.location.hash = id; };
+  // The pending count stays live even while another section is open.
+  useEffect(() => {
+    const count = () => supabase.rpc('admin_vendors').then(({ data }) => { if (Array.isArray(data)) setPending(data.filter((f) => f.verification_status === 'pending').length); });
+    count();
+    const ch = supabase.channel('ops-pending').on('postgres_changes', { event: '*', schema: 'public', table: 'vendor_profiles' }, count).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="row gap">
-          <div className="brand"><div className="mark sm" /><span className="hide-sm">Poultry360 <b>Ops</b></span></div>
-          <nav className="tabs nav" aria-label="Sections">
-            {SECTIONS.map((s) => <button key={s.id} className={'tab' + (section === s.id ? ' on' : '')} aria-current={section === s.id ? 'page' : undefined} onClick={() => go(s.id)}>{s.label}</button>)}
-          </nav>
+      <aside className="side">
+        <div className="side-brand"><img src="/logo-mark.png" alt="" className="side-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><span>Poultry360 <b>Ops</b></span></div>
+        <nav className="side-nav" aria-label="Sections">
+          {SECTIONS.map((s) => (
+            <button key={s.id} className={'side-item' + (section === s.id ? ' on' : '')} aria-current={section === s.id ? 'page' : undefined} onClick={() => go(s.id)}>
+              <span className="side-ico" aria-hidden="true">{s.icon}</span><span className="grow">{s.label}</span>
+              {s.id === 'farms' && pending ? <span className="badge" aria-label={pending + ' pending'}>{pending}</span> : null}
+            </button>
+          ))}
+        </nav>
+        <div className="side-foot">
+          <span className="side-email" title={user.email}>{user.email}</span>
+          <div className="row gap-sm">
+            <button className="side-link" onClick={onChangePassword}>Password</button>
+            <button className="side-link" onClick={() => supabase.auth.signOut()}>Sign out</button>
+          </div>
         </div>
-        <div className="row gap">
-          <span className="muted small hide-sm">{user.email}</span>
-          <button className="btn ghost sm" onClick={onChangePassword} title="Change your password">Password</button>
-          <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Sign out</button>
-        </div>
-      </header>
-      {section === 'riders' ? <Riders /> : section === 'invest' ? <Invest /> : section === 'vets' ? <Vets /> : <Farms />}
+      </aside>
+      <div className="content">
+        {section === 'riders' ? <Riders /> : section === 'invest' ? <Invest /> : section === 'vets' ? <Vets /> : <Farms onPending={setPending} />}
+      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { normalizeEmail, pad } from './format';
 import { Screen, Txt, Input, Button, Banner, OtpBoxes, AppBar, Icon, MAX_FONT_SCALE } from './ui';
+import { ProgressSegments } from './kit';
+import { PlaceholderArt } from './art';
 import { useTheme } from './ThemeProvider';
 import { Logo } from './Intro';
 
@@ -42,8 +44,8 @@ export function passwordProblem(pw, again) {
 
 const authError = (e) => {
   const m = (e && e.message) || '';
-  if (/invalid login credentials/i.test(m)) return "That email and password don't match. If you haven't set a password yet, tap “Forgot password, or never set one?” below.";
-  if (/email not confirmed/i.test(m)) return 'Confirm your email first: tap “Forgot password, or never set one?” to get a code.';
+  if (/invalid login credentials/i.test(m)) return "That email and password don't match. Never set a password? Tap “Forgot password?” below.";
+  if (/email not confirmed/i.test(m)) return 'Confirm your email first: tap “Forgot password?” to get a code.';
   if (/signups not allowed|user not found/i.test(m)) return "We couldn't find an account with that email.";
   if (/different from the old|same as the old|should be different/i.test(m)) return 'Choose a password you have not used on this account before.';
   if (/reauth|nonce|recently/i.test(m)) return 'For your security, sign out, then use “Forgot password” to set a new one with a code.';
@@ -56,16 +58,41 @@ const authError = (e) => {
 // Sign-in content sits as one block in the middle of the screen; scrolls if the keyboard squeezes it.
 const CENTERED = { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 64, gap: 18, width: '100%', maxWidth: 460, alignSelf: 'center' };
 
-// Small Poultry360 egg mark (matches the splash) to anchor the sign-in screens.
-function AuthMark() {
-  return <View style={{ marginBottom: 6 }}><Logo full size={150} /></View>;
+// Hearth-coloured brand panel at the top of sign-in: logo, one line, art.
+function BrandPanel({ tagline = 'Fresh poultry from verified farms.' }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ backgroundColor: c.hc, borderRadius: 28, padding: 22, gap: 18, overflow: 'hidden', marginBottom: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ alignSelf: 'flex-start' }}><Logo size={44} /></View>
+        <Txt v="h2" color={c.hink}>Poultry360</Txt>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
+        <Txt v="display" color={c.hink} style={{ flex: 1 }}>{tagline}</Txt>
+        <View style={{ flexDirection: 'row', gap: 6 }}><PlaceholderArt kind="eggs" size={56} radius={16} /><PlaceholderArt kind="bird" size={56} radius={16} /></View>
+      </View>
+    </View>
+  );
+}
+
+// Top of each sign-up step: back button, four segments and "2 of 4". Without a step it is just the back button.
+export function AuthTop({ onBack, step, total = 4 }) {
+  return (
+    <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      {onBack ? <AppBar bare onBack={onBack} /> : <View style={{ height: 56 }} />}
+      {step ? <>
+        <ProgressSegments total={total} done={step - 1} style={{ flex: 1 }} />
+        <Txt v="small" style={{ fontSize: 14 }}>{step + ' of ' + total}</Txt>
+      </> : null}
+    </View>
+  );
 }
 
 function Heading({ title, subtitle }) {
   return (
-    <View style={{ gap: 8, alignItems: 'center', marginBottom: 8 }}>
-      <Txt v="display" style={{ textAlign: 'center' }}>{title}</Txt>
-      {subtitle ? <Txt v="small" style={{ fontSize: 15, lineHeight: 22, textAlign: 'center' }}>{subtitle}</Txt> : null}
+    <View style={{ gap: 8, marginBottom: 4 }}>
+      <Txt v="display">{title}</Txt>
+      {subtitle ? <Txt v="small" style={{ fontSize: 15, lineHeight: 22 }}>{subtitle}</Txt> : null}
     </View>
   );
 }
@@ -93,7 +120,7 @@ function PasswordField({ label, value, onChangeText, error, autoFocus, newPasswo
 }
 
 // Returning users: email + password. Links out to "create account" and "forgot password" (both go through a code).
-export function SignInScreen({ onCreate, onForgot, title = 'Welcome back', subtitle = 'Sign in with your email and password.', createLabel = 'New here? Create an account' }) {
+export function SignInScreen({ onCreate, onForgot, title = 'Sign in', subtitle, createLabel = 'Create account', tagline }) {
   const { c } = useTheme();
   const [raw, setRaw] = useState('');
   const [pw, setPw] = useState('');
@@ -112,15 +139,15 @@ export function SignInScreen({ onCreate, onForgot, title = 'Welcome back', subti
   };
   return (
     <Screen scroll style={CENTERED}>
-      <AuthMark />
+      <BrandPanel tagline={tagline} />
       <Heading title={title} subtitle={subtitle} />
       <Input label="Email" placeholder="ada@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress"
         value={raw} onChangeText={(t) => { setRaw(t); setErr(null); }} accessibilityLabel="Email address" />
       <PasswordField label="Password" value={pw} onChangeText={(t) => { setPw(t); setErr(null); }} onSubmitEditing={signIn} />
       {err ? <Banner tone="err" body={err} /> : null}
       <Button title="Sign in" onPress={signIn} loading={busy} />
-      <Txt v="bold" color={c.acc} onPress={() => onForgot?.(normalizeEmail(raw) || '')} style={{ textAlign: 'center', fontSize: 14, paddingVertical: 8 }}>Forgot password, or never set one?</Txt>
       {onCreate ? <Button variant="outline" title={createLabel} onPress={onCreate} /> : null}
+      <Txt v="bold" color={c.acc} onPress={() => onForgot?.(normalizeEmail(raw) || '')} style={{ textAlign: 'center', fontSize: 14, paddingVertical: 8 }}>Forgot password?</Txt>
     </Screen>
   );
 }
@@ -148,8 +175,7 @@ export function EmailScreen({ onSent, onBack, mode = 'signup', initialEmail = ''
   };
   const body = (
     <>
-      <AuthMark />
-      <Heading title={title || (reset ? 'Reset your password' : "What's your email?")} subtitle={subtitle || (reset ? "We'll email you a 6-digit code, then you can choose a new password." : "We'll email you a 6-digit code to confirm it's you, then you'll create a password.")} />
+      <Heading title={title || (reset ? 'Reset your password' : "What's your email?")} subtitle={subtitle || "We'll email you a 6-digit code."} />
       {limited ? <Banner tone="warn" icon="timer-sand" title="Too many code requests" body="Please wait a few minutes before asking for another code." /> : null}
       <Input placeholder="ada@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="emailAddress"
         value={raw} onChangeText={(t) => { setRaw(t); setErr(null); }} error={err} autoFocus accessibilityLabel="Email address" />
@@ -157,11 +183,11 @@ export function EmailScreen({ onSent, onBack, mode = 'signup', initialEmail = ''
       {footer}
     </>
   );
-  if (!onBack) return <Screen scroll style={CENTERED}>{body}</Screen>;
+  if (!onBack) return <Screen scroll style={CENTERED}><Logo size={64} />{body}</Screen>;
   return (
     <Screen pad={false}>
       {/* the back button sits above the centred form, not at the window edge */}
-      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onBack} /></View>
+      <AuthTop onBack={onBack} step={reset ? null : 1} />
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">{body}</ScrollView>
     </Screen>
   );
@@ -194,10 +220,11 @@ export function PasswordScreen({ mode = 'create', email }) {
     </View>
   );
   return (
-    <Screen scroll style={CENTERED}>
-      <AuthMark />
+    <Screen pad={false}>
+      {creating ? <AuthTop step={2} /> : null}
+      <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">
       <Heading title={creating ? 'Create a password' : 'Choose a new password'}
-        subtitle={creating ? "Your email is confirmed. Next time you'll sign in with " + (email || 'your email') + ' and this password.' : 'This replaces the password for ' + (email || 'your account') + '.'} />
+        subtitle={creating ? 'You sign in with ' + (email || 'your email') + ' and this password.' : 'This replaces the password for ' + (email || 'your account') + '.'} />
       <PasswordField label={creating ? 'Password' : 'New password'} value={pw} onChangeText={(t) => { setPw(t); setErr(null); }} newPassword autoFocus />
       <PasswordField label="Type it again" value={again} onChangeText={(t) => { setAgain(t); setErr(null); }} newPassword onSubmitEditing={save} error={tried && pw.length >= 8 && again && pw !== again ? "The two passwords don't match." : null} />
       <View style={{ gap: 6 }}>
@@ -208,12 +235,13 @@ export function PasswordScreen({ mode = 'create', email }) {
       {err ? <Banner tone="err" body={err} /> : tried && problem ? <Txt v="small" color={c.err} style={{ fontSize: 14, textAlign: 'center' }}>{problem}</Txt> : null}
       <Button title={creating ? 'Save password and continue' : 'Save new password'} onPress={save} loading={busy} />
       <Button variant="ghost" title={creating ? 'Sign out' : 'Cancel'} onPress={leave} />
+      </ScrollView>
     </Screen>
   );
 }
 
 // OTP entry (waiting / sent / wrong code / expired / cooldown / 3-strike lockout)
-export function OtpScreen({ email, onVerified, onEdit }) {
+export function OtpScreen({ email, onVerified, onEdit, step }) {
   const { c } = useTheme();
   const [code, setCode] = useState('');
   const [err, setErr] = useState(null);
@@ -246,16 +274,15 @@ export function OtpScreen({ email, onVerified, onEdit }) {
 
   return (
     <Screen pad={false}>
-      <View style={{ width: '100%', maxWidth: 460, alignSelf: 'center', paddingHorizontal: 16 }}><AppBar bare onBack={onEdit} /></View>
+      <AuthTop onBack={onEdit} step={step} />
       <ScrollView contentContainerStyle={CENTERED} keyboardShouldPersistTaps="handled">
-        <AuthMark />
-        <View style={{ gap: 10, alignItems: 'center', marginBottom: 8 }}>
-          <Txt v="display" style={{ textAlign: 'center' }}>Enter the code</Txt>
-          <Txt v="small" style={{ fontSize: 15, textAlign: 'center' }}>Sent to <Txt v="strong" style={{ fontSize: 15 }}>{email}</Txt></Txt>
+        <View style={{ gap: 8, marginBottom: 4 }}>
+          <Txt v="display">Enter the code</Txt>
+          <Txt v="small" style={{ fontSize: 15 }}>Sent to <Txt v="strong" style={{ fontSize: 15 }}>{email}</Txt></Txt>
         </View>
         {locked ? <Banner tone="err" icon="lock-clock" title="Sign-in paused for your security" body={'Too many incorrect codes. Try again in ' + pad(Math.floor(left / 60)) + ':' + pad(left % 60) + '.'} />
           : <OtpBoxes value={code} error={!!err} onChange={(v) => { setCode(v); setErr(null); if (v.length === 6) verify(v); }} />}
-        {err ? <Txt v="small" color={c.err} style={{ fontSize: 14 }}>{err}</Txt> : !locked ? <Banner tone="ok" icon="email-check-outline" body="Code sent by email. Check your spam folder if it isn't in your inbox." /> : null}
+        {err ? <Txt v="small" color={c.err} style={{ fontSize: 14 }}>{err}</Txt> : !locked ? <Txt v="small" style={{ fontSize: 14 }}>Not in your inbox? Check spam.</Txt> : null}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <Txt v="small" style={{ fontSize: 14 }}>Didn't get it?</Txt>
           {cool > 0 ? <Txt v="mono" color={c.mute} style={{ fontSize: 14 }}>Resend in 0:{pad(cool)}</Txt>

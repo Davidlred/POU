@@ -12,6 +12,18 @@ export const CATEGORIES = [
 ];
 // What a supplier (feed, drugs, equipment store) can list: farm supplies only, never birds or eggs.
 export const SUPPLY_CATEGORIES = ['feed', 'drugs', 'equipment', 'packaging'];
+// What a farm lists: birds, eggs and meat. Stores may also list day-old chicks (STORE_BIRD_TYPES). The database checks the same
+// rule (seller_may_list, migration 024).
+export const FARM_CATEGORIES = ['eggs', 'chicken', 'turkey', 'live_birds'];
+export const STORE_BIRD_TYPES = ['Day-old broiler chicks', 'Day-old layer chicks', 'Noiler chicks', 'Turkey poults'];
+// Categories a seller can list, from their roles: farm (vendor), store (supplier) or both.
+export const sellerCategories = ({ farm, store }) => {
+  const list = CATEGORIES.filter((k) => (farm && FARM_CATEGORIES.includes(k.id)) || (store && (SUPPLY_CATEGORIES.includes(k.id) || k.id === 'live_birds')));
+  // a store starts on its own shelves; day-old chicks come last
+  return store && !farm ? [...list.filter((k) => k.id !== 'live_birds'), ...list.filter((k) => k.id === 'live_birds')] : list;
+};
+// Kinds a seller can pick in a category: a store-only seller gets just the day-old chicks under Birds & chicks.
+export const sellerTypes = (category, { farm, store }) => (category === 'live_birds' && store && !farm ? STORE_BIRD_TYPES : SUBTYPES[category]);
 export const WASTE_CATEGORIES = [
   { id: 'manure', label: 'Manure', icon: 'sprout-outline' },
   { id: 'litter', label: 'Litter', icon: 'leaf' },

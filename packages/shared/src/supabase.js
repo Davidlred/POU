@@ -28,6 +28,7 @@ const MESSAGES = {
   INVALID_CODE: "That code doesn't match or has expired.",
   INVALID_ACCOUNT: 'Enter a 10-digit NUBAN account number.',
   VENDOR_NOT_VERIFIED: 'This unlocks once your farm or store is verified.',
+  CATEGORY_NOT_ALLOWED: 'Farms list birds, eggs and meat. Stores list feed, drugs, equipment, packaging and day-old chicks.',
   WANTED_INCOMPLETE: 'Say what you need and how many.',
   WANTED_DATE_PAST: 'Pick today or a later date.',
   WANTED_TOO_MANY: 'You have 10 open requests. Close one to post another.',

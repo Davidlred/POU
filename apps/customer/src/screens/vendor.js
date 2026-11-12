@@ -8,7 +8,7 @@ import { getHere } from '../lib/spot';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';
 import { WantedRow, OfferSheet } from './wanted';
-import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE, SUBTYPES, FORMS, hasForm, typeLine } from '../lib/catalog';
+import { CATEGORIES, WASTE_CATEGORIES, SUPPLY_CATEGORIES, catLabel, unitsFor, TITLE_EXAMPLE, SUBTYPES, FORMS, hasForm, typeLine, sellerCategories, sellerTypes } from '../lib/catalog';
 import { ExploreOptions } from './explore';
 import { getPhotos, asksSource, PhotoSourceSheet } from '../lib/photos';
 import { useFarm, flockStats } from '../lib/offlineQueue';
@@ -295,8 +295,10 @@ export function ListingFormScreen({ navigation, route }) {
   const wide = useWide();
   const { uid, vendor } = useAuth();
   const id = route.params?.id; const waste = !!route.params?.waste;
-  const { supplierOnly } = useAuth();
-  const cats = waste ? WASTE_CATEGORIES : supplierOnly ? CATEGORIES.filter((k) => SUPPLY_CATEGORIES.includes(k.id)) : CATEGORIES;
+  const { supplierOnly, profile } = useAuth();
+  const who = { farm: (profile?.roles || []).includes('vendor'), store: (profile?.roles || []).includes('supplier') };
+  const allowed = sellerCategories(who);
+  const cats = waste ? WASTE_CATEGORIES : allowed.length ? allowed : CATEGORIES;
   const [f, setF] = useState({ category: cats[0].id, title: '', price: '', unit: waste ? 'bag' : unitsFor(cats[0].id)[0], quantity: '', description: '', moisture: '', agent_pct: '', type: '', form: '' });
   const [photos, setPhotos] = useState([]); // { uri, path, state }
   const [errs, setErrs] = useState({});
@@ -327,7 +329,7 @@ export function ListingFormScreen({ navigation, route }) {
     });
   };
   // What is still missing, in order; the button says it.
-  const types = waste ? null : SUBTYPES[f.category];
+  const types = waste ? null : sellerTypes(f.category, who);
   const needsForm = !waste && hasForm(f.category, f.type);
   const missing = !photos.some((p) => p.state === 'done') ? 'Add at least 1 photo' : types && !f.type ? 'Pick what kind' : needsForm && !f.form ? 'Pick fresh, chilled or frozen' : !f.title.trim() ? 'Add a title' : !(Number(f.price) > 0) ? 'Enter a price'
     : !(parseInt(f.quantity, 10) > 0) ? 'Enter how many you have' : f.agent_pct !== '' && !(Number(f.agent_pct) >= 0 && Number(f.agent_pct) <= 100) ? 'Agent rebate must be 0 to 100' : null;
@@ -386,7 +388,7 @@ export function ListingFormScreen({ navigation, route }) {
         <Txt v="small" color={errs.photos ? c.err : undefined}>{errs.photos || 'Up to 4. Tap a photo to remove it.'}</Txt>
       </FormGroup>
       <FormGroup title="What it is">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{cats.map((k) => <Chip key={k.id} label={k.label} selected={f.category === k.id} onPress={() => setCategory(k.id)} />)}</View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[...cats, ...(cats.some((k) => k.id === f.category) ? [] : CATEGORIES.filter((k) => k.id === f.category))].map((k) => <Chip key={k.id} label={k.label} selected={f.category === k.id} onPress={() => setCategory(k.id)} />)}</View>
         {types ? <View style={{ gap: 8 }}>
           <Txt v="strong" style={{ fontSize: 14 }}>What kind</Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{types.map((t) => <Chip key={t} label={t} selected={f.type === t} onPress={() => { set('type')(t); setErrs((e) => ({ ...e, type: undefined })); }} />)}</View>

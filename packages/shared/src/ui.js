@@ -189,16 +189,19 @@ export function Hearth({ children, style, onPress }) {
   );
 }
 
+// Selected = green fill, green border, bold green text and a tick, so several picked chips stay easy to see.
+// The fill is its own view: on Android, toggling the background of the pressable itself sometimes didn't repaint.
 export function Chip({ label, selected, onPress, icon }) {
   const { c, f } = useTheme();
   const wide = useWide();
   const fam = selected ? (wide ? f.bold : f.semibold) : f.medium;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }}
-      style={({ hovered }) => ({ height: 40, paddingHorizontal: 14, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: selected ? c.ink : hovered ? c.sf2 : c.sf, borderWidth: 1, borderColor: selected ? c.ink : c.line2 })}>
-      {selected ? <Icon name="check" size={16} color={c.bg} /> : icon ? <Icon name={icon} size={16} /> : null}
-      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: fam, fontSize: 14, color: selected ? c.bg : c.ink }}>{withNaira(label, fam)}</Text>
+      style={({ hovered }) => ({ height: 40, paddingHorizontal: 14, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden',
+        backgroundColor: hovered && !selected ? c.sf2 : c.sf, borderWidth: 2, borderColor: selected ? c.yolk : c.line2 })}>
+      {selected ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: c.navact }} /> : null}
+      {selected ? <Icon name="check-circle" size={16} color={c.yolk} /> : icon ? <Icon name={icon} size={16} /> : null}
+      <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: fam, fontSize: 14, color: selected ? c.navactink : c.ink }}>{withNaira(label, fam)}</Text>
     </Pressable>
   );
 }

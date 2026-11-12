@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Pressable } from 'react-native';
-import { useTheme, Txt, Icon, Sheet, useWide, CountBadge } from '@p360/shared';
+import { useTheme, Txt, Icon, Sheet, useWide, CountBadge, Button } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
@@ -96,12 +96,13 @@ export function RoleSwitcher({ variant = 'pill', go, home }) {
       <Sheet visible={open} onClose={() => setOpen(false)}>
         <Txt v="h1">Switch role</Txt>
         <OptionList opts={opts} active={active} onPick={pick} onAdd={add} />
+        <Button variant="outline" icon="account-circle-outline" title="Profile and settings" onPress={() => { setOpen(false); go?.('Profile'); }} />
       </Sheet>
     </>
   );
 }
 
-// Phone header on the top-level screens: role switcher on the left; dark mode and cart on the right.
+// Phone header on the top-level screens: role switcher on the left; dark mode, cart and Profile on the right.
 // Renders nothing on the website (the sidebar carries the switcher).
 export function TopBar({ navigation, cart = true, right }) {
   const { c, mode, toggle } = useTheme();
@@ -124,6 +125,9 @@ export function TopBar({ navigation, cart = true, right }) {
           {count ? <CountBadge n={count} style={{ position: 'absolute', top: -4, right: -4 }} /> : null}
         </Pressable>
       ) : null}
+      <Pressable onPress={() => navigation.navigate('Profile')} accessibilityRole="button" accessibilityLabel="Profile and settings" style={round}>
+        <Icon name="account-circle-outline" size={22} />
+      </Pressable>
     </View>
   );
 }

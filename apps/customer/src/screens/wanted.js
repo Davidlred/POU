@@ -13,50 +13,92 @@ const STATUS = { open: { tone: 'live', label: 'Taking offers' }, accepted: { ton
 const plural = (u, n) => (Number(n) === 1 || !u || u === 'kg' || u.endsWith('s') ? u : u + 's');
 const qtyText = (n, u) => Number(n).toLocaleString() + ' ' + plural(u, n);
 
-// Post a request.
+// Post what you need, like a shopping list: tick kinds in any number of categories (eggs, then equipment…); picks are kept
+// when you switch category. Each kind gets its own quantity and price and is posted as its own request, so different
+// sellers can offer on each.
 export function WantedNewScreen({ navigation, route }) {
   const { c } = useTheme();
   const wide = useWide();
-  const [f, setF] = useState({ category: route.params?.category || 'chicken', type: '', title: '', quantity: '', unit: unitsFor(route.params?.category || 'chicken')[0], max: '', needed: '', notes: '' });
+  const [cat, setCat] = useState(route.params?.category || 'eggs');   // category being browsed
+  const [picks, setPicks] = useState([]);                             // [{ category, type }] in the order ticked
+  const [units, setUnits] = useState({});                             // category -> unit
+  const [lines, setLines] = useState({});                             // 'category|type' -> { qty, max }
+  const [desc, setDesc] = useState('');                               // used when nothing is ticked
+  const [needed, setNeeded] = useState('');
+  const [notes, setNotes] = useState('');
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
-  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-  const setCategory = (k) => setF((x) => ({ ...x, category: k, type: '', unit: unitsFor(k).includes(x.unit) ? x.unit : unitsFor(k)[0] }));
-  const types = SUBTYPES[f.category];
-  const missing = !f.title.trim() && !f.type ? 'Say what you need' : !(parseInt(f.quantity, 10) > 0) ? 'Enter how many' : null;
+  const key = (p) => p.category + '|' + p.type;
+  const unitOf = (k) => units[k] || unitsFor(k)[0];
+  const has = (type) => picks.some((p) => p.category === cat && p.type === type);
+  const toggle = (type) => setPicks((ps) => (ps.some((p) => p.category === cat && p.type === type) ? ps.filter((p) => !(p.category === cat && p.type === type)) : [...ps, { category: cat, type }]));
+  const remove = (p) => setPicks((ps) => ps.filter((x) => key(x) !== key(p)));
+  const setLine = (k, patch) => setLines((l) => ({ ...l, [k]: { qty: '', max: '', ...l[k], ...patch } }));
+  const countIn = (k) => picks.filter((p) => p.category === k).length;
+  // Nothing ticked: one free-text line in the category being browsed.
+  const items = picks.length ? picks : [{ category: cat, type: '' }];
+  const qtyOf = (p) => parseInt(lines[key(p)]?.qty, 10) || 0;
+  const missing = !picks.length && !desc.trim() ? 'Tick what you need' : items.some((p) => !qtyOf(p)) ? (items.length > 1 ? 'Enter how many of each' : 'Enter how many') : null;
+  const groups = [...new Set(items.map((p) => p.category))];
   const post = async () => {
     setTried(true);
     if (missing) return;
     setBusy(true);
+    let done = 0;
     try {
-      await rpc('post_buy_request', { p_category: f.category, p_type: f.type || null, p_title: f.title.trim() || f.type, p_quantity: parseInt(f.quantity, 10), p_unit: f.unit,
-        p_max_price: Number(f.max) > 0 ? Number(f.max) : null, p_needed_by: f.needed || null, p_notes: f.notes.trim() || null });
+      for (const p of items) {
+        const max = Number(lines[key(p)]?.max);
+        await rpc('post_buy_request', { p_category: p.category, p_type: p.type || null, p_title: p.type || desc.trim(), p_quantity: qtyOf(p), p_unit: unitOf(p.category),
+          p_max_price: max > 0 ? max : null, p_needed_by: needed || null, p_notes: [picks.length ? desc.trim() : '', notes.trim()].filter(Boolean).join(' · ') || null });
+        done += 1;
+      }
       navigation.replace('MyWanted', { posted: true });
-    } catch (e) { Alert.alert("Couldn't post it", friendlyError(e)); } finally { setBusy(false); }
+    } catch (e) {
+      Alert.alert(done ? 'Posted ' + done + ' of ' + items.length : "Couldn't post it", friendlyError(e));
+      if (done) navigation.replace('MyWanted', { posted: true });
+    } finally { setBusy(false); }
   };
   return (
-    <Screen scroll style={wide ? { maxWidth: 760 } : null} footer={<Button title={missing || 'Post request'} disabled={!!missing && tried} loading={busy} onPress={post} />}>
+    <Screen scroll style={wide ? { maxWidth: 760 } : null} footer={<Button title={missing || (items.length > 1 ? 'Post ' + items.length + ' requests' : 'Post request')} disabled={!!missing && tried} loading={busy} onPress={post} />}>
       <AppBar title="Post what you need" close />
-      <Txt v="body" color={c.mute}>Verified farms and stores near you reply with a price. You choose one.</Txt>
+      <Txt v="body" color={c.mute}>Tick what you need in any category. Verified farms and stores reply with a price.</Txt>
       <Card style={{ gap: 14, padding: 18 }}>
         <Txt v="strong" style={{ fontSize: 14 }}>Category</Txt>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{CATEGORIES.map((k) => <Chip key={k.id} label={k.label} selected={f.category === k.id} onPress={() => setCategory(k.id)} />)}</View>
-        {types ? <>
-          <Txt v="strong" style={{ fontSize: 14 }}>What kind</Txt>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{types.map((t) => <Chip key={t} label={t} selected={f.type === t} onPress={() => set('type')(f.type === t ? '' : t)} />)}</View>
-        </> : null}
-        <Input label="Describe it" value={f.title} onChangeText={set('title')} placeholder={f.type ? f.type + ', e.g. size or grade' : 'e.g. Frozen chicken wings'} error={tried && !f.title.trim() && !f.type ? 'Say what you need' : null} />
-      </Card>
-      <Card style={{ gap: 14, padding: 18 }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}><Input label="How many" keyboardType="number-pad" value={f.quantity} onChangeText={(t) => set('quantity')(t.replace(/\D/g, ''))} mono error={tried && !(parseInt(f.quantity, 10) > 0) ? 'Enter how many' : null} /></View>
-          <View style={{ flex: 1 }}><Input label={'Most you pay per ' + f.unit + ' (optional)'} prefix="₦" keyboardType="number-pad" value={f.max} onChangeText={(t) => set('max')(t.replace(/\D/g, ''))} mono /></View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {CATEGORIES.map((k) => <Chip key={k.id} label={k.label + (countIn(k.id) ? ' · ' + countIn(k.id) : '')} selected={cat === k.id} onPress={() => setCat(k.id)} />)}
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{unitsFor(f.category).map((u) => <Chip key={u} label={'Per ' + u} selected={f.unit === u} onPress={() => set('unit')(u)} />)}</View>
-        <DateInput label="Needed by (optional)" value={f.needed} onChange={set('needed')} min={isoDate()} clearable />
-        <Input label="Notes (optional)" value={f.notes} onChangeText={set('notes')} multiline placeholder="Weekly supply, size, packing…" />
+        <Txt v="strong" style={{ fontSize: 14 }}>{catLabel(cat) + ': tick all you need'}</Txt>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{(SUBTYPES[cat] || []).map((t) => <Chip key={t} label={t} selected={has(t)} onPress={() => toggle(t)} />)}</View>
+        <Input label={picks.length ? 'Details (optional)' : 'Or describe it'} value={desc} onChangeText={setDesc}
+          placeholder={picks.length ? 'Size, grade or packing, e.g. frozen, 1 kg packs' : 'e.g. Frozen chicken wings'} error={tried && !picks.length && !desc.trim() ? 'Tick what you need, or describe it' : null} />
       </Card>
-      <Txt v="small">Sellers see your area and business name, not your address or phone.</Txt>
+      <SectionHead title="Your list" count={picks.length || null} />
+      {groups.map((g) => (
+        <Card key={g} style={{ gap: 12, padding: 18 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <PlaceholderArt category={g} size={36} radius={10} />
+            <Txt v="bold" style={{ flex: 1 }}>{catLabel(g)}</Txt>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{unitsFor(g).map((u) => <Chip key={u} label={'Per ' + u} selected={unitOf(g) === u} onPress={() => setUnits((x) => ({ ...x, [g]: u }))} />)}</View>
+          {items.filter((p) => p.category === g).map((p) => (
+            <View key={key(p)} style={{ gap: 8, paddingTop: 12, borderTopWidth: 1, borderColor: c.line }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Txt v="bold" style={{ flex: 1 }}>{p.type || desc.trim() || 'What you described'}</Txt>
+                {p.type ? <Button small variant="ghost" icon="close" title="Remove" onPress={() => remove(p)} style={{ height: 36, paddingHorizontal: 10 }} /> : null}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><Input label={'How many (' + unitOf(g) + ')'} keyboardType="number-pad" value={lines[key(p)]?.qty || ''} onChangeText={(t) => setLine(key(p), { qty: t.replace(/\D/g, '') })} mono error={tried && !qtyOf(p) ? 'Enter how many' : null} /></View>
+                <View style={{ flex: 1 }}><Input label={'Most you pay per ' + unitOf(g) + ' (optional)'} prefix="₦" keyboardType="number-pad" value={lines[key(p)]?.max || ''} onChangeText={(t) => setLine(key(p), { max: t.replace(/\D/g, '') })} mono /></View>
+              </View>
+            </View>
+          ))}
+        </Card>
+      ))}
+      <Card style={{ gap: 14, padding: 18 }}>
+        <DateInput label="Needed by (optional)" value={needed} onChange={setNeeded} min={isoDate()} clearable />
+        <Input label="Notes (optional)" value={notes} onChangeText={setNotes} multiline placeholder="Weekly supply, delivery times…" />
+      </Card>
+      <Txt v="small">{items.length > 1 ? 'Each item is posted separately, so different sellers can offer on each. ' : ''}Sellers see your area and business name, not your address or phone.</Txt>
     </Screen>
   );
 }

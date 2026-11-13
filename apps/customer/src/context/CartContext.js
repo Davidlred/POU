@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '@p360/shared';
+import { supabase, haptic } from '@p360/shared';
 
 const Ctx = createContext(null);
 const KEY = 'p360-cart';
@@ -12,6 +12,7 @@ export function CartProvider({ children }) {
   const save = (next) => { setItems(next); AsyncStorage.setItem(KEY, JSON.stringify(next)); };
 
   const add = (listing, qty = 1, viaSearch = false) => {
+    haptic('light');
     const i = items.findIndex((x) => x.listing_id === listing.id);
     if (i >= 0) { const n = [...items]; n[i] = { ...n[i], qty: n[i].qty + qty }; return save(n); }
     save([...items, { listing_id: listing.id, title: listing.title, price: Number(listing.price), unit: listing.unit, qty,

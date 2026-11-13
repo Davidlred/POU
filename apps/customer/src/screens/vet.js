@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Pressable, ScrollView, Linking, Image, Alert, Platform } from 'react-native';
+import { View, ScrollView, Linking, Image, Alert, Platform } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useWide, SectionHead, PlaceholderArt, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Pill, Stat, Group, Row, Skeleton,

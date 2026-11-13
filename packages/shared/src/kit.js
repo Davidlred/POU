@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Pressable, ScrollView } from 'react-native';
+import { View, ScrollView, Platform } from 'react-native';
 import Svg, { Polyline, Circle as SvgCircle } from 'react-native-svg';
 import { useTheme } from './ThemeProvider';
 import { useWide } from './web';
-import { Txt, Icon, Button } from './ui';
+import { Txt, Icon, Button, Press, haptic, useBleed, BLEED } from './ui';
+const InList = React.createContext(false);
 
 // The redesign's shared building blocks (newdesign.md section 3.3). All Views, Text and SVG.
 
@@ -33,7 +34,10 @@ export function SectionHead({ title, count, action, onAction, right, style }) {
       <CountBadge n={count} />
       <View style={{ flex: 1 }} />
       {right}
-      {action ? <Pressable onPress={onAction} accessibilityRole="button" hitSlop={8} style={{ minHeight: 36, justifyContent: 'center' }}><Txt v="bold" color={c.acc} style={{ fontSize: 14 }}>{action}</Txt></Pressable> : null}
+      {action ? (Platform.OS === 'web'
+        ? <Press onPress={onAction} accessibilityRole="button" hitSlop={8} style={{ minHeight: 36, justifyContent: 'center' }}><Txt v="bold" color={c.acc} style={{ fontSize: 14 }}>{action}</Txt></Press>
+        : <Press onPress={onAction} accessibilityRole="button" hitSlop={6} style={{ minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 12, paddingRight: 6, borderRadius: 18, backgroundColor: c.navact, overflow: 'hidden' }}>
+            <Txt v="bold" color={c.navactink} style={{ fontSize: 14 }}>{action}</Txt><Icon name="chevron-right" size={18} color={c.navactink} /></Press>) : null}
     </View>
   );
 }
@@ -110,6 +114,7 @@ export function FigureStrip({ items, style }) {
 export function ActionList({ title = 'Needs your action', count, children, empty, right }) {
   const { c } = useTheme();
   const wide = useWide();
+  const bleed = useBleed();
   const rows = React.Children.toArray(children).filter(Boolean);
   return (
     <View style={{ gap: 12 }}>
@@ -117,6 +122,10 @@ export function ActionList({ title = 'Needs your action', count, children, empty
       {!rows.length ? empty || null : wide ? (
         <View style={{ backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, borderRadius: 20, overflow: 'hidden' }}>
           {rows.map((r, i) => <View key={i} style={{ borderTopWidth: i ? 1 : 0, borderColor: c.line }}>{r}</View>)}
+        </View>
+      ) : bleed ? (
+        <View style={[{ backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, overflow: 'hidden' }, BLEED]}>
+          <InList.Provider value>{rows.map((r, i) => <View key={i} style={{ borderTopWidth: i ? 1 : 0, borderColor: c.line }}>{r}</View>)}</InList.Provider>
         </View>
       ) : <View style={{ gap: 10 }}>{rows}</View>}
     </View>
@@ -126,13 +135,14 @@ export function ActionList({ title = 'Needs your action', count, children, empty
 export function ActionRow({ lead, icon, iconTone = 'navact', title, detail, pill, amount, action, onPress, children }) {
   const { c } = useTheme();
   const wide = useWide();
+  const inList = React.useContext(InList);
   const leadNode = lead || (icon ? (
     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: iconTone === 'warn' ? c.warnbg : iconTone === 'err' ? c.errbg : iconTone === 'orange' ? c.obg : c.navact, alignItems: 'center', justifyContent: 'center' }}>
       <Icon name={icon} size={21} color={iconTone === 'warn' ? c.warn : iconTone === 'err' ? c.err : iconTone === 'orange' ? c.oink : c.navactink} />
     </View>) : null);
   const btn = action ? <Button small variant={action.variant || 'primary'} title={action.title} icon={action.icon} onPress={action.onPress} disabled={action.disabled} loading={action.loading} style={{ paddingHorizontal: 18, height: wide ? 40 : 44 }} /> : null;
   if (wide) return (
-    <Pressable onPress={onPress} disabled={!onPress} style={({ hovered }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 18, backgroundColor: hovered && onPress ? c.sf2 : 'transparent' })}>
+    <Press onPress={onPress} disabled={!onPress} style={({ hovered }) => ({ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 18, backgroundColor: hovered && onPress ? c.sf2 : 'transparent' })}>
       {leadNode}
       <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
         <Txt v="strong" numberOfLines={1}>{title}</Txt>
@@ -142,10 +152,10 @@ export function ActionRow({ lead, icon, iconTone = 'navact', title, detail, pill
       {pill}
       {amount != null ? <Txt v="mono" style={{ minWidth: 90, textAlign: 'right' }}>{amount}</Txt> : null}
       {btn}
-    </Pressable>
+    </Press>
   );
   return (
-    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => ({ backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, borderRadius: 20, padding: 14, gap: 12, opacity: pressed ? 0.9 : 1 })}>
+    <Press onPress={onPress} disabled={!onPress} style={({ pressed }) => (inList ? { paddingVertical: 14, paddingHorizontal: 20, gap: 12 } : { backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, borderRadius: 20, padding: 14, gap: 12, opacity: pressed ? 0.9 : 1 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {leadNode}
         <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
@@ -156,7 +166,7 @@ export function ActionRow({ lead, icon, iconTone = 'navact', title, detail, pill
       </View>
       {children}
       {pill || btn ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>{pill}<View style={{ flex: 1 }} />{btn}</View> : null}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -167,15 +177,16 @@ export function ActionRow({ lead, icon, iconTone = 'navact', title, detail, pill
 export function DataTable({ columns, rows, empty, minWidth = 640, phoneMiddle = true }) {
   const { c } = useTheme();
   const wide = useWide();
+  const bleed = useBleed();
   const text = (node, right, j) => (typeof node === 'string' || typeof node === 'number'
     ? <Txt v={j === 0 ? 'strong' : 'body'} numberOfLines={1} style={right ? { textAlign: 'right' } : null}>{node}</Txt> : node);
   if (!wide) return (
-    <View style={{ backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, borderRadius: 20, overflow: 'hidden' }}>
+    <View style={[{ backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, borderRadius: 20, overflow: 'hidden' }, bleed && BLEED]}>
       {rows.length ? rows.map((r, i) => {
         const last = r.cells[r.cells.length - 1];
         const mid = r.cells.slice(1, -1);
         return (
-          <Pressable key={r.key} onPress={r.onPress} disabled={!r.onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, minHeight: 60,
+          <Press key={r.key} onPress={r.onPress} disabled={!r.onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: bleed ? 20 : 14, minHeight: 60,
             borderTopWidth: i ? 1 : 0, borderColor: c.line, backgroundColor: pressed && r.onPress ? c.sf2 : 'transparent' })}>
             <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
               {text(r.cells[0], false, 0)}
@@ -184,7 +195,7 @@ export function DataTable({ columns, rows, empty, minWidth = 640, phoneMiddle = 
               </View> : null}
             </View>
             {r.cells.length > 1 ? text(last, true, 1) : null}
-          </Pressable>
+          </Press>
         );
       }) : empty}
     </View>
@@ -201,11 +212,11 @@ export function DataTable({ columns, rows, empty, minWidth = 640, phoneMiddle = 
             {columns.map((col, j) => cell(j, <Txt v="bold" color={c.mute} style={[{ fontSize: 13, lineHeight: 18 }, col.right && { textAlign: 'right' }]}>{col.label}</Txt>))}
           </View>
           {rows.length ? rows.map((r) => (
-            <Pressable key={r.key} onPress={r.onPress} disabled={!r.onPress} accessibilityRole={r.onPress ? 'button' : undefined}
+            <Press key={r.key} onPress={r.onPress} disabled={!r.onPress} accessibilityRole={r.onPress ? 'button' : undefined}
               style={({ hovered }) => ({ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 18, paddingVertical: 12, minHeight: 60,
                 borderTopWidth: 1, borderColor: c.line, backgroundColor: hovered && r.onPress ? c.sf2 : 'transparent' })}>
               {r.cells.map((node, j) => cell(j, node))}
-            </Pressable>
+            </Press>
           )) : <View style={{ borderTopWidth: 1, borderColor: c.line }}>{empty}</View>}
         </View>
       </ScrollView>
@@ -217,8 +228,8 @@ export function DataTable({ columns, rows, empty, minWidth = 640, phoneMiddle = 
 export function SelectCard({ selected, onPress, title, subtitle, lead, right, disabled, children, error }) {
   const { c } = useTheme();
   return (
-    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="radio" accessibilityState={{ checked: !!selected, disabled: !!disabled }}
-      style={({ hovered }) => ({ backgroundColor: c.sf, borderRadius: 20, borderWidth: 2, padding: 14, gap: 10, opacity: disabled ? 0.55 : 1,
+    <Press onPress={onPress} disabled={disabled} accessibilityRole="radio" accessibilityState={{ checked: !!selected, disabled: !!disabled }}
+      haptic="select" style={({ hovered }) => ({ backgroundColor: c.sf, borderRadius: 20, borderWidth: 2, padding: 14, gap: 10, opacity: disabled ? 0.55 : 1, overflow: 'hidden',
         borderColor: error ? c.err : selected ? c.yolk : hovered ? c.line2 : c.line })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         {lead}
@@ -230,7 +241,7 @@ export function SelectCard({ selected, onPress, title, subtitle, lead, right, di
         {selected ? <Icon name="check-circle" size={24} color={c.yolk} /> : <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: c.line2 }} />}
       </View>
       {children}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -289,6 +300,7 @@ export function BarChart({ label, value, note, noteTone, bars = [], caption, hei
 // SuccessMoment: a 92 px primary circle with a white tick inside a 12 px navact ring, title, key number, what happens next.
 export function SuccessMoment({ title, value, body, children, style }) {
   const { c } = useTheme();
+  React.useEffect(() => { haptic('success'); }, []);
   return (
     <View style={[{ alignItems: 'center', gap: 12, paddingVertical: 12 }, style]}>
       <View style={{ width: 116, height: 116, borderRadius: 58, backgroundColor: c.navact, alignItems: 'center', justifyContent: 'center' }}>
@@ -310,7 +322,7 @@ export function Toast({ message, onDismiss, style }) {
     <View accessibilityLiveRegion="polite" style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: c.sagebg, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14 }, style]}>
       <Icon name="check-circle" size={20} color={c.sage} />
       <Txt v="strong" color={c.sage} style={{ flex: 1 }}>{message}</Txt>
-      {onDismiss ? <Pressable onPress={onDismiss} hitSlop={8} accessibilityRole="button"><Txt v="bold" color={c.sage} style={{ fontSize: 14 }}>Dismiss</Txt></Pressable> : null}
+      {onDismiss ? <Press onPress={onDismiss} hitSlop={8} accessibilityRole="button"><Txt v="bold" color={c.sage} style={{ fontSize: 14 }}>Dismiss</Txt></Press> : null}
     </View>
   );
 }
@@ -323,11 +335,11 @@ export function UnderTabs({ tabs, value, onChange, style }) {
       {tabs.map((t) => {
         const on = t.value === value;
         return (
-          <Pressable key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" accessibilityState={{ selected: on }}
+          <Press key={t.value} onPress={() => onChange(t.value)} accessibilityRole="tab" accessibilityState={{ selected: on }}
             style={{ minHeight: 44, justifyContent: 'center', borderBottomWidth: 3, borderColor: on ? c.yolk : 'transparent', marginBottom: -1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Txt v={on ? 'bold' : 'strong'} color={on ? c.ink : c.mute}>{t.label}</Txt>
             <CountBadge n={t.count} />
-          </Pressable>
+          </Press>
         );
       })}
     </ScrollView>

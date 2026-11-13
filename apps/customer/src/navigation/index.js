@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, Platform } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Image, Platform } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { NavigationContainer, DefaultTheme, DarkTheme, createNavigationContainerRef, StackActions, getStateFromPath } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 // Local notifications are phone-only; the browser build has no reminders to open.
@@ -7,8 +8,8 @@ const useLastResponse = Platform.OS === 'web' ? () => null : Notifications.useLa
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite, pendingInviteNow, rpc, CountBadge } from '@p360/shared';
-import { RoleSwitcher } from '../components/RoleSwitcher';
+import { useTheme, Icon, EmailScreen, OtpScreen, SignInScreen, PasswordScreen, usePasswordGate, useWide, LOGO_MARK, Txt, inviteOpenedNow, getPendingInvite, pendingInviteNow, rpc, CountBadge, UnderAppBar } from '@p360/shared';
+import { RoleSwitcher, TopBar } from '../components/RoleSwitcher';
 import { useAuth } from '../context/AuthContext';
 import { Splash, RoleScreen, BusinessScreen, PendingScreen } from '../screens/onboarding';
 import { HomeScreen, MarketScreen, ListingsScreen, ProductScreen, StoreScreen } from '../screens/buyer';
@@ -240,11 +241,16 @@ function TabBar({ state, descriptors, navigation }) {
   );
 }
 
+// Phone app: the top bar (role switcher, dark mode, cart, Profile) is the tab header, fixed while the page scrolls.
+const NATIVE = Platform.OS !== 'web';
+const underBar = (C) => function UnderBar(p) { return <UnderAppBar.Provider value><C {...p} /></UnderAppBar.Provider>; };
 function MainTabs({ mode }) {
   const items = useTabItems();
+  const wrapped = useMemo(() => Object.fromEntries(items.map((t) => [t.name, NATIVE ? underBar(t.component) : t.component])), [items.map((t) => t.name).join()]);
   return (
-    <Tab.Navigator key={mode} tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
-      {items.map((t) => <Tab.Screen key={t.name} name={t.name} component={t.component} options={{ title: t.title, icon: t.icon, iconOff: t.iconOff }} />)}
+    <Tab.Navigator key={mode} tabBar={(p) => <TabBar {...p} />}
+      screenOptions={NATIVE ? { headerShown: true, header: ({ navigation }) => <TopBar navigation={navigation} fixed cart={mode === 'buyer'} /> } : { headerShown: false }}>
+      {items.map((t) => <Tab.Screen key={t.name} name={t.name} component={wrapped[t.name]} options={{ title: t.title, icon: t.icon, iconOff: t.iconOff }} />)}
     </Tab.Navigator>
   );
 }

@@ -147,7 +147,7 @@ export function SignInScreen({ onCreate, onForgot, title = 'Sign in', subtitle, 
       {err ? <Banner tone="err" body={err} /> : null}
       <Button title="Sign in" onPress={signIn} loading={busy} />
       {onCreate ? <Button variant="outline" title={createLabel} onPress={onCreate} /> : null}
-      <Txt v="bold" color={c.acc} onPress={() => onForgot?.(normalizeEmail(raw) || '')} style={{ textAlign: 'center', fontSize: 14, paddingVertical: 8 }}>Forgot password?</Txt>
+      <Button variant="ghost" title="Forgot password?" onPress={() => onForgot?.(normalizeEmail(raw) || '')} />
     </Screen>
   );
 }
@@ -283,10 +283,10 @@ export function OtpScreen({ email, onVerified, onEdit, step }) {
         {locked ? <Banner tone="err" icon="lock-clock" title="Sign-in paused for your security" body={'Too many incorrect codes. Try again in ' + pad(Math.floor(left / 60)) + ':' + pad(left % 60) + '.'} />
           : <OtpBoxes value={code} error={!!err} onChange={(v) => { setCode(v); setErr(null); if (v.length === 6) verify(v); }} />}
         {err ? <Txt v="small" color={c.err} style={{ fontSize: 14 }}>{err}</Txt> : !locked ? <Txt v="small" style={{ fontSize: 14 }}>Not in your inbox? Check spam.</Txt> : null}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Txt v="small" style={{ fontSize: 14 }}>Didn't get it?</Txt>
           {cool > 0 ? <Txt v="mono" color={c.mute} style={{ fontSize: 14 }}>Resend in 0:{pad(cool)}</Txt>
-            : <Txt v="bold" color={c.acc} onPress={resend} style={{ fontSize: 14 }}>Resend code</Txt>}
+            : <Button small variant="outline" title="Resend code" onPress={resend} style={{ paddingHorizontal: 14, height: 36 }} />}
         </View>
         <Button title="Verify" onPress={() => verify()} loading={busy} disabled={code.length !== 6 || locked} />
       </ScrollView>

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Press as Pressable } from '@p360/shared';
 import { useTheme, Txt, Icon, Sheet, useWide, CountBadge, Button } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -104,14 +106,17 @@ export function RoleSwitcher({ variant = 'pill', go, home }) {
 
 // Phone header on the top-level screens: role switcher on the left; dark mode, cart and Profile on the right.
 // Renders nothing on the website (the sidebar carries the switcher).
-export function TopBar({ navigation, cart = true, right }) {
+// In the phone app the tab navigator draws it once, fixed above the page (fixed), and the copies inside pages render nothing.
+export function TopBar({ navigation, cart = true, right, fixed }) {
   const { c, mode, toggle } = useTheme();
   const wide = useWide();
   const { count } = useCart();
   if (wide) return null;
+  if (Platform.OS !== 'web' && !fixed) return null;
   const round = { width: 44, height: 44, borderRadius: 22, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' };
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52 }}>
+  const bar = fixed ? { paddingHorizontal: 16, paddingVertical: 6, backgroundColor: c.bg, borderBottomWidth: 1, borderColor: c.line } : null;
+  const content = (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52 }, bar]}>
       <View style={{ flex: 1, alignItems: 'flex-start' }}>
         <RoleSwitcher variant="pill" go={(name, params) => navigation.navigate(name, params)} home={() => { if (navigation.getState?.()?.routeNames?.includes('Tabs')) navigation.popTo('Tabs'); }} />
       </View>
@@ -130,4 +135,5 @@ export function TopBar({ navigation, cart = true, right }) {
       </Pressable>
     </View>
   );
+  return fixed ? <SafeAreaView edges={['top']} style={{ backgroundColor: c.bg }}>{content}</SafeAreaView> : content;
 }

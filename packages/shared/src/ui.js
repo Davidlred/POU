@@ -5,6 +5,35 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from './ThemeProvider';
 import { useWide } from './web';
+import { fonts } from './theme';
+import * as Haptics from 'expo-haptics';
+
+// Vibration for key moments (phone app only): 'select' (ticking an option), 'light' (a main button), 'success'.
+export function haptic(kind = 'select') {
+  if (Platform.OS === 'web') return;
+  try {
+    if (kind === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else if (kind === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    else if (kind === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    else Haptics.selectionAsync();
+  } catch {}
+}
+
+// Every tappable thing in the phone app responds to touch with a light dim while pressed (no ripple: the founder found
+// the ripple read as a dark overlay). android_ripple / ripple props are accepted and ignored.
+// The website keeps plain Pressable (hover styles do the job there). haptic: optional vibration kind on press.
+// ripple={false} for things that shouldn't ripple (a dimmed backdrop).
+export function Press({ style, android_ripple, ripple = true, haptic: buzz, onPress, disabled, children, ...p }) {
+  const { c } = useTheme();
+  const press = onPress && buzz ? (e) => { haptic(buzz); onPress(e); } : onPress;
+  if (Platform.OS === 'web') return <Pressable style={style} onPress={press} disabled={disabled} {...p}>{children}</Pressable>;
+  return (
+    <Pressable {...p} onPress={press} disabled={disabled}
+      style={(st) => [typeof style === 'function' ? style(st) : style, st.pressed && onPress && !disabled ? { opacity: 0.86 } : null]}>
+      {children}
+    </Pressable>
+  );
+}
 
 export function Icon({ name, size = 22, color, style }) {
   const { c } = useTheme();
@@ -16,7 +45,19 @@ export const MAX_FONT_SCALE = 1.3;
 
 // Type scale (newdesign.md section 2). The website uses the full weights; the phone (and a browser under 900 px)
 // is one weight step lighter everywhere and never uses 800.
-const VARIANTS = (f, c, wide) => (wide ? {
+const NATIVE_VARIANTS = (f, c) => ({
+  display: { fontFamily: f.bold, fontSize: 24, lineHeight: 30, color: c.ink },
+  h1: { fontFamily: f.bold, fontSize: 21, lineHeight: 27, color: c.ink },
+  h2: { fontFamily: f.semibold, fontSize: 17, lineHeight: 23, color: c.ink },
+  body: { fontFamily: f.regular, fontSize: 15, lineHeight: 22, color: c.ink },
+  strong: { fontFamily: f.medium, fontSize: 15, lineHeight: 21, color: c.ink },
+  bold: { fontFamily: f.semibold, fontSize: 15, lineHeight: 21, color: c.ink },
+  small: { fontFamily: f.regular, fontSize: 13, lineHeight: 18, color: c.mute },
+  label: { fontFamily: f.medium, fontSize: 13, lineHeight: 18, color: c.mute },
+  mono: { fontFamily: f.bold, fontSize: 15, color: c.ink, fontVariant: ['tabular-nums'] },
+  monoLg: { fontFamily: f.bold, fontSize: 36, lineHeight: 42, letterSpacing: -0.5, color: c.ink, fontVariant: ['tabular-nums'] },
+});
+const VARIANTS = (f, c, wide) => (Platform.OS !== 'web' ? NATIVE_VARIANTS(f, c) : wide ? {
   display: { fontFamily: f.extrabold, fontSize: 32, lineHeight: 37, letterSpacing: -0.5, color: c.ink },
   h1: { fontFamily: f.extrabold, fontSize: 24, lineHeight: 29, letterSpacing: -0.4, color: c.ink },
   h2: { fontFamily: f.bold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: c.ink },
@@ -74,8 +115,12 @@ const InPage = createContext(false);
 
 // column: with pad={false}, keep the whole screen in a centred page-wide column on the wide website
 // (for screens whose layout isn't one scroll area, e.g. search results and the product page).
-export function Screen({ children, scroll, pad = true, column, edges = ['top'], style, footer, bg }) {
+// Set by the phone app's tab navigator, which draws the fixed top bar (and the top safe area) itself.
+export const UnderAppBar = createContext(false);
+export function Screen({ children, scroll, pad = true, column, edges: edgesIn = ['top'], style, footer, bg }) {
   const { c, mode } = useTheme();
+  const underBar = useContext(UnderAppBar);
+  const edges = underBar ? edgesIn.filter((e) => e !== 'top') : edgesIn;
   const wide = useWide();
   const page = wide && pad ? WIDE_PAGE : wide && column ? PAGE : null;
   const inner = scroll
@@ -102,19 +147,26 @@ export function BackButton({ onPress, close, style }) {
   const web = Platform.OS === 'web';
   const icon = close ? 'close' : 'arrow-left';
   if (web && wide) return (
-    <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={6}
+    <Press accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={6}
       style={({ hovered }) => [{ height: 36, borderRadius: 18, paddingLeft: 10, paddingRight: 14, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: hovered ? c.sf2 : c.sf, borderWidth: 1, borderColor: hovered ? c.line2 : c.line }, style]}>
       <Icon name={icon} size={18} />
       <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: f.semibold, fontSize: 14, color: c.ink }}>{close ? 'Close' : 'Back'}</Text>
-    </Pressable>
+    </Press>
+  );
+  // Phone app: Android's plain arrow with a round ripple, no outlined circle.
+  if (!web) return (
+    <Press accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={8} android_ripple={{ color: c.ripple, borderless: true, radius: 24 }}
+      style={[{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }, style]}>
+      <Icon name={icon} size={24} />
+    </Press>
   );
   const d = web ? 32 : 40;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={web ? 10 : 8}
+    <Press accessibilityRole="button" accessibilityLabel={close ? 'Close' : 'Back'} onPress={onPress} hitSlop={web ? 10 : 8}
       style={[{ width: web ? 40 : 48, height: web ? 40 : 48, alignItems: 'center', justifyContent: 'center' }, style]}>
       <View style={{ width: d, height: d, borderRadius: d / 2, backgroundColor: c.sf, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={web ? 18 : 22} /></View>
-    </Pressable>
+    </Press>
   );
 }
 
@@ -133,7 +185,7 @@ export function AppBar({ title, subtitle, right, close, onBack, bare }) {
     <View style={[{ height: Platform.OS === 'web' ? 52 : 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: inset, gap: wide ? 12 : 4 }, align && { ...PAGE, marginTop: 12 }]}>
       {button ? <BackButton close={close} onPress={onBack || (() => nav.goBack())} /> : null}
       <View style={{ flex: 1, marginLeft: wide ? 0 : button ? 4 : 8 }}>
-        {title ? <Txt v="h2" numberOfLines={1}>{title}</Txt> : null}
+        {title ? <Txt v="h2" numberOfLines={1} style={Platform.OS === 'web' ? null : { fontSize: 20, lineHeight: 26, fontFamily: fonts.medium }}>{title}</Txt> : null}
         {subtitle ? <Txt v="label">{subtitle}</Txt> : null}
       </View>
       {right}
@@ -159,22 +211,24 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
   let [bg, fg, bd] = map[variant];
   if (disabled) { bg = variant === 'onHearth' || variant === 'hearthOutline' ? 'rgba(255,255,255,0.10)' : c.sf2; fg = variant === 'onHearth' || variant === 'hearthOutline' ? c.hmute : c.mute; bd = 'transparent'; }
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} onPress={onPress} disabled={disabled || loading}
-      style={({ pressed }) => [{ height: small ? 44 : 56, borderRadius: 100, backgroundColor: bg, borderWidth: 1.5, borderColor: bd, paddingHorizontal: 18,
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.85 : 1 }, style]}>
+    <Press accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} onPress={onPress} disabled={disabled || loading} haptic={strongBtn ? 'light' : undefined}
+      android_ripple={{ color: fg === '#fff' || fg === c.onyolk ? 'rgba(255,255,255,0.22)' : c.ripple, foreground: true }}
+      style={({ pressed }) => [{ height: small ? 44 : 56, borderRadius: 100, backgroundColor: bg, borderWidth: 1.5, borderColor: bd, paddingHorizontal: 18, overflow: 'hidden',
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: pressed ? 0.9 : 1, transform: pressed && Platform.OS !== 'web' ? [{ scale: 0.98 }] : undefined }, style]}>
       {loading ? <ActivityIndicator color={fg} /> : <>
         {icon ? <Icon name={icon} size={20} color={fg} /> : null}
         <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: fg, fontFamily: fam, fontSize: small ? 14 : 16, flexShrink: 1 }}>{withNaira(title, fam)}</Text>
       </>}
-    </Pressable>
+    </Press>
   );
 }
 
 export function Card({ children, onPress, style, tone }) {
   const { c } = useTheme();
   const bg = tone === 'err' ? c.errbg : tone === 'warn' ? c.warnbg : tone === 'ok' ? c.sagebg : c.sf;
-  const body = [{ backgroundColor: bg, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: tone ? 'transparent' : c.line }, style];
-  return onPress ? <Pressable onPress={onPress} style={({ pressed }) => [body, pressed && { opacity: 0.85 }]}>{children}</Pressable> : <View style={body}>{children}</View>;
+  const body = [{ backgroundColor: bg, borderRadius: 20, padding: 16, gap: 10, borderWidth: 1, borderColor: tone ? 'transparent' : c.line, overflow: 'hidden' }, style];
+  const inner = <Nested.Provider value>{children}</Nested.Provider>;
+  return onPress ? <Press onPress={onPress} style={({ pressed }) => [body, pressed && { opacity: 0.85 }]}>{inner}</Press> : <View style={body}>{inner}</View>;
 }
 
 // Dark "hearth" card reserved for money and live status. Glow approximates the radial gradient in the designs.
@@ -184,7 +238,7 @@ export function Hearth({ children, style, onPress }) {
   return (
     <C onPress={onPress} style={[{ backgroundColor: c.hc, borderColor: c.hcb, borderWidth: 1, borderRadius: 24, padding: 22, gap: 12, overflow: 'hidden' }, style]}>
       <View pointerEvents="none" style={{ position: 'absolute', right: -90, top: -110, width: 240, height: 240, borderRadius: 120, backgroundColor: c.hbtn, opacity: 0.12 }} />
-      {children}
+      <Nested.Provider value>{children}</Nested.Provider>
     </C>
   );
 }
@@ -196,13 +250,13 @@ export function Chip({ label, selected, onPress, icon }) {
   const wide = useWide();
   const fam = selected ? (wide ? f.bold : f.semibold) : f.medium;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }}
+    <Press onPress={onPress} haptic="select" accessibilityRole="button" accessibilityState={{ selected: !!selected }}
       style={({ hovered }) => ({ height: 40, paddingHorizontal: 14, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden',
         backgroundColor: hovered && !selected ? c.sf2 : c.sf, borderWidth: 2, borderColor: selected ? c.yolk : c.line2 })}>
       {selected ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: c.navact }} /> : null}
       {selected ? <Icon name="check-circle" size={16} color={c.yolk} /> : icon ? <Icon name={icon} size={16} /> : null}
       <Text maxFontSizeMultiplier={MAX_FONT_SCALE} style={{ fontFamily: fam, fontSize: 14, color: selected ? c.navactink : c.ink }}>{withNaira(label, fam)}</Text>
-    </Pressable>
+    </Press>
   );
 }
 export function ChipRow({ options, value, onChange, multi }) {
@@ -240,7 +294,7 @@ export function Banner({ tone = 'info', icon, title, body, action, onAction }) {
         {title ? <Txt v="bold" color={t[1]} style={{ fontSize: 14 }}>{title}</Txt> : null}
         {body ? <Txt v="small" color={t[1]}>{body}</Txt> : null}
       </View>
-      {action ? <Pressable onPress={onAction} hitSlop={8}><Txt v="bold" color={t[1]} style={{ fontSize: 13 }}>{action}</Txt></Pressable> : null}
+      {action ? <Press onPress={onAction} hitSlop={8} style={Platform.OS === 'web' ? null : { alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1.5, borderColor: t[1], justifyContent: 'center', overflow: 'hidden' }}><Txt v="bold" color={t[1]} style={{ fontSize: 13 }}>{action}</Txt></Press> : null}
     </View>
   );
 }
@@ -263,8 +317,8 @@ export function Segmented({ options, value, onChange }) {
     <View style={{ flexDirection: 'row', backgroundColor: c.sf2, borderRadius: 100, padding: 4 }}>
       {options.map((o) => {
         const on = (o.value ?? o) === value;
-        return <Pressable key={o.value ?? o} onPress={() => onChange(o.value ?? o)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0, paddingHorizontal: 10 }}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 14, color: on ? c.ink : c.mute }}>{withNaira(o.label ?? o, on ? f.bold : f.semibold)}</Text></Pressable>;
+        return <Press key={o.value ?? o} haptic="select" onPress={() => onChange(o.value ?? o)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={{ flex: 1, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.seg : 'transparent', elevation: on ? 1 : 0, paddingHorizontal: 10 }}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SCALE} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ fontFamily: on ? f.bold : f.semibold, fontSize: 14, color: on ? c.ink : c.mute }}>{withNaira(o.label ?? o, on ? f.bold : f.semibold)}</Text></Press>;
       })}
     </View>
   );
@@ -281,7 +335,11 @@ export function Row({ icon, iconColor, title, subtitle, right, onPress, last }) 
     </C>
   );
 }
-export const Group = ({ children, style }) => { const { c } = useTheme(); return <View style={[{ backgroundColor: c.sf, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: c.line }, style]}>{children}</View>; };
+// Phone app: lists run edge to edge with hairline dividers (Android style) unless they sit inside a card, sheet or Hearth.
+export const Nested = createContext(false);
+export function useBleed() { const nested = useContext(Nested); return Platform.OS !== 'web' && !nested; }
+export const BLEED = { marginHorizontal: -20, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 };
+export const Group = ({ children, style }) => { const { c } = useTheme(); const bleed = useBleed(); return <View style={[{ backgroundColor: c.sf, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: c.line }, bleed && BLEED, style]}>{children}</View>; };
 
 export function Empty({ icon, art, title, body, action, onAction, style }) {
   const { c } = useTheme();
@@ -329,7 +387,7 @@ export function OtpBoxes({ value, onChange, length = 6, error, autoFocus = true 
   const { c, f } = useTheme();
   const ref = useRef(null);
   return (
-    <Pressable onPress={() => ref.current?.focus()} style={{ flexDirection: 'row', gap: 8 }}>
+    <Press onPress={() => ref.current?.focus()} style={{ flexDirection: 'row', gap: 8 }}>
       {Array.from({ length }).map((_, i) => {
         const ch = value[i]; const active = i === value.length;
         return <View key={i} style={{ flex: 1, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: error ? c.errbg : c.sf,
@@ -338,28 +396,29 @@ export function OtpBoxes({ value, onChange, length = 6, error, autoFocus = true 
       })}
       <TextInput ref={ref} value={value} onChangeText={(t) => onChange(t.replace(/\D/g, '').slice(0, length))} keyboardType="number-pad"
         autoFocus={autoFocus} textContentType="oneTimeCode" autoComplete="sms-otp" style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }} />
-    </Pressable>
+    </Press>
   );
 }
 
 export function Toggle({ value, onValueChange, accessibilityLabel, disabled }) {
   const { c } = useTheme();
   return (
-    <Pressable onPress={() => !disabled && onValueChange?.(!value)} accessibilityRole="switch" accessibilityState={{ checked: !!value, disabled: !!disabled }} accessibilityLabel={accessibilityLabel}
+    <Press haptic="select" onPress={() => !disabled && onValueChange?.(!value)} accessibilityRole="switch" accessibilityState={{ checked: !!value, disabled: !!disabled }} accessibilityLabel={accessibilityLabel}
       hitSlop={6} style={{ width: 52, height: 32, borderRadius: 16, padding: 3, backgroundColor: value ? c.yolk : c.line2, opacity: disabled ? 0.5 : 1, justifyContent: 'center' }}>
       <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#FFFFFF', alignSelf: value ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 }} />
-    </Pressable>
+    </Press>
   );
 }
 
 export function Stars({ value, onChange, size = 36 }) {
   const { c } = useTheme();
   return <View style={{ flexDirection: 'row', gap: 6 }}>{[1, 2, 3, 4, 5].map((n) =>
-    <Pressable key={n} onPress={() => onChange?.(n)} hitSlop={4} accessibilityLabel={n + ' stars'}><Icon name={n <= value ? 'star' : 'star-outline'} size={size} color={n <= value ? c.warn : c.line2} /></Pressable>)}</View>;
+    <Press key={n} onPress={() => onChange?.(n)} hitSlop={4} accessibilityLabel={n + ' stars'}><Icon name={n <= value ? 'star' : 'star-outline'} size={size} color={n <= value ? c.warn : c.line2} /></Press>)}</View>;
 }
 
-export function Sheet({ visible, onClose, children }) {
+export function Sheet({ visible, onClose, children: kids }) {
   const { c } = useTheme();
+  const children = <Nested.Provider value>{kids}</Nested.Provider>;
   // Website at desktop width: a small centred dialog instead of an edge-to-edge bottom sheet.
   if (useWide()) return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -418,28 +477,28 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt v="strong" style={{ fontSize: 13 }}>{label}</Txt> : null}
-      <Pressable onPress={show} accessibilityRole="button" accessibilityLabel={(label || 'Date') + ', ' + (shown || 'not set')}
+      <Press onPress={show} accessibilityRole="button" accessibilityLabel={(label || 'Date') + ', ' + (shown || 'not set')}
         style={{ minHeight: 54, borderRadius: 16, backgroundColor: error ? c.errbg : c.sf, borderWidth: error ? 2 : 1, borderColor: error ? c.err : c.line2, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10 }}>
         <Icon name="calendar-month-outline" size={22} color={c.acc} />
         <Txt v={shown ? 'strong' : 'body'} color={shown ? c.ink : c.mute} style={{ flex: 1 }}>{shown || placeholder}</Txt>
         <Icon name="chevron-down" size={20} color={c.mute} />
-      </Pressable>
+      </Press>
       {error ? <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}><Icon name="alert-circle" size={16} color={c.err} /><Txt v="small" color={c.err}>{error}</Txt></View>
         : hint ? <Txt v="small">{hint}</Txt> : null}
       <Sheet visible={open} onClose={() => setOpen(false)}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Pressable onPress={() => step(-1)} disabled={!canPrev || pickYear} accessibilityLabel="Previous month" style={[s.iconBtn, { opacity: canPrev && !pickYear ? 1 : 0.3 }]}><Icon name="chevron-left" size={26} /></Pressable>
-          <Pressable onPress={() => setPickYear(!pickYear)} accessibilityLabel="Choose a year" style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: 12 }}>
+          <Press onPress={() => step(-1)} disabled={!canPrev || pickYear} accessibilityLabel="Previous month" style={[s.iconBtn, { opacity: canPrev && !pickYear ? 1 : 0.3 }]}><Icon name="chevron-left" size={26} /></Press>
+          <Press onPress={() => setPickYear(!pickYear)} accessibilityLabel="Choose a year" style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingHorizontal: 12 }}>
             <Txt v="h2">{MONTHS[view.m]} {view.y}</Txt><Icon name={pickYear ? 'chevron-up' : 'chevron-down'} size={20} color={c.acc} />
-          </Pressable>
-          <Pressable onPress={() => step(1)} disabled={!canNext || pickYear} accessibilityLabel="Next month" style={[s.iconBtn, { opacity: canNext && !pickYear ? 1 : 0.3 }]}><Icon name="chevron-right" size={26} /></Pressable>
+          </Press>
+          <Press onPress={() => step(1)} disabled={!canNext || pickYear} accessibilityLabel="Next month" style={[s.iconBtn, { opacity: canNext && !pickYear ? 1 : 0.3 }]}><Icon name="chevron-right" size={26} /></Press>
         </View>
         {pickYear ? (
           <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {years.map((y) => (
-              <Pressable key={y} onPress={() => { setView((v) => ({ ...v, y })); setPickYear(false); }}
+              <Press key={y} onPress={() => { setView((v) => ({ ...v, y })); setPickYear(false); }}
                 style={{ flexBasis: '22%', flexGrow: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: y === view.y ? c.ember : c.sf, borderWidth: 1.5, borderColor: y === view.y ? c.ember : c.line2 }}>
-                <Txt v="mono" color={y === view.y ? c.onember : c.ink} style={{ fontSize: 14 }}>{y}</Txt></Pressable>))}
+                <Txt v="mono" color={y === view.y ? c.onember : c.ink} style={{ fontSize: 14 }}>{y}</Txt></Press>))}
           </ScrollView>
         ) : (
           <View style={{ gap: 4 }}>
@@ -450,11 +509,11 @@ export function DateInput({ label, value, onChange, error, hint, placeholder = '
                   if (!d) return <View key={i} style={{ flex: 1, height: 44 }} />;
                   const iso = toYmd(view.y, view.m, d); const on = iso === value; const ok = allowed(iso);
                   return (
-                    <Pressable key={i} disabled={!ok} onPress={() => pick(iso)} accessibilityLabel={d + ' ' + MONTHS[view.m] + ' ' + view.y} accessibilityState={{ selected: on, disabled: !ok }} style={{ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                    <Press key={i} disabled={!ok} onPress={() => pick(iso)} accessibilityLabel={d + ' ' + MONTHS[view.m] + ' ' + view.y} accessibilityState={{ selected: on, disabled: !ok }} style={{ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                       <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.ember : 'transparent', borderWidth: iso === today && !on ? 1.5 : 0, borderColor: c.ember }}>
                         <Txt v={on ? 'bold' : 'body'} color={on ? c.onember : ok ? c.ink : c.line2} maxFontSizeMultiplier={1.1}>{d}</Txt>
                       </View>
-                    </Pressable>
+                    </Press>
                   );
                 })}
               </View>
@@ -516,11 +575,11 @@ export function Fab({ icon = 'plus', label, onPress, accessibilityLabel }) {
   const { c } = useTheme();
   const wide = useWide();
   const btn = (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel || label} onPress={onPress}
+    <Press accessibilityRole="button" accessibilityLabel={accessibilityLabel || label} onPress={onPress}
       style={({ pressed, hovered }) => [{ height: 56, minWidth: 56, paddingHorizontal: label ? 20 : 0, borderRadius: 18, backgroundColor: c.yolk, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', elevation: 4 },
         wide && { shadowColor: '#000', shadowOpacity: hovered ? 0.18 : 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } }, pressed && { opacity: 0.85 }]}>
       <Icon name={icon} size={label ? 24 : 26} color={c.onyolk} />{label ? <Txt v="bold" color={c.onyolk}>{label}</Txt> : null}
-    </Pressable>
+    </Press>
   );
   if (!wide) return <View style={{ position: 'absolute', right: 20, bottom: 20 }}>{btn}</View>;
   return <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 28 }}><View pointerEvents="box-none" style={[PAGE, { paddingHorizontal: 40, alignItems: 'flex-end' }]}>{btn}</View></View>;

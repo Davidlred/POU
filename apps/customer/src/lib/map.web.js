@@ -1,6 +1,7 @@
 // Browser build: react-native-maps has no web version, so show where the pin is and link to Google Maps.
 import React from 'react';
-import { View, Linking, Pressable } from 'react-native';
+import { View, Linking } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { useTheme, Txt, Icon } from '@p360/shared';
 
 export const PROVIDER_GOOGLE = 'google';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Pressable, Linking, Image, Alert } from 'react-native';
+import { View, Linking, Image, Alert } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';

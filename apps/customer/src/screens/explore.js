@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Pressable, Alert } from 'react-native';
+import { View, Alert } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { useTheme, Screen, AppBar, Txt, Icon, rpc, friendlyError } from '@p360/shared';
 import { useAuth } from '../context/AuthContext';
 import { INVEST_ENABLED } from '../lib/roi';

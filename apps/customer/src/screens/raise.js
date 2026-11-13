@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, Image, Alert } from 'react-native';
+import { View, ScrollView, Image, Alert } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Pill, Skeleton,
   naira, pct, isoDate, INVEST_STATUS, rpc, publicUrl, uploadImage, friendlyError, supabase, Fab } from '@p360/shared';

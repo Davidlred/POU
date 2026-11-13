@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Pressable, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
+import { View, ScrollView, Image, RefreshControl, Alert, Linking } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Stat, Group, Row, Skeleton, Steps, PhotoBox,
@@ -219,7 +220,7 @@ function TargetScreen({ navigation, route, kind }) {
       </> : null}
       <Txt v="label">Payout schedule</Txt>
       <Card><Txt v="body">{(t.payout_schedule || 'end_of_term') === 'monthly' ? 'Returns are paid into your wallet monthly. Your principal comes back with the final payout.' : 'Returns and your principal are paid into your wallet together at the end of the term.'}</Txt></Card>
-      <Txt v="bold" color={c.acc} onPress={() => navigation.navigate('RoiCalc', { kind, id })}>Run the numbers →</Txt>
+      <Button small variant="outline" icon="calculator-variant-outline" title="Run the numbers" onPress={() => navigation.navigate('RoiCalc', { kind, id })} style={{ alignSelf: 'flex-start', paddingHorizontal: 16 }} />
     </Screen>
   );
 }

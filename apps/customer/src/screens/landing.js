@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ScrollView, Pressable, Image, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Image, useWindowDimensions } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { useTheme, Txt, Button, Icon, Pill, LOGO_MARK, MAX_FONT_SCALE } from '@p360/shared';
 import { PHOTOS } from './landingPhotos';
 import { ListingCard } from './buyer';

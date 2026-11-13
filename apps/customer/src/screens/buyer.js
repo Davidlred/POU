@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, FlatList, ScrollView, Dimensions, RefreshControl, TextInput, Platform } from 'react-native';
+import { View, FlatList, ScrollView, Dimensions, RefreshControl, TextInput, Platform } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, Screen, AppBar, BackButton, Txt, Button, Card, Hearth, Icon, Banner, Empty, Chip, Skeleton, Pill, Segmented,
   naira, rpc, publicUrl, supabase, HeaderBar, SectionHead, LiveDot, ProgressSegments, ArtPanel, PlaceholderArt, Thumb, TrustRow, MoneyLine, artTint, MAX_FONT_SCALE, CountBadge } from '@p360/shared';

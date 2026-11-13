@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, ScrollView, RefreshControl, Alert, Linking, BackHandler, Platform } from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, Linking, BackHandler, Platform } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useTheme, liveChannel, DateInput, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, Chip, ChipRow, Segmented, Pill, Group, Row, Skeleton, Sheet, Steps, PhotoBox, Toggle,

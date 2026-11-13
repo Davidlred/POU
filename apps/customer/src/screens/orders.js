@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, Image, ScrollView, RefreshControl, Linking } from 'react-native';
+import { View, Image, ScrollView, RefreshControl, Linking , Platform } from 'react-native';
+import { Press as Pressable } from '@p360/shared';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../lib/map';
 import { useFocusEffect } from '@react-navigation/native';
 import { usePage, useWide, useTheme, liveChannel, Screen, AppBar, Txt, Button, Card, Hearth, Icon, Banner, Empty, Input, ChipRow, Segmented, Steps, Stars, Pill, Skeleton,
@@ -17,13 +18,13 @@ const orderStatus = (o) => {
 };
 
 // One order in the list: code, status, items, total. Selected (website) = 2 px primary border.
-function OrderCard({ o, selected, onPress, onRate }) {
+function OrderCard({ o, selected, onPress, onRate, flat }) {
   const { c } = useTheme();
   const st = orderStatus(o);
   const unrated = (o.subs || []).find((s) => s.status === 'delivered' && !s.reviewed);
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!selected }}
-      style={({ hovered }) => ({ backgroundColor: c.sf, borderRadius: 20, borderWidth: selected ? 2 : 1, borderColor: selected ? c.yolk : hovered ? c.line2 : c.line, padding: 16, gap: 8 })}>
+      style={({ hovered }) => (flat ? { paddingVertical: 14, paddingHorizontal: 20, gap: 8 } : { backgroundColor: c.sf, borderRadius: 20, borderWidth: selected ? 2 : 1, borderColor: selected ? c.yolk : hovered ? c.line2 : c.line, padding: 16, gap: 8 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Txt v="bold" style={{ flex: 1 }}>{o.code}</Txt>
         {st ? <Pill tone={tone(st)} icon={st === 'out_for_delivery' ? null : undefined} label={STATUS_LABEL[st]} /> : null}
@@ -80,7 +81,12 @@ export function OrdersScreen({ navigation }) {
         <Txt v="display">Orders</Txt>
         {seg}
         {orders === null ? <Skeleton h={110} r={20} /> : !list.length ? empty
-          : list.map((o) => <OrderCard key={o.id} o={o} onPress={() => navigation.navigate('Tracking', { orderId: o.id })} onRate={rate(o)} />)}
+          : Platform.OS !== 'web'
+            // phone app: one edge-to-edge list with dividers
+            ? <View style={[{ backgroundColor: c.sf, borderTopWidth: 1, borderBottomWidth: 1, borderColor: c.line }, { marginHorizontal: -20 }]}>
+                {list.map((o, i) => <View key={o.id} style={{ borderTopWidth: i ? 1 : 0, borderColor: c.line }}><OrderCard flat o={o} onPress={() => navigation.navigate('Tracking', { orderId: o.id })} onRate={rate(o)} /></View>)}
+              </View>
+            : list.map((o) => <OrderCard key={o.id} o={o} onPress={() => navigation.navigate('Tracking', { orderId: o.id })} onRate={rate(o)} />)}
       </ScrollView>
     </Screen>
   );
